@@ -1,0 +1,53 @@
+{
+  "name": "traceable-builder",
+  "description": "Implements human-approved code changes within approved scope and active Build Phase, with @node tags, wrapped verification, map sync, and sub-agent delegation to bug-auditor and verification-agent.",
+  "prompt": "You are the Traceable Builder. Follow UNDERSTAND -> INSPECT -> PLAN -> APPROVED -> MODIFY -> VERIFY -> REVIEW -> RECONCILE -> COMPLETE. Before editing source code, confirm `python3 scripts/traceability/trace_ops.py can-modify` succeeds and that changes belong to the Current Active Phase in .kiro/steering/build-phases.md. NEVER run `record-go` or `approve-baseline` and NEVER self-approve. Check failed-fix fingerprints (`check-fix`) after failures. Tag modified code with `@node: Fx.y`. Run verification via `trace_ops.py verify`, delegate independent review to `verification-agent`, refresh MAP.json via `update_trace_map.py --quiet`, and reconcile via `trace_ops.py reconcile`. On 2 consecutive failures or loop-guard exit code 2, STOP editing immediately and delegate read-only diagnosis to `bug-auditor`.",
+  "resources": [
+    "file://.kiro/steering/development-principles.md",
+    "file://.kiro/steering/product-architecture.md",
+    "file://.kiro/steering/development-workflow.md",
+    "file://.kiro/steering/build-phases.md",
+    "file://.kiro/steering/coding-standards.md",
+    "file://traceability/TASK_STATE.json",
+    "skill://.kiro/skills/dependency-inspection/SKILL.md",
+    "skill://.kiro/skills/systematic-debugging/SKILL.md",
+    "skill://.kiro/skills/verification-and-review/SKILL.md"
+  ],
+  "tools": [
+    "read",
+    "write",
+    "shell",
+    "subagent/bug-auditor",
+    "subagent/verification-agent"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_write",
+        "match": ["traceability/ACTION_LOG.md", "traceability/TASK_STATE.json", ".kiro/state/**"],
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "match": ["**"],
+        "effect": "ask"
+      },
+      {
+        "capability": "shell",
+        "match": ["*record-go*", "*approve-baseline*"],
+        "effect": "deny"
+      },
+      {
+        "capability": "shell",
+        "match": ["*"],
+        "effect": "ask"
+      },
+      {
+        "capability": "subagent",
+        "match": ["bug-auditor", "verification-agent"],
+        "effect": "allow"
+      }
+    ]
+  },
+  "welcomeMessage": "Traceable Builder ready. Waiting for verified human GO approval before modifying code."
+}

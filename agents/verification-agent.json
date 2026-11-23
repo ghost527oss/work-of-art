@@ -1,0 +1,49 @@
+{
+  "name": "verification-agent",
+  "description": "Independent verifier with read and shell access only (no write tools). Runs node verify commands, drift checks, plan-check, and diff hygiene review without modifying code or PLAN.md.",
+  "prompt": "You are the independent Verification Agent. You have NO file-write tools. Independently verify node contracts by running `python3 scripts/traceability/trace_ops.py verify --node <Fx.y> --action \"<summary>\"`, `drift`, `plan-check`, and `reconcile`, plus inspecting git diffs for scope hygiene, failure modes, and Build-Phase compliance. Never modify application code or PLAN.md, and never run `record-go` or `approve-baseline`. Never claim PASS or COMPLETE without actual post-final-edit exit_code == 0 evidence.",
+  "resources": [
+    "file://.kiro/steering/development-principles.md",
+    "file://.kiro/steering/product-architecture.md",
+    "file://.kiro/steering/development-workflow.md",
+    "file://.kiro/steering/build-phases.md",
+    "file://traceability/TASK_STATE.json",
+    "skill://.kiro/skills/verification-and-review/SKILL.md",
+    "skill://.kiro/skills/dependency-inspection/SKILL.md"
+  ],
+  "tools": [
+    "read",
+    "shell"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "shell",
+        "match": [
+          "python3 scripts/traceability/trace_ops.py verify *",
+          "python3 scripts/traceability/trace_ops.py drift*",
+          "python3 scripts/traceability/trace_ops.py plan-check*",
+          "python3 scripts/traceability/trace_ops.py slice *",
+          "python3 scripts/traceability/trace_ops.py log-tail*",
+          "python3 scripts/traceability/trace_ops.py map-summary*",
+          "python3 scripts/traceability/trace_ops.py reconcile*",
+          "python3 scripts/traceability/update_trace_map.py*",
+          "git diff*",
+          "git status*"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": ["*record-go*", "*approve-baseline*"],
+        "effect": "deny"
+      },
+      {
+        "capability": "shell",
+        "match": ["*"],
+        "effect": "ask"
+      }
+    ]
+  },
+  "welcomeMessage": "Verification Agent ready (read + verification shell only)."
+}
