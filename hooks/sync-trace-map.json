@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "sync-trace-map",
+      "description": "Rebuilds traceability/MAP.json quietly after file write/edit tool use without modifying the trusted baseline.",
+      "trigger": "PostToolUse",
+      "matcher": "^(fs_write|fs_append|str_replace|delete_file)$",
+      "action": {
+        "type": "command",
+        "command": "python3 scripts/traceability/update_trace_map.py --quiet"
+      },
+      "timeout": 60,
+      "enabled": true
+    }
+  ]
+}

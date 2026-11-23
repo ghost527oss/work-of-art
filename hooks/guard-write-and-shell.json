@@ -1,0 +1,29 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "pre-write-governance-guard",
+      "description": "Blocks unauthorized source edits, direct tampering with traceability state files, and edits while loop_guard.halt_required is true, while permitting .kiro/specs/ and traceability/PLAN.md during planning.",
+      "trigger": "PreToolUse",
+      "matcher": "^(fs_write|fs_append|str_replace|delete_file)$",
+      "action": {
+        "type": "command",
+        "command": "python3 scripts/traceability/hook_guard.py --mode write"
+      },
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "pre-shell-self-approval-guard",
+      "description": "Blocks shell commands attempting agent self-approval (record-go / approve-baseline) or direct shell tampering with traceability state files.",
+      "trigger": "PreToolUse",
+      "matcher": "^(execute_bash|execute_pwsh)$",
+      "action": {
+        "type": "command",
+        "command": "python3 scripts/traceability/hook_guard.py --mode shell"
+      },
+      "timeout": 10,
+      "enabled": true
+    }
+  ]
+}
