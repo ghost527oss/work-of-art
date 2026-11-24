@@ -1,10 +1,12 @@
-// @node: F1.7
-// Studio STUB for this spec: repository identity, coverage, the inventory, and the session
-// log. The real Studio (preview, action rail) is a later spec. Plain wireframe.
+// @node: F2.7
+// Studio STUB for this spec: repository identity, coverage, the inventory, the session
+// log, and the AI Assistant panel. The real Studio (preview, action rail) is a later spec.
 import { useState } from 'react';
 import { describeTarget, useStudioStore } from '../store/useStudioStore';
 import { formatResetTime } from './LoadingScene';
 import { CoveragePanel } from './CoveragePanel';
+import { AIAssistantPanel } from './AIAssistantPanel';
+import type { AssistantActions } from '../hooks/useAssistant';
 
 const PAGE = 500;
 const LOG_SHOWN = 50;
@@ -15,9 +17,10 @@ export interface StudioLayoutProps {
   onRetry(): void;
   onDismissError(): void;
   onBack(): void;
+  assistant: AssistantActions;
 }
 
-export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack }: StudioLayoutProps) {
+export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant }: StudioLayoutProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const ingestion = useStudioStore((s) => s.ingestion);
   const log = useStudioStore((s) => s.log);
@@ -124,6 +127,8 @@ export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError,
           ))}
         </ol>
       </section>
+
+      <AIAssistantPanel key={snapshot.id} snapshot={snapshot} assistant={assistant} />
     </main>
   );
 }

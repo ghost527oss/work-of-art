@@ -163,3 +163,50 @@ fieldset {
 code {
   font-family: ui-monospace, monospace;
 }
+
+/* @node: F2.7 — AI panel additions. Black and white only, no animation. */
+.assistant {
+  border-top: 2px solid #000;
+  padding-top: 1rem;
+  margin-top: 1.5rem;
+}
+
+.mock-label {
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+.ai-empty,
+.ai-pending {
+  font-style: italic;
+}
+
+.ai-response section {
+  margin-top: 1rem;
+}
+
+.diff-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid #000;
+}
+
+.diff {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  white-space: pre;
+  margin: 0;
+  padding: 0.5rem;
+  overflow: visible;
+}
+
+textarea {
+  width: 100%;
+  max-width: 40rem;
+  padding: 0.5rem;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  resize: vertical;
+}
