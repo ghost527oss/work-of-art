@@ -1,4 +1,6 @@
 // @node: F2.5
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AssistantError,
@@ -266,8 +268,8 @@ describe('requestAssistant: failures', () => {
 
 describe('no browser-side canned response', () => {
   it('aiAssistant.ts does not import mockAssistant or redact mock output', async () => {
-    const src = (await import('node:fs')).readFileSync(
-      new URL('../src/engine/aiAssistant.ts', import.meta.url).pathname, 'utf-8',
+    const src = readFileSync(
+      fileURLToPath(new URL('../src/engine/aiAssistant.ts', import.meta.url)), 'utf-8',
     );
     expect(src).not.toContain("from './mockAssistant'");
     expect(src).not.toContain('from "./mockAssistant"');
