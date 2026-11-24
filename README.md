@@ -4,13 +4,13 @@ A browser-based repository inspection studio. **This build contains repository i
 
 The app never runs the imported code, never writes to GitHub, and never changes the original repository.
 
-## Commands
+## Development
 
 ```bash
 npm install
-npm run dev        # Vite dev server; serves /api/repo itself, no Vercel CLI needed
+npm run dev        # Serves /api/repo and /api/assistant without the Vercel CLI
 npm run typecheck
-npm test           # vitest, offline: every GitHub call is mocked
+npm test           # Offline; every GitHub and AI call is mocked
 npm run build
 ```
 
@@ -48,6 +48,24 @@ tests/               offline unit tests
 traceability/        PLAN.md
 ```
 
-## Status
+## AI Assistant (AI_MODE)
+
+The AI Assistant endpoint is at `POST /api/assistant`. It is controlled by the `AI_MODE` environment variable on the server:
+
+| `AI_MODE` | Behaviour |
+|---|---|
+| unset or blank | Same as `mock` |
+| `mock` | Returns instant, canned mock responses. No AI model is called. No data leaves your server. |
+| `live` or any other value | Returns `501 unsupported` immediately, before reading the request body. No key is read; no network call is made. |
+
+**Phase 1 (current):** only `mock` works. Live AI (Phase 3) will add a free-tier provider chain behind this same endpoint. Setting `AI_MODE=live` now returns `unsupported`.
+
+The endpoint:
+- Reads `AI_MODE` only from environment variables. No other env key is accessed.
+- Makes zero outbound network requests.
+- Logs only the error code and task type, never the instruction, file paths, or file content.
+- Redacts likely secrets from request fields before building any response.
+
+
 
 Verified by automated tests and by a headless-browser run. **Not yet verified:** a real Vercel deployment (including request cancellation), branch names containing `/` on the tree endpoint, and a physical phone.

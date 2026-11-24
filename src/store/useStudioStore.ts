@@ -22,6 +22,8 @@ import {
   type SessionLogEntry,
 } from '../types/contracts';
 
+import { idleAI, type AIState } from './aiSlice';
+
 export type ExperienceStage = 'start' | 'loading' | 'studio';
 export type IngestionStatus = 'idle' | 'running' | 'failed' | 'done';
 export type StageStatus = 'pending' | 'active' | 'done' | 'skipped' | 'failed' | 'not_available';
@@ -54,6 +56,7 @@ export interface StudioState {
   experience: ExperienceStage;
   ingestion: IngestionState;
   snapshot?: RepoSnapshot;
+  ai: AIState;
   log: SessionLogEntry[];
   logSeq: number;
 }
@@ -79,7 +82,7 @@ function idleIngestion(runId: number): IngestionState {
 }
 
 export function initialState(): StudioState {
-  return { experience: 'start', ingestion: idleIngestion(0), log: [], logSeq: 0 };
+  return { experience: 'start', ingestion: idleIngestion(0), ai: idleAI(), log: [], logSeq: 0 };
 }
 
 export function describeTarget(target: IngestTarget): string {
@@ -87,10 +90,11 @@ export function describeTarget(target: IngestTarget): string {
   return `${target.owner}/${target.repo}${target.ref ? `@${target.ref}` : ''}`;
 }
 
-function withLog(
+/** @internal Exported for aiActions.ts only. Do not use elsewhere. */
+export function withLog(
   state: StudioState,
   now: number,
-  entry: { action: string; status: SessionLogEntry['status']; message: string },
+  entry: { action: string; status: SessionLogEntry['status']; message: string; affectedPaths?: string[] },
 ): Pick<StudioState, 'log' | 'logSeq'> {
   const logSeq = state.logSeq + 1;
   const next: SessionLogEntry = {
@@ -98,7 +102,7 @@ function withLog(
     timestamp: now,
     action: entry.action,
     status: entry.status,
-    affectedPaths: [],
+    affectedPaths: entry.affectedPaths ?? [],
     message: entry.message,
     redacted: false,
   };
@@ -127,7 +131,7 @@ export function beginIngestion(
 ): StudioState {
   if (state.ingestion.status === 'running') return state;
   const background = options.keepSnapshot === true && state.snapshot !== undefined;
-  const base: StudioState = background ? state : { ...state, snapshot: undefined };
+  const base: StudioState = background ? state : { ...state, snapshot: undefined, ai: idleAI() };
   return {
     ...base,
     experience: background ? 'studio' : 'loading',
@@ -186,6 +190,7 @@ export function completeIngestion(state: StudioState, runId: number, snapshot: R
     ...state,
     experience: 'studio',
     snapshot,
+    ai: idleAI(),
     ingestion: { ...ing, status: 'done', background: false },
     ...withLog(state, now, {
       action: 'ingest_completed',
@@ -217,7 +222,7 @@ export function cancelIngestion(state: StudioState, now: number): StudioState {
   if (state.ingestion.background && state.snapshot) {
     return { ...state, experience: 'studio', ingestion: { ...idleIngestion(state.ingestion.runId), status: 'done' }, ...log };
   }
-  return { ...state, experience: 'start', snapshot: undefined, ingestion: idleIngestion(state.ingestion.runId), ...log };
+  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), ingestion: idleIngestion(state.ingestion.runId), ...log };
 }
 
 /**
@@ -231,7 +236,7 @@ export function dismissError(state: StudioState): StudioState {
 
 /** Returns to the Start screen and clears the snapshot. The session log is kept. */
 export function reset(state: StudioState): StudioState {
-  return { ...state, experience: 'start', snapshot: undefined, ingestion: idleIngestion(state.ingestion.runId) };
+  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), ingestion: idleIngestion(state.ingestion.runId) };
 }
 
 // ---------------------------------------------------------------------------
