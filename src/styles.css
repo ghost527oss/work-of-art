@@ -1,0 +1,165 @@
+/* @node: F1.7 */
+/* Phase 1 wireframe: black on white only. No colors, no animation, no images. */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #000;
+  background: #fff;
+}
+
+.screen {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+}
+
+section,
+header {
+  margin-bottom: 1.5rem;
+}
+
+label {
+  display: block;
+  font-weight: bold;
+}
+
+input[type='text'],
+select {
+  width: 100%;
+  max-width: 40rem;
+  padding: 0.5rem;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+  font: inherit;
+}
+
+select {
+  width: auto;
+  max-width: 100%;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled {
+  color: #000;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+fieldset:disabled {
+  color: #000;
+}
+
+:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 2px;
+}
+
+.note {
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+.error {
+  min-height: 1.5rem;
+  font-weight: bold;
+}
+
+.start form {
+  margin-top: 1rem;
+}
+
+.start input[type='text'] {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.secondary {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #000;
+  font-size: 0.875rem;
+}
+
+.secondary label {
+  display: inline;
+  font-weight: normal;
+}
+
+.stages {
+  padding-left: 1.5rem;
+}
+
+.stages li {
+  margin-bottom: 0.25rem;
+}
+
+.error-panel {
+  padding: 1rem;
+  border: 2px solid #000;
+}
+
+.banner {
+  padding: 0.5rem;
+  border: 1px dashed #000;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #000;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.table-wrap {
+  max-height: 24rem;
+  overflow: auto;
+  border: 1px solid #000;
+}
+
+fieldset {
+  border: 2px solid #000;
+}
+
+.check {
+  display: block;
+  font-weight: normal;
+}
+
+.log {
+  padding-left: 1.5rem;
+  font-size: 0.875rem;
+}
+
+code {
+  font-family: ui-monospace, monospace;
+}
