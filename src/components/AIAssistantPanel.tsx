@@ -166,7 +166,7 @@ export function AIAssistantPanel({ snapshot, assistant }: Props) {
           <p>
             <strong>{ai.error.code}</strong>: {ai.error.message}
           </p>
-          <button type="button" onClick={() => setInlineError('')}>Retry</button>
+          <button type="button" onClick={assistant.clear}>Retry</button>
         </div>
       )}
     </section>

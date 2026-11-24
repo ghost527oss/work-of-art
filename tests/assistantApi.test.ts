@@ -368,6 +368,25 @@ describe('default export', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 12b. Redaction is applied server-side (mutation-catch test)
+// ---------------------------------------------------------------------------
+
+describe('redaction applied server-side', () => {
+  it('the redactionCount note appears in the result when secrets are present', async () => {
+    const SECRET = `ghp_${'Y'.repeat(36)}`;
+    const instruction = `Context: ${SECRET}`;
+    const [req, env] = post({ ...baseReq, instruction });
+    const res = await handleAssistantRequest(req, env);
+    expect(res.status).toBe(200);
+    const result = await json(res) as { response?: { limitations?: string[]; risks?: string[] } };
+    // The mock responder adds a "N likely secrets were redacted" note when redactionCount > 0
+    const allText = JSON.stringify(result);
+    expect(allText).toContain('likely secret');
+    expect(allText).not.toContain(SECRET);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 13. Prompt injection fixture
 // ---------------------------------------------------------------------------
 
