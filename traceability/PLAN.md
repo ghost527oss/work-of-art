@@ -102,9 +102,9 @@ Contract: A user-chosen request goes to `POST /api/assistant` and gets back a de
 - Inputs: a validated, redacted `AIRequest` and a redaction count
 - Outputs: a deterministic `AIResponse`; a one-line-insert unified diff
 - Invariants: pure (no clock, randomness, or environment); never echoes the instruction; response type follows the selected-file-count rule; mock notice is the first `limitations` or `risks` entry; the diff is valid, inserts one line, removes none, touches only the selected path, and applies to the redacted content
-- Files: `src/engine/unifiedDiff.ts`, `src/engine/mockAssistant.ts`, `tests/helpers/applyDiff.ts`, `tests/mockAssistant.test.ts`
+- Files: `src/engine/unifiedDiff.ts`, `src/engine/mockAssistant.ts`, `tests/helpers/applyDiff.ts`, `tests/unifiedDiff.test.ts`, `tests/mockAssistant.test.ts`
 - Depends on: F2.1, F2.2
-- verify: `npx vitest run tests/mockAssistant.test.ts`
+- verify: `npx vitest run tests/unifiedDiff.test.ts tests/mockAssistant.test.ts`
 
 ### F2.4 — `/api/assistant` endpoint and dev routes
 - Inputs: HTTP request, environment (`AI_MODE` only)
@@ -134,7 +134,7 @@ Contract: A user-chosen request goes to `POST /api/assistant` and gets back a de
 - Inputs: the store, the assistant controller
 - Outputs: the wireframe panel and response view in the Studio stub
 - Invariants: always labelled mock; all text rendered as text, never HTML; no Apply, Approve, or Reject control; no color or animation; works by keyboard and touch; empty, pending, error, and cancel states; no horizontal page overflow at 375 px
-- Files: `src/components/AIAssistantPanel.tsx`, `src/components/AIResponseView.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/styles.css`
+- Files: `src/components/AIAssistantPanel.tsx`, `src/components/AIResponseView.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/styles.css`, `vite.config.ts` (vitest include line), `tests/aiResponseView.test.tsx`
 - Depends on: F2.6
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): headless browser run for all four response types plus error, empty, pending, and cancel; zero console errors
