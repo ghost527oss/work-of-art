@@ -352,3 +352,77 @@ export function assertCoverageConsistent(snapshot: RepoSnapshot): void {
     throw new Error(`Coverage inconsistent:\n- ${problems.join('\n- ')}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// @node: F2.1 — AI Adapter contracts
+// ---------------------------------------------------------------------------
+
+export const AITaskTypeSchema = z.enum(['explain', 'suggest_change', 'review_finding']);
+export type AITaskType = z.infer<typeof AITaskTypeSchema>;
+
+const MAX_STR = 2000;
+const MAX_QUESTIONS = 5;
+const MAX_STEPS = 12;
+const MAX_RISKS = 8;
+const MAX_TESTS = 8;
+const MAX_LIMITATIONS = 8;
+
+// Bounded string helper
+const bstr = z.string().min(1).max(MAX_STR);
+
+/** A single sourceContext item. Strict: no extra fields. */
+const SourceContextItemSchema = z.strictObject({
+  filePath: z.string().min(1).max(250),
+  content: z.string(),
+});
+
+/**
+ * AI Assistant request. Strict: unknown fields are rejected so the server
+ * never accidentally proxies extra data to any future provider.
+ */
+export const AIRequestSchema = z.strictObject({
+  requestId: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/, 'requestId must be A-Z a-z 0-9 _ -'),
+  instruction: z.string().min(1).max(MAX_STR),
+  taskType: AITaskTypeSchema,
+  selectedPaths: z.array(z.string().min(1).max(250)).max(10),
+  sourceContext: z.array(SourceContextItemSchema).max(5).optional(),
+});
+export type AIRequest = z.infer<typeof AIRequestSchema>;
+
+/** Four response shapes, each identified by `type`. */
+export const AIResponseSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('clarification'),
+    questions: z.array(bstr).min(1).max(MAX_QUESTIONS),
+  }),
+  z.object({
+    type: z.literal('explanation'),
+    summary: bstr,
+    evidencePaths: z.array(z.string().min(1).max(250)),
+    limitations: z.array(bstr).min(1).max(MAX_LIMITATIONS),
+  }),
+  z.object({
+    type: z.literal('plan'),
+    summary: bstr,
+    affectedPaths: z.array(z.string().min(1).max(250)),
+    steps: z.array(bstr).min(1).max(MAX_STEPS),
+    risks: z.array(bstr).min(1).max(MAX_RISKS),
+  }),
+  z.object({
+    type: z.literal('patch_proposal'),
+    summary: bstr,
+    affectedPaths: z.array(z.string().min(1).max(250)),
+    unifiedDiff: z.string().min(1),
+    tests: z.array(bstr).min(1).max(MAX_TESTS),
+    risks: z.array(bstr).min(1).max(MAX_RISKS),
+  }),
+]);
+export type AIResponse = z.infer<typeof AIResponseSchema>;
+
+/** Envelope returned by POST /api/assistant. Strict: no extra fields. */
+export const AIResultSchema = z.strictObject({
+  requestId: z.string().min(1).max(64),
+  mode: z.enum(['mock', 'live']),
+  response: AIResponseSchema,
+});
+export type AIResult = z.infer<typeof AIResultSchema>;
