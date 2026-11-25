@@ -142,3 +142,55 @@ Contract: A user-chosen request goes to `POST /api/assistant` and gets back a de
 ### F2 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Phase 1 core-loop evidence (with F1): live dev-server run of all four request shapes with no unhandled server error
+
+---
+
+> plan_id: `P2A-SHELL` — Studio Shell (spec `.kiro/specs/03-studio-shell/`). Active product phase: Phase 2, Sub-phase 2A. Status: draft for approval; no node is approved for modification. Black-and-white wireframe, no animation, `AI_MODE=mock` only, no new dependency. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F3 — Studio Shell
+Contract: The Studio screen has a left area, a vertical 6-button toolbar on the far right edge, and one right-hand panel that opens, closes, collapses, and switches between two widths. Skeleton Crew (Screen 4) and Domain Debugging (Screen 5) exist as empty pages without the toolbar. The panel layout is saved in browser storage and restored. The current screen is kept as plain data in a store so the whole session (repository address, screen, layout, edits, Log, History) can be saved and restored by a later sub-phase; 2A saves only the layout. Existing Studio features and the AI panel keep working. No action list, chat commands, scanner, sandbox, or editor.
+
+### F3.1 — Layout state, saved layout, store and hook
+- Inputs: panel and width actions; a storage object
+- Outputs: `LayoutState { openPanel, collapsed, width }`, saved record, `layoutStore`, `useLayout`, `useLayoutPersistence`
+- Invariants: `collapsed` implies a panel is open; a no-op returns the same object; the saved record has exactly four fields plus a version and is under 200 bytes; bad, missing, oversized, or old data gives the default; blocked or full storage never throws or shows an error; no repository data, text, or secret is stored; slice and storage files import nothing from React, the engine, `api/`, or the AI store
+- Files: `src/store/layoutSlice.ts`, `src/store/layoutStorage.ts`, `src/hooks/useLayout.ts`, `tests/layoutState.test.ts`, `tests/layoutStorage.test.ts`
+- Depends on: F1.7 (`createStore`)
+- verify: `npm run typecheck && npx vitest run tests/layoutState.test.ts tests/layoutStorage.test.ts`
+
+### F3.2 — Screen navigation and screen store
+- Inputs: navigation actions; the experience stage
+- Outputs: `ShellView` (studio, skeleton, domain with an area) as plain data, `AREAS`, `toolbarVisible`, `viewWhenStudio`, `shellStore`, `useShellView`, `shellActions`, `useShellReset`
+- Invariants: the pure file imports nothing from React, the engine, or the stores; a move that is not allowed returns the same object; the toolbar is visible only on the Studio screen; the view is plain data that survives a JSON round trip; the view lives in a store, not a component, so a restore step can set it; it returns to the Studio screen only when the experience leaves `studio`; not saved in 2A and no browser storage use
+- Files: `src/store/shellView.ts`, `src/hooks/useShell.ts`, `tests/shellView.test.ts`
+- Depends on: none
+- verify: `npm run typecheck && npx vitest run tests/shellView.test.ts`
+
+### F3.3 — Toolbar, panel frame, placeholder panel
+- Inputs: props only
+- Outputs: `StudioToolbar` (Edit, AI Chat, Log, History, Journal, Skeleton Crew), `PanelFrame` (collapse, width, close, closed), `PlaceholderPanel`, shell CSS
+- Invariants: six buttons in fixed order; `aria-pressed` on the five panel buttons; the panel body stays mounted when collapsed or closed; text rendered as text; black and white only, no transition or animation; no Apply, Approve, Reject, Pause, Resume, or Stop control
+- Files: `src/components/StudioToolbar.tsx`, `src/components/PanelFrame.tsx`, `src/components/PlaceholderPanel.tsx`, `src/styles.css`, `tests/studioShell.test.tsx`
+- Depends on: F3.1
+- verify: `npm run typecheck && npx vitest run tests/studioShell.test.tsx`
+
+### F3.4 — Screens 4 and 5
+- Inputs: props only
+- Outputs: `SandboxPlaceholder`, `SkeletonCrewScreen`, `DomainScreen`
+- Invariants: plain text and buttons only; no toolbar; area names come from `AREAS`; black and white only
+- Files: `src/components/SandboxPlaceholder.tsx`, `src/components/SkeletonCrewScreen.tsx`, `src/components/DomainScreen.tsx`, `src/styles.css`, `tests/screens.test.tsx`
+- Depends on: F3.2, F3.3
+- verify: `npm run typecheck && npx vitest run tests/screens.test.tsx tests/studioShell.test.tsx`
+
+### F3.5 — Studio rewiring
+- Inputs: the existing store, layout store, snapshot, existing callbacks
+- Outputs: the new Studio screen with Project info in the left area, the Log panel, and the AI panel kept mounted behind the AI Chat button
+- Invariants: every existing Studio behavior and text is kept (scoped reload, cancel, retry, dismiss, Back to Start, coverage, inventory, log); the AI panel never unmounts while the Studio screen is shown; leaving Studio returns to Screen 3 and a remount or background reload keeps the screen; the Studio reads the snapshot, screen, and layout only from stores (session restore later needs no change here); Back to Start does not reset the layout; no existing test is edited
+- Files: `src/components/ProjectInfo.tsx`, `src/components/LogPanel.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/styles.css`, `tests/studioLayout.test.tsx`
+- Depends on: F3.1, F3.2, F3.3, F3.4, F2.7
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- manual gate (Unverified until run): headless browser run of every item in `requirements.md` section 6, item 7; zero console errors
+
+### F3 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Sub-phase 2A gate (build-phases.md): layout survives refresh; rapid clicks cause no desync

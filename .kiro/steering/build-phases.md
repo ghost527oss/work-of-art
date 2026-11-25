@@ -4,7 +4,7 @@ inclusion: always
 
 # 5-Phase Product Build Strategy
 
-Current Active Phase: Phase 2
+Current Active Phase: Phase 2 (Sub-phase 2A)
 
 ## 1. Hard Gates & Phase Precedence (Non-Negotiable)
 1. **Strict Phase Boundary:** Design, spec, and implement **ONLY** what belongs to `Current Active Phase` above. Never build features, install libraries, or write styles belonging to a later phase.
@@ -24,14 +24,29 @@ Current Active Phase: Phase 2
   - Frontend triggers backend endpoints and renders Mock AI payloads cleanly.
   - Zero browser console errors and zero unhandled server errors across the core request loop.
 
-### Phase 2: Movement & Interactive Controls
-- **Allowed Scope:**
-  - Interactive frontend mechanics and layout movement (repositioning/sliding panels, moving elements, collapsible workspaces).
-  - Execution controls: pause/resume loop, step-by-step inspection, manual edit, and approve/reject actions synced with backend state.
-- **Forbidden in Phase 2:** Visual theming, decorative styling, custom SVG polishing, or real LLM API calls.
-- **Phase-Exit Test Gate:**
-  - Every interactive control (move, pause, resume, inspect, approve/reject) updates state predictably.
-  - State survives a page refresh and handles rapid repeated clicks without desyncing or crashing.
+### Phase 2: Movement, Interactive Controls & Debugging Workspace
+Phase 2 is built in sub-phases 2A to 2F, one at a time. Design, spec and implement ONLY the
+Current Active Sub-phase. The human advances sub-phases, never the agent.
+Each sub-phase has its own spec and test gate. All PatchBay screens stay black-and-white
+wireframe. The Edit pad's colour tools only change the imported app's elements, never PatchBay's own screens.
+
+- **Allowed in all of Phase 2:**
+  - Interactive layout: collapsible and sliding panels, saved layout.
+  - One safe action list (pause, resume, stop, step, approve, reject, undo, redo, open panel,
+    edit practice copy) used by the AI Chat harness. Chat-driven control; no separate pause/resume buttons.
+  - Browser storage for layout, log, and history. Never store secrets or whole repositories.
+  - Offline (no AI) file sorting, connection map, skill-book scanner, and Journal content.
+  - Locked-down sandbox preview and the visual Edit pad (Screen 3 only).
+  - AI Chat in `AI_MODE=mock` only.
+- **Forbidden in Phase 2:** real LLM calls or keys, PatchBay's own colours/themes/animations/SVG polish,
+  running imported backend servers or databases, pushing to GitHub, new runtime dependencies without approval.
+- **Sub-phases and gates:**
+  - 2A Studio shell: toolbar, panels, saved layout, Screens 4 and 5 as empty pages. Gate: layout survives refresh; rapid clicks cause no desync.
+  - 2B Action harness: chat commands, practice run, Log, History with Undo/Redo, Automation/Self-editing modes. Gate: every command updates state predictably, survives refresh, handles repeated commands.
+  - 2C Project understanding: file sorting with confidence and reasons, user corrections, connection map. Gate: no guessed labels; low-confidence files go to Needs Review.
+  - 2D Scanner and Skeleton Crew: four-area scanner, findings with proof and honest fix labels, Screens 4 and 5. Gate: every finding shows file, lines, snippet and reason; no invented scores.
+  - 2E Sandbox and Edit pad: three display modes, isolation, visual editing, layout checks, three change layers. Gate: imported code cannot read PatchBay data, cookies or secrets, or load external scripts.
+  - 2F Journal and export: three reading levels, log and change export, full Phase 2 test. Gate: all earlier gates pass again, zero console errors.
 
 ### Phase 3: Automation & Auto-Fix (`AI_MODE=live`)
 - **Allowed Scope:**
