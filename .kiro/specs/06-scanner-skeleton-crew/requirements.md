@@ -16,7 +16,7 @@ In simple words: PatchBay reads your code with a checklist, shows every problem 
 - **Findings with proof:** every finding has the file, the line range, a short code snippet (secrets hidden), a plain-English explanation, why it matters, a plan for fixing it, a severity, and an honest fix label (Auto-supported, Guided, or Explanation only).
 - **No fake scores:** only real counts by severity, by area, and by fix label, plus what was and was not checked.
 - **The scan run:** automatic when you open Screen 4, batched and cancellable, with partial results marked clearly. After you approve or undo a fix, the affected files are checked again.
-- **The Skeleton Crew run:** started by typing `start crew`. It reuses the 2B run controls (`pause`, `resume`, `step`, `stop`, `approve`, `reject`, `undo`, `redo`). It narrates each step, proposes the one kind of fix that is safe to automate, and verifies it by checking the file again.
+- **The Skeleton Crew run:** started by pressing **Start Crew** on Screen 4 or by typing `start crew` in the command box. It reuses the 2B run controls (`pause`, `resume`, `step`, `stop`, `approve`, `reject`, `undo`, `redo`). It narrates each step, proposes the one kind of fix that is safe to automate, and verifies it by checking the file again.
 - **Screen 4:** the four-area map (a plain-text wireframe), the helper groups, the four worker slots, and the scan summary.
 - **Screen 5:** one area's findings, a finding detail view, the crew's narration, the pending proposal card, and the changes made.
 - **A command box** on Screens 4 and 5 (the toolbar is hidden there), so the commands, Approve, and Reject still work.
@@ -103,14 +103,14 @@ In simple words: PatchBay reads your code with a checklist, shows every problem 
 8. THE results SHALL be deterministic: sorted by severity (High first), then path, then line, then skill id.
 
 ### R6. The Skeleton Crew run
-1. WHEN the user types `start crew` (R6.8), THE SYSTEM SHALL build a **crew script** from the current findings and start a run with the 2B run controls. `start` alone still starts the 2B practice run and is unchanged.
+1. WHEN the user types `start crew` (R6.8) or presses the **Start Crew** button on Screen 4 (R8.9), THE SYSTEM SHALL build a **crew script** from the current findings and start a run with the 2B run controls. `start` alone still starts the 2B practice run and is unchanged.
 2. THE system SHALL refuse `start crew` when no scan is `done` ("Open Skeleton Crew and wait for the scan first."), when a run is already active, when the mode is Self-editing ("Close the Edit panel first."), or when no snapshot is loaded.
 3. THE script SHALL contain, in this order: an intro step; then for each area in the order Frontend, Backend, Security, APIs & Data, an area step and then one step per finding **whose primary area is that area** (so no finding is narrated twice), sorted by severity, path, and line, at most 12 findings per area; and a finish step. A finding with an Auto-supported fix that passes the safety check (R7.2) adds a `propose` step and a `verify` step right after its step. The script is capped at 150 steps. WHEN findings were left out, THE area step and the finish step SHALL say how many and why.
 4. EACH step SHALL write narration to the Log in plain sentences: what it is checking ("Checking <check title> in <path>, lines <a> to <b>."), what is wrong ("Problem: <explanation>"), and what it plans to do ("Plan: <first how step>" for Guided, "Plan: <fix description>" for Auto-supported, "No fix is offered; <why it matters>" for Explanation only). Narration SHALL contain no code lines.
 5. THE worker slots on Screen 4 SHALL show, for each area, one of: "Waiting", "Checking <check title>", "Waiting for your decision", "Done: <n> findings", or "Paused". Only one worker is active at a time. THE page SHALL say "Workers take turns in this version."
 6. THE run states, the tick, `autoAdvance`, pause, resume, step, stop, Edit auto-pause, and refusals SHALL be exactly those of 2B (R2 and R3 of that spec). The crew tick is 1.0 second (provisional).
 7. THE crew SHALL NEVER change anything without a decision. A `propose` step creates a proposal and the run waits (R7).
-8. THE command `start` SHALL accept one optional word, `practice` or `crew`. `start` and `start practice` start the practice run. `start crew` starts the crew. Any other word is refused with "Use: start, start practice, or start crew."
+8. THE button and the typed command SHALL be the same action: the button calls the same function as the command and gets the same refusals. THE command `start` SHALL accept one optional word, `practice` or `crew`. `start` and `start practice` start the practice run. `start crew` starts the crew. Any other word is refused with "Use: start, start practice, or start crew."
 9. WHEN the crew run finishes or is stopped, THE Log SHALL say how many findings were narrated, how many fixes were approved, and how many were rejected.
 10. THE crew run and its pending proposal SHALL NOT be saved. After a refresh the run is gone and the findings are scanned again. The approved changes in History are restored by 2B.
 
@@ -132,6 +132,7 @@ In simple words: PatchBay reads your code with a checklist, shows every problem 
 6. THE screen SHALL show the crew's current narration (last 5 lines) and the pending proposal card, if any.
 7. THE screen SHALL show the "what was and was not checked" block (R4.3) in a collapsible section, closed by default.
 8. **Back to Studio** SHALL return to Screen 3.
+9. THE screen SHALL show a **Start Crew** button near the worker slots. The button SHALL be enabled only when the scan is `done` and not out of date, no run is active, and the Edit panel is closed. WHEN it is disabled, the reason SHALL be written beside it in plain words ("Wait for the scan to finish.", "A run is already active.", "Scan again: labels changed.", "Close the Edit panel first."). Pressing it SHALL start the same crew run as `start crew` and its reply SHALL appear in the command box replies. There SHALL be no Pause, Resume, or Step button; those stay typed commands.
 
 ### R9. Screen 5 (Domain Debugging)
 1. THE screen SHALL keep the left Sandbox placeholder and show on the right: the area name as heading, the Stop bar above, the command box, and **no toolbar**.
@@ -176,7 +177,7 @@ In simple words: PatchBay reads your code with a checklist, shows every problem 
 | A limit reached | Partial line with one reason per limit. |
 | Labels changed after a scan | "Out of date: labels changed." and Scan again. |
 | A check fails on a file | Listed under "Could not be checked". The scan continues. |
-| `start crew` with no finished scan | Refused with the reason. |
+| `start crew` with no finished scan | Refused with the reason. The Start Crew button is disabled with the same reason beside it. |
 | `start crew` with no findings | The crew run is allowed and finishes after the intro and finish steps, saying "No findings to go through." |
 | Auto fix cannot be built safely | The finding shows as Guided with the note. |
 | Proposal diff no longer applies at approval | 2B behavior: Log "failed", proposal stays waiting. |
@@ -206,9 +207,11 @@ The spec is satisfied when all of the following hold:
 
 ## 7. Open questions for approval
 
+**Status: all nine approved by the user. Question 3 was approved as "both" (a button and the typed command).**
+
 1. **The 16 checks (R2).** Three with Frontend as the main area, four Backend, six Security, and three APIs & Data. They are a small, honest first set. Left out on purpose: layout overflow (2E, measured in the sandbox), data-shape mismatch, and anything that needs running the code. Approve this list, or add or remove checks?
 2. **Only one fix is automatic (R7.1).** Adding `rel="noopener noreferrer"` to links that open a new tab. Everything else is explained, not changed. Approve, or do you want a second automatic fix in version 1?
-3. **How the crew starts (R6.1, R6.8).** You type `start crew` (and `start` alone stays the 2B practice run). Approve, or should the crew start from a button on Screen 4?
+3. **How the crew starts (R6.1, R6.8, R8.9).** Decided: **both**. A Start Crew button on Screen 4 and the typed `start crew`, which are the same action. `start` alone stays the 2B practice run.
 4. **Workers take turns (R6.5).** Four worker slots, one per area, but only one works at a time, because the run is one step at a time. Approve?
 5. **A command box on Screens 4 and 5 (R10).** The toolbar is hidden there, so a one-line command box keeps `pause`, `resume`, `approve`, and the rest working. Approve?
 6. **The scan runs when Screen 4 opens (R5.1),** not during loading, so loading stays fast. The Security row in Project info shows "pending scan (2D)" until then, then the count. Approve?

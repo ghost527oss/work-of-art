@@ -11,7 +11,7 @@ Implements `requirements.md` in this folder. Active product phase: **Phase 2, Su
 | 2B | One run machine and one proposal slot with Approve, Reject, Undo, Redo, Stop, and Edit auto-pause. The crew reuses them. |
 | 2C | Labels (with your corrections) decide which checks run. Connections feed the route-mismatch check, the links table, and the request trace. Security was left for 2D. |
 | 2A | Screens 4 and 5 are empty pages with no toolbar. 2D fills them. |
-| Requirements section 7 (pending your answers) | 16 checks. One automatic fix. `start crew`. Workers take turns. A command box on Screens 4 and 5. Scan when Screen 4 opens. Findings can be in several areas. Crew run is not saved. Provisional limits. |
+| Requirements section 7 (all approved) | 16 checks. One automatic fix. `start crew` **and** a Start Crew button. Workers take turns. A command box on Screens 4 and 5. Scan when Screen 4 opens. Findings can be in several areas. Crew run is not saved. Provisional limits. |
 
 ## 2. Phase 2D compliance
 
@@ -20,7 +20,7 @@ Implements `requirements.md` in this folder. Active product phase: **Phase 2, Su
 | Design only the Current Active Sub-phase (2D) | Scanner, findings, crew run, Screens 4 and 5, command box. No sandbox, no editor, no Journal, no restore. |
 | Offline skill-book scanner, no AI | Pure functions over the loaded files. No network, no AI import. |
 | Browser storage never holds secrets or whole repositories | Nothing new is saved. History (2B) saves small diffs, guarded by a secret check. |
-| Safe action list, chat-driven control | `start crew` and the existing 2B words. Buttons only for Stop, Approve, Reject (2B) plus scan Cancel and Scan again. |
+| Safe action list, chat-driven control | `start crew` and the existing 2B words. Buttons only for Stop, Approve, Reject (2B), plus Start Crew (the same action as `start crew`, approved by you), scan Cancel and Scan again. |
 | Black-and-white wireframe, no animation | The map is boxes and a table. The drawn web waits for Phase 4. |
 | No new runtime dependency | None. |
 
@@ -46,11 +46,11 @@ All paths are relative to `work-of-art/`.
 | `src/engine/scanFrontend.ts`, `scanBackend.ts`, `scanSecurity.ts`, `scanApi.ts` | The check functions by area. Each is `(file, ctx) => RawFinding[]`. Pure. |
 | `src/engine/scanFix.ts` | `buildTargetBlankFix(content, finding)` and `buildFixProposal(finding, content)` with the safety conditions (section 8). Pure. |
 | `src/engine/scanProject.ts` | `scanProject(snapshot, understanding, effective, options)` (batched async), `rescanPaths(result, ...)` (sync, incremental), `scanFile(...)`. |
-| `src/engine/scanView.ts` | Pure view helpers: `countsBy`, `areaCounts`, `filterFindings`, `linksBetweenAreas`, `workerSlots`, `whatWasChecked`. |
+| `src/engine/scanView.ts` | Pure view helpers: `countsBy`, `areaCounts`, `filterFindings`, `linksBetweenAreas`, `workerSlots`, `crewStartState`, `whatWasChecked`. |
 | `src/engine/crewScript.ts` | `buildCrewScript(findings)` and `narrate(step, finding)`. Pure. |
 | `src/store/scanSlice.ts`, `scanActions.ts` | Types, pure transitions, and whole-state actions with Log entries for the `scan` state. |
 | `src/hooks/useScan.ts` | `createScanController(...)` (ensure, run, cancel) and `useScan()`. |
-| `src/components/AreaMap.tsx`, `WorkerSlots.tsx`, `ScanSummary.tsx`, `WhatWasChecked.tsx` | Screen 4 parts. Props only. |
+| `src/components/AreaMap.tsx`, `WorkerSlots.tsx`, `StartCrewButton.tsx`, `ScanSummary.tsx`, `WhatWasChecked.tsx` | Screen 4 parts. Props only. |
 | `src/components/FindingsTable.tsx`, `FindingDetail.tsx`, `CrewNarration.tsx`, `RequestTrace.tsx`, `ChangesMade.tsx` | Screen 5 parts. Props only. |
 | `src/components/CommandBar.tsx` | The one-line command box for Screens 4 and 5. Props only. |
 | Tests | `scanSkills`, `scanChecks` (one group per check), `scanSecrets`, `scanFix`, `scanProject`, `scanSamples`, `scanView`, `crewScript`, `crewRun`, `crewStorage`, `scanController` (`*.test.ts`); `crewUi` (`*.test.tsx`). |
@@ -243,7 +243,7 @@ Left: the Sandbox placeholder. Right, top to bottom:
 2. `CommandBar`.
 3. Scan state line: "Scanning N of M files." with **Cancel**; "Scan is up to date: <n> findings from 16 checks over <m> files."; "Scan was cancelled." with **Scan again**; failure message with **Scan again**; "Out of date: labels changed." with **Scan again**; "Project understanding is not ready, so the scan cannot start." with **Try again**. A "Partial result: <reasons>" line when partial.
 4. **Map** (`AreaMap`): four bordered boxes in a 2-by-2 grid: area name, file count (Security: "all code files"), "High n, Medium n, Low n" or "No findings from the checks that ran.", and **Open**. Under it the **Links between areas** table, and the helper-group line.
-5. **Worker slots** (`WorkerSlots`): four boxes "Frontend crew", "Backend crew", "Security crew", "APIs & Data crew", each with its status text, and the sentence "Workers take turns in this version."
+5. **Worker slots** (`WorkerSlots`): four boxes "Frontend crew", "Backend crew", "Security crew", "APIs & Data crew", each with its status text, and the sentence "Workers take turns in this version." Beside them the **Start Crew** button (`StartCrewButton`, props `{ enabled, reason, onStart }`). `enabled` and `reason` come from a pure helper `crewStartState(state)` in `scanView.ts` that applies the same refusal rules as `runCommand('start', 'crew')`, so the button and the command cannot disagree. `onStart` calls `harness.run('start', 'crew')`, the same path as the typed command.
 6. **Crew narration** (last 5 lines) and the **proposal card** when one is pending (2B `ProposalCard`).
 7. **What was and was not checked** (`WhatWasChecked`, a closed `details`): files scanned and not read, the 16 checks by title with their area and fix label, file types with no checks, and the three "not checked" lines (layout overflow in 2E, data shapes, imported code is never run).
 
