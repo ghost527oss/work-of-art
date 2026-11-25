@@ -226,7 +226,7 @@ This section records what 2A leaves ready, so the later sub-phase can add restor
 |---|---|---|---|
 | Layout | `patchbay.studio-layout.v1` | open panel, collapsed, width | 2A |
 | Run state, Log, History | own keys, named in the 2B spec | entries and run position, no file contents or secrets | 2B |
-| Session | `patchbay.session.v1` (planned) | repository address (owner, repository, ref, chosen folders, or sample id), current screen and area, and the edits as small diffs | session-restore sub-phase |
+| Session | `patchbay.session.v1` (planned) | repository address (owner, repository, ref, chosen folders, or sample id), current screen and area, and the edits as small diffs | sub-phase 2G (session restore) |
 
 How restore will work, using what 2A provides:
 1. On start, read the session record. If there is none, show Start as today.

@@ -147,9 +147,11 @@ The spec is satisfied when all of the following hold:
 
 ## 7. Open questions for approval
 
-1. **Screen kept restorable, saved later (R5.5, R9).** 2A keeps the screen in a store and does not save it, because saving it without the repository would open an empty Screen 4 after a refresh. The screen is saved together with the repository in the session-restore sub-phase. Approve?
+**Status: all six approved by the user. Session restore is built in sub-phase 2G.**
+
+1. **Screen kept restorable, saved later (R5.5, R9).** 2A keeps the screen in a store and does not save it, because saving it without the repository would open an empty Screen 4 after a refresh. The screen is saved together with the repository in sub-phase 2G (session restore). Approve?
 2. **Screens 4 and 5 keep the left Sandbox placeholder (R5).** This follows the blueprint (the sandbox stays on the left). The brief said "empty pages". Approve?
 3. **Reaching Screen 5 (R5.1).** The brief did not say how Screen 5 is reached. I put four area buttons on Screen 4. Approve?
 4. **Default layout and widths (R4.5, R7.4).** AI Chat open and narrow at 22 rem, wide at 40 rem, as placeholders. Approve?
 5. **One shared collapsed/width setting (R3.6)** instead of one per panel. Approve?
-6. **Where session restore is built (R9).** It needs the sandbox and your edits, so it cannot come before 2E. See the question in the 2B hand-off message. The decision affects `build-phases.md`, so it is yours to make.
+6. **Where session restore is built (R9).** Decided: sub-phase **2G**, after 2F (it needs the sandbox and your edits).

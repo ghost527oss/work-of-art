@@ -194,3 +194,87 @@ Contract: The Studio screen has a left area, a vertical 6-button toolbar on the 
 ### F3 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2A gate (build-phases.md): layout survives refresh; rapid clicks cause no desync
+
+---
+
+> plan_id: `P2B-HARNESS` — Action Harness (spec `.kiro/specs/04-action-harness/`). Active product phase: Phase 2, Sub-phase 2B. Status: draft for approval; no node is approved for modification. Depends on 2A (`P2A-SHELL`) being built. Black-and-white wireframe, no animation, `AI_MODE=mock` only, no new dependency, no AI call from any 2B code. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F4 — Action Harness
+Contract: One short list of safe actions (help, status, start, pause, resume, step, stop, approve, reject, undo, redo, open, reset) that the user runs by typing fixed words in AI Chat. A labelled offline practice run gives the controls something to act on, and its proposals are approved or rejected by typed word or by card button. Approved changes go to an in-memory practice copy with Undo and Redo. One always-visible Stop button. Opening Edit pauses automation. Log and History are real and saved per repository. No scanner, sandbox, editor, or AI call.
+
+### F4.1 — Diff apply, reverse, and fingerprint
+- Inputs: file text and a unified diff
+- Outputs: `applyUnifiedDiff`, `reverseUnifiedDiff`, `hashText`
+- Invariants: pure; exact matching with no fuzz; every failure returns a reason and no partial text; reverse then apply restores the text exactly (including CRLF and no final newline); never throws; no React, store, or network imports; agrees with the independent test-side applier
+- Files: `src/engine/diffApply.ts`, `tests/diffApply.test.ts`
+- Depends on: F2.3 (`buildInsertDiff` fixtures)
+- verify: `npm run typecheck && npx vitest run tests/diffApply.test.ts`
+
+### F4.2 — Limits and command parser
+- Inputs: free text typed in AI Chat
+- Outputs: `ACTIONS`, `PANEL_WORDS`, `parseCommand` returning `command`, `refused`, or `none`; `WORK_LIMITS`
+- Invariants: pure; only an exact action name (with at most one panel word for `open`) is a command; a two-word near miss is refused with the correct form; three or more words are never a command; never throws; no React, store, or network imports; limits provisional
+- Files: `src/config/workLimits.ts`, `src/engine/commands.ts`, `tests/commands.test.ts`
+- Depends on: none
+- verify: `npm run typecheck && npx vitest run tests/commands.test.ts`
+
+### F4.3 — Practice script and practice copy
+- Inputs: a snapshot; the applied history
+- Outputs: a deterministic script of at most 8 steps or `null`; `practiceContent(snapshot, applied, path)`
+- Invariants: same snapshot gives the same script; only fully loaded, safe, small, secret-free files are used; proposals are zero-context diffs holding no repository content; the snapshot is never mutated; no network, no AI, no `mockAssistant` import
+- Files: `src/engine/practiceScript.ts`, `tests/practiceScript.test.ts`
+- Depends on: F4.1, F4.2, F2.2 (`redact`), F2.3 (`buildInsertDiff`)
+- verify: `npm run typecheck && npx vitest run tests/practiceScript.test.ts`
+
+### F4.4 — Work state
+- Inputs: run, proposal, and history actions
+- Outputs: `WorkState` and pure transitions
+- Invariants: at most one proposal; `awaiting_decision` iff a proposal exists; `idle` implies no proposal; at most 50 history entries; every refusal returns the same object; repeated pause, resume, stop, and approve end where the first press ends; plain data that survives a JSON round trip (except chat and run counter); no imports from React, stores, network, or AI
+- Files: `src/store/workSlice.ts`, `tests/workState.test.ts`
+- Depends on: F4.1, F4.2, F4.3
+- verify: `npm run typecheck && npx vitest run tests/workState.test.ts`
+
+### F4.5 — Work actions and store integration
+- Inputs: commands, ticks, Edit-open events
+- Outputs: whole-state actions with Log entries; effects `cancel_ai`, `clear_slot`, `open_panel`; `openPanelById`; `StudioState.work`
+- Invariants: one command is one atomic update of run, history, log, and chat; Log entries hold paths and fixed phrases only, never instruction text, content, secrets, or diffs; stale ticks change nothing; existing tests pass unedited; no import cycle
+- Files: `src/store/workActions.ts`, `src/store/useStudioStore.ts`, `src/store/layoutSlice.ts`, `tests/workActions.test.ts`, `tests/workStore.test.ts`
+- Depends on: F4.4, F3.1
+- verify: `npm run typecheck && npx vitest run tests/workActions.test.ts tests/workStore.test.ts tests/store.test.ts tests/aiState.test.ts tests/layoutState.test.ts`
+
+### F4.6 — Saved work
+- Inputs: the work state, the log, a storage object, a loaded snapshot
+- Outputs: the saved record under `patchbay.work.v1`; the restore result
+- Invariants: one slot keyed by repository; strict schema and size limits; no file content, secrets, AI text, chat lines, or mode saved; a running run is saved paused; the log is restored once per page load; a fingerprint mismatch discards history, run, and proposal but keeps the log; applied changes are never dropped silently; blocked or full storage never throws
+- Files: `src/store/workStorage.ts`, `src/store/workActions.ts` (`restoreWork`), `tests/workStorage.test.ts`
+- Depends on: F4.1, F4.4, F4.5
+- verify: `npm run typecheck && npx vitest run tests/workStorage.test.ts tests/workActions.test.ts`
+
+### F4.7 — Harness controller
+- Inputs: text commands, button presses, the studio store, the layout store, services
+- Outputs: `createHarnessController`, `useHarness`
+- Invariants: at most one timer; ticks are guarded by run id and position; a button press and a typed command share one code path; no save before restore finishes for the current snapshot; opening Edit pauses and closing it does not resume; Stop and reset cancel a pending AI request; `dispose` clears the timer and both subscriptions; no fetch or AI service import
+- Files: `src/hooks/useHarness.ts`, `tests/harnessController.test.ts`
+- Depends on: F4.5, F4.6, F3.1
+- verify: `npm run typecheck && npx vitest run tests/harnessController.test.ts`
+
+### F4.8 — Stop bar, proposal card, History, Edit panel
+- Inputs: props only
+- Outputs: `StopBar`, `ProposalCard`, `HistoryPanel`, `EditPanel`, styles
+- Invariants: text rendered as text; the only buttons are Stop, Approve, and Reject; no Pause, Resume, or Step button; black and white only, no transition or animation; usable by keyboard and touch
+- Files: `src/components/StopBar.tsx`, `src/components/ProposalCard.tsx`, `src/components/HistoryPanel.tsx`, `src/components/EditPanel.tsx`, `src/styles.css`, `tests/harnessUi.test.tsx`
+- Depends on: F4.4
+- verify: `npm run typecheck && npx vitest run tests/harnessUi.test.tsx`
+
+### F4.9 — Wiring into Chat, Log, Studio, and App
+- Inputs: the controller, the existing panels
+- Outputs: command hand-off in AI Chat, replies and card in the chat panel, Stop bar on Screens 3, 4, and 5, real Log, History, and Edit panels
+- Invariants: ordinary text still goes to the AI exactly as before; command text never reaches the AI; AI Chat patch proposals stay display-only; every existing test passes unedited
+- Files: `src/components/AIAssistantPanel.tsx`, `src/components/LogPanel.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/styles.css`, `tests/harnessUi.test.tsx`
+- Depends on: F4.5, F4.7, F4.8, F3.5, F2.7
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- manual gate (Unverified until run): headless browser run of every item in `requirements.md` section 6, item 11; zero console errors
+
+### F4 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Sub-phase 2B gate (build-phases.md): every command updates state predictably, survives a refresh (through restore), and handles repeated commands

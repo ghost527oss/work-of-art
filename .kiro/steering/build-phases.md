@@ -25,7 +25,7 @@ Current Active Phase: Phase 2 (Sub-phase 2A)
   - Zero browser console errors and zero unhandled server errors across the core request loop.
 
 ### Phase 2: Movement, Interactive Controls & Debugging Workspace
-Phase 2 is built in sub-phases 2A to 2F, one at a time. Design, spec and implement ONLY the
+Phase 2 is built in sub-phases 2A to 2G, one at a time. Design, spec and implement ONLY the
 Current Active Sub-phase. The human advances sub-phases, never the agent.
 Each sub-phase has its own spec and test gate. All PatchBay screens stay black-and-white
 wireframe. The Edit pad's colour tools only change the imported app's elements, never PatchBay's own screens.
@@ -47,6 +47,7 @@ wireframe. The Edit pad's colour tools only change the imported app's elements, 
   - 2D Scanner and Skeleton Crew: four-area scanner, findings with proof and honest fix labels, Screens 4 and 5. Gate: every finding shows file, lines, snippet and reason; no invented scores.
   - 2E Sandbox and Edit pad: three display modes, isolation, visual editing, layout checks, three change layers. Gate: imported code cannot read PatchBay data, cookies or secrets, or load external scripts.
   - 2F Journal and export: three reading levels, log and change export, full Phase 2 test. Gate: all earlier gates pass again, zero console errors.
+  - 2G Session restore: after a refresh, reload the repository from its saved address and restore the screen, layout, edits, Log and History; Back to Start and Reset session clear saved data. Gate: refresh returns to the same screen with the same work; no secrets or file contents in storage; failed reload shows a clear error and a reset path.
 
 ### Phase 3: Automation & Auto-Fix (`AI_MODE=live`)
 - **Allowed Scope:**
