@@ -11,7 +11,8 @@ Implements `requirements.md` in this folder. Active product phase: **Phase 2, Su
 | Blueprint section 3 | Real connections only, proven kept apart from guessed, four areas with helper groups for images, tests, settings, and docs. |
 | Phase 2 text, 2C gate | No guessed labels. Low-confidence files go to Needs Review. |
 | 2A R9, 2B R8 | Saved parts use their own versioned key, hold no secrets or file contents, and use the restore gate. |
-| Requirements section 7 (pending your answers) | Results in Project info. JavaScript, TypeScript, HTML, and CSS for connections. Security is not a label in 2C. `shared` only from imports. Analysis after loading. Corrections in their own slot. Provisional limits. |
+| 2C interview answers (approved) | Results in Project info below the Sandbox. Connections for JavaScript, TypeScript, HTML, CSS, and basic Python. Security shown as "pending scan (2D)", never 0. `shared` only from import proof. The analysis is the real `classifying` loading stage. Corrections saved for one repository with a Clear button. Limits of 2,000 files, 5,000 connections, 8 seconds, 500 corrections, and every limit reached marks the result Partial with a reason. |
+| Questions A to E in requirements section 7 (pending) | The classify stage is listed after "Load source files". Two `store.test.ts` tests change. Loading may wait up to 8 seconds more. An analysis failure does not block loading. Python is basic. |
 
 ## 2. Phase 2C compliance
 
@@ -43,33 +44,36 @@ All paths are relative to `work-of-art/`.
 | `src/skillbook/types.ts` | `SkillStrength`, `ClueFamily`, `SortSkill`, `SkillBook`. |
 | `src/skillbook/sortSkills.ts` | The sort skills as data (section 6). |
 | `src/skillbook/index.ts` | `SKILLBOOK` (`version`, `sort`), `skillById`. 2D adds `scan` here. |
-| `src/engine/sourceScan.ts` | `scanSource(path, content)`: finds imports, loads, route definitions, API calls, config reads, and code patterns, with line numbers. Pure. |
-| `src/engine/sortFiles.ts` | `sortFile(facts)` and `sortAll(...)`: runs the skills and builds results. Pure. |
-| `src/engine/connectionMap.ts` | `buildConnections(scans, inventory, ...)`: resolves targets, mounts routes, matches calls, assigns certainty. Pure. |
-| `src/engine/analyzeProject.ts` | `analyzeProject(snapshot, options)`: the batched async run that ties the three together. |
+| `src/engine/sourceScan.ts` | `scanSource(path, content)`: dispatches by extension and holds the JavaScript, TypeScript, HTML, and CSS scanners. Pure. |
+| `src/engine/sourceScanPy.ts` | `scanPython(path, content)`: the basic Python scanner (section 7.2). Pure. |
+| `src/engine/sortFiles.ts` | `sortAll(...)`: runs the skills and builds results. Pure. |
+| `src/engine/connectionMap.ts` | `buildConnections(...)`: resolves targets, mounts routes, matches calls, assigns certainty, collects partial reasons. Pure. |
+| `src/engine/analyzeProject.ts` | `analyzeProject(snapshot, options)`: the batched async run that ties the three together and reports progress. |
 | `src/engine/understandingView.ts` | Pure view helpers: `applyCorrections`, `AREA_OF_LABEL`, `HELPER_OF_LABEL`, `summarize`, `filterFiles`, `filterEdges`, `labelName`. |
 | `src/store/understandingSlice.ts` | Types and pure transitions for the understanding state. |
 | `src/store/understandingActions.ts` | Whole-state actions with log entries (like `aiActions.ts`). |
 | `src/store/correctionsStorage.ts` | Saved corrections under `patchbay.corrections.v1`. |
-| `src/hooks/useUnderstanding.ts` | `createUnderstandingController(...)` and `useUnderstanding()`. |
-| `src/components/UnderstandingSection.tsx` | The section: state, summary, Needs Review, files, connections, coverage note. Props only. |
-| `src/components/FileLabelsTable.tsx` | The files table with filters and the Why? disclosure. Props only. |
-| `src/components/LabelEditor.tsx` | The small label form. Props only. |
-| `src/components/ConnectionsTable.tsx` | The connections table with filters. Props only. |
-| Tests | `skillbook`, `sourceScan`, `sortFiles`, `connectionMap`, `analyzeSamples`, `analyzeProject`, `understandingView`, `understandingState`, `correctionsStorage`, `understandingController` (`*.test.ts`); `understandingUi` (`*.test.tsx`). |
+| `src/hooks/useUnderstanding.ts` | `createUnderstandingController(...)` (re-run, cancel, corrections, saving) and `useUnderstanding()`. |
+| `src/components/UnderstandingSection.tsx` | The section: state, partial line, summary, and the collapsible blocks. Props only. |
+| `src/components/FileLabelsTable.tsx`, `LabelEditor.tsx`, `ConnectionsTable.tsx` | The files table with filters and Why?, the label form, the connections table. Props only. |
+| Tests | `skillbook`, `sourceScan`, `sourceScanPy`, `sortFiles`, `connectionMap`, `analyzeSamples`, `analyzeProject`, `understandingView`, `understandingState`, `classifyStage`, `correctionsStorage`, `understandingController` (`*.test.ts`); `understandingUi` (`*.test.tsx`). |
 
 ### 4.2 Modified
 | File | Change |
 |---|---|
-| `src/store/useStudioStore.ts` | `StudioState` gains `understanding: UnderstandingState`. `initialState()` sets `idleUnderstanding()`. The four actions that already set `ai` and `work` also set `understanding: idleUnderstanding()`. |
-| `src/components/ProjectInfo.tsx` | Renders `UnderstandingSection` between the coverage panel and the inventory. Gains a `understanding` prop (the controller actions). |
+| `src/types/contracts.ts` | `NOT_YET_AVAILABLE_STAGES` becomes `['preparing_preview']`. No other change. |
+| `src/store/useStudioStore.ts` | `StudioState` gains `understanding`. `IngestionState` gains `classifyProgress`. `freshStages()` makes `classifying` `pending`. New pure actions `beginClassifying`, `classifyProgressed`, `finishClassifying`. `completeIngestion` gains an optional last argument, the understanding state to store (default `idleUnderstanding()`). The four actions that clear `ai` and `work` also clear `understanding`. |
+| `src/hooks/useIngestion.ts` | `IngestionServices` gains the optional `analyze` and `loadCorrections` services. After the snapshot is validated, the run does the classify stage (with the same `AbortController`) and then one `completeIngestion` carrying the result. Without `analyze`, the stage is skipped and nothing else changes. |
+| `src/components/LoadingScene.tsx` | The stage list puts "Classify files" after "Load source files" and shows "(N of M files)" for it from `classifyProgress`. |
+| `tests/store.test.ts` | **Exactly two tests** are updated: the initial stages test (`classifying` is now `pending`) and the "never changes the two stages that do not exist yet" test (now only `preparing_preview`). No other existing test changes. |
+| `src/components/ProjectInfo.tsx` | Renders `UnderstandingSection` between the coverage panel and the inventory. Gains a prop for the controller actions. |
 | `src/components/StudioLayout.tsx` | Passes the new prop down. |
-| `src/App.tsx` | Calls `useUnderstanding()` once. |
+| `src/App.tsx` | Calls `useUnderstanding()` once and gives the ingestion controller the analysis and corrections services. |
 | `src/styles.css` | A black-and-white block for the section. |
-| `traceability/PLAN.md` | Adds plan `P2C-UNDERSTAND` with nodes F5.1 to F5.9. |
+| `traceability/PLAN.md` | Adds plan `P2C-UNDERSTAND` with nodes F5.1 to F5.11. |
 
 ### 4.3 Not touched
-`api/*`, `src/engine/{ingestPipeline,repoInventory,fileSelector,githubSource,...}.ts`, `src/types/contracts.ts` (the existing labels, confidence, and evidence types are reused as they are), every 2B file except through `repoKeyOf` (imported), the AI files, and all existing tests.
+`api/*`, `src/engine/{ingestPipeline,repoInventory,fileSelector,githubSource,repoFetcher,...}.ts` (the server and the `/api/repo` events do not change), every 2B file except through `repoKeyOf` (imported), the AI files, and every existing test except the two named above.
 
 ## 5. Data model
 
@@ -109,9 +113,12 @@ interface AnalysisResult {
   coverage: {
     fileEntries: number; read: number; pathOnly: number; ignored: number
     scanned: number                        // files scanned for connections
-    unsupportedLanguage: number            // loaded files whose language is not scanned
+    notScanned: Record<string, number>     // extension -> count, for "connections not scanned for this language"
     aliasImportsNotFollowed: number
-    partial: boolean; notAnalysed: number
+    djangoUrlFilesSeen: boolean
+    partial: boolean
+    partialReasons: string[]               // plain-words reasons, one per limit reached, empty when not partial
+    notAnalysed: number
   }
 }
 
@@ -124,8 +131,12 @@ interface UnderstandingState {
   error?: string
   corrections: Record<string, Label[]>     // plain data, saved
 }
+
+// Summary rows come from `summarize(result, corrections)`. The Security area is the fixed value
+// 'pending' (never a number) until 2D adds the scanner.
 ```
 
+- `IngestionState` (existing) gains `classifyProgress?: { done: number; total: number }`, set only while the `classifying` stage is active and only with both numbers known.
 - `result` is **derived**: it holds no file content, and reasons are short strings. It is not saved.
 - `effective` file results (corrections applied) are computed by `applyCorrections(result, corrections)` on demand, not stored.
 - The state is plain data. `corrections` and nothing else is saved.
@@ -137,11 +148,11 @@ Each skill: `id`, `title`, `strength`, `label`, `family` (`name`, `folder`, `man
 | Id | Strength | Label | Clue (plain description) |
 |---|---|---|---|
 | `sort.ext.image` | strong | assets | Images, fonts, and media files (`png jpg jpeg gif webp svg ico bmp avif woff woff2 ttf otf eot mp3 mp4 webm`) |
-| `sort.name.test` | strong | tests | `.test.` or `.spec.` in the name, or a folder named `__tests__`, `tests`, `test`, `spec`, or `e2e` |
+| `sort.name.test` | strong | tests | `.test.` or `.spec.` in the name, `test_*.py`, `*_test.py`, `conftest.py`, or a folder named `__tests__`, `tests`, `test`, `spec`, or `e2e` |
 | `sort.ext.docs` | strong | documentation | `md mdx rst txt` files, and `LICENSE`, `CHANGELOG`, `CONTRIBUTING` |
 | `sort.folder.docs` | moderate | documentation | A folder named `docs` or `documentation` |
 | `sort.name.infra` | strong | infrastructure | `Dockerfile`, `docker-compose.*`, `Procfile`, `vercel.json`, `netlify.toml`, `render.yaml`, `*.tf`, anything under `.github/workflows/` |
-| `sort.name.config` | strong | configuration | `package.json`, `tsconfig*.json`, `*.config.*`, `.eslintrc*`, `.prettierrc*`, `.gitignore`, `.editorconfig`, `.nvmrc`, `.babelrc`, `.env*` |
+| `sort.name.config` | strong | configuration | `package.json`, `tsconfig*.json`, `*.config.*`, `.eslintrc*`, `.prettierrc*`, `.gitignore`, `.editorconfig`, `.nvmrc`, `.babelrc`, `.env*`, `requirements*.txt`, `pyproject.toml`, `Pipfile`, `setup.cfg` |
 | `sort.ext.data-file` | moderate | configuration | Other `json yml yaml toml ini` files |
 | `sort.ext.markup` | moderate | frontend | `html htm vue svelte` |
 | `sort.ext.style` | moderate | frontend | `css scss sass less` |
@@ -154,17 +165,17 @@ Each skill: `id`, `title`, `strength`, `label`, `family` (`name`, `folder`, `man
 | `sort.folder.data` | moderate | api_data | A folder named `models`, `schemas`, `migrations`, `prisma`, `db`, `database`, or `repositories` |
 | `sort.folder.client-api` | weak | api_data | `api/` below the root (for example `src/api/`), which is usually a client data layer, not a server |
 | `sort.import.frontend` | strong | frontend | Imports `react`, `react-dom`, `vue`, `svelte`, `solid-js`, `preact`, `@angular/core`, or `next/*` components |
-| `sort.import.server` | strong | backend | Imports `express`, `fastify`, `koa`, `hono`, `@hapi/hapi`, `next/server` |
+| `sort.import.server` | strong | backend | Imports `express`, `fastify`, `koa`, `hono`, `@hapi/hapi`, `next/server`; in Python `flask`, `fastapi`, `django`, `starlette`, `tornado`, `bottle`, `sanic` |
 | `sort.import.node` | moderate | backend | Imports `fs`, `path`, `child_process`, `http`, `net`, or any `node:` module |
-| `sort.import.db` | moderate | api_data | Imports `pg`, `mysql`, `mysql2`, `mongodb`, `mongoose`, `sqlite3`, `redis`, `knex`, `sequelize`, `typeorm`, `drizzle-orm`, `@prisma/client` |
-| `sort.import.http-client` | moderate | api_data | Imports `axios`, `ky`, `got`, `node-fetch`, `swr`, `@tanstack/react-query` |
+| `sort.import.db` | moderate | api_data | Imports `pg`, `mysql`, `mysql2`, `mongodb`, `mongoose`, `sqlite3`, `redis`, `knex`, `sequelize`, `typeorm`, `drizzle-orm`, `@prisma/client`; in Python `sqlalchemy`, `psycopg2`, `asyncpg`, `pymongo`, `peewee`, `sqlite3`, `django.db` |
+| `sort.import.http-client` | moderate | api_data | Imports `axios`, `ky`, `got`, `node-fetch`, `swr`, `@tanstack/react-query`; in Python `requests`, `httpx`, `urllib3` |
 | `sort.syntax.dom` | moderate | frontend | Uses `document.`, `window.`, `localStorage`, or `sessionStorage` |
 | `sort.syntax.handler` | strong | backend | A request handler: `export default function handler(req`, exported `GET`, `POST`, `PUT`, `PATCH`, or `DELETE` functions, or `exports.handler =` |
 | `sort.syntax.route-def` | strong | backend | A route definition (an edge of kind `defines_route`) |
 | `sort.syntax.route-data` | moderate | api_data | The same route definition (it serves requests and data) |
 | `sort.syntax.request-call` | moderate | api_data | A call that sends a request (an edge of kind `calls_api` or `calls_external`) |
 | `sort.manifest.frontend-project` | weak | frontend | `package.json` lists a frontend framework and no server framework, and the file is JavaScript or TypeScript under `src/` |
-| `sort.manifest.backend-project` | weak | backend | `package.json` lists a server framework and no frontend framework, and the file is JavaScript or TypeScript |
+| `sort.manifest.backend-project` | weak | backend | `package.json` (or `requirements.txt`) lists a server framework and no frontend framework, and the file is JavaScript, TypeScript, or Python |
 | `sort.ref.loaded-by-html` | moderate | frontend | A web page loads this file with a script, stylesheet, or image tag |
 | `sort.ref.shared` | moderate | shared | Imported by both a Frontend and a Backend file (second pass) |
 
@@ -187,6 +198,19 @@ The `explain` text for each is written for a beginner, for example `sort.ext.jsx
 5. **Limits:** it stops after 200 results per file and works only on the first 200 KB (the loaded size is already capped at that). It treats a line longer than 10,000 characters as one token and does not scan inside it, to keep the time bounded.
 
 It is a scanner, not a parser. That is why every connection carries a certainty, and why anything the scanner cannot be sure of is Inferred.
+
+### 7.2 Python (`sourceScanPy.ts`)
+
+`scanPython(path, content)` returns the same shape as `scanSource`, and the dispatcher in `sourceScan.ts` calls it for `.py`.
+1. **Mask** `#` comments and the bodies of triple-quoted strings (replace with spaces, keep line breaks). Ordinary string literals stay, because route paths and addresses are strings.
+2. **Imports**, matched only at the start of a line (after indentation): `import a.b`, `import a.b as c`, `from a.b import c, d`, `from . import x`, `from .x import y`, `from ..x import y`. The result keeps the dotted module, the imported names, and the number of leading dots.
+3. **Bindings:** `X = Flask(...)`, `X = Blueprint('name', __name__, url_prefix='/p')`, `X = FastAPI(...)`, `X = APIRouter(prefix='/p')`, and the imported names from step 2. The `url_prefix=` or `prefix=` string is read from the call.
+4. **Routes:** a decorator line `@X.route('/p', methods=['GET', 'POST'])` or `@X.get|post|put|patch|delete('/p')` where `X` is a binding from step 3. One route per method (or one route with no method when `methods` is missing).
+5. **Mounts:** `app.register_blueprint(Y, url_prefix='/p')` and `app.include_router(Y, prefix='/p')` where `Y` is a binding (same file or imported). The prefix is stored with `Y`.
+6. **Calls:** `requests.<method>(`, `httpx.<method>(`, `requests.request('METHOD', `, and `urllib.request.urlopen(` with a string literal or an f-string first address. `{...}` inside an f-string becomes the unknown marker. External addresses are recognised by `http://` or `https://`.
+7. **Config reads:** `os.environ['NAME']`, `os.environ.get('NAME')`, `os.getenv('NAME')`.
+8. **Not read:** Django `urls.py` forms, class-based views, dynamic imports, and star imports. A file named `urls.py` that contains `path(` or `re_path(` sets `djangoUrlFilesSeen`.
+9. The same limits as 7.1 apply: 200 results per file, lines over 10,000 characters skipped, linear time, and no source lines or values in the output.
 
 ## 8. Sorting (`sortFiles.ts`)
 
@@ -211,6 +235,8 @@ It is a scanner, not a parser. That is why every connection carries a certainty,
 4. **Edges** are built in a fixed order and capped (200 per file, 5,000 total). When a cap cuts results, `coverage.partial` is true.
 5. **The `to` of a `calls_api` edge** that matches a route is the route's file in `targetPath` and `"<METHOD> <route path>"` in `target`.
 6. **Environment names** are stored only as names. The scanner does not capture anything after `=`.
+7. **Python resolution.** A dotted module `a.b.c` is tried from the repository root and from `src/` as `a/b/c.py`, then `a/b/c/__init__.py`. For `from a.b import c`, the module `a/b/c.py` is tried first (when `c` is a submodule), then `a/b.py`, then `a/b/__init__.py`. Relative forms start at the importing file's folder, one level up per extra dot. A relative import that does not resolve follows the same Broken or Inferred rule as JavaScript. An absolute import that does not resolve adds its top-level name to `externals` (shown as "external package or standard library") and makes no edge.
+8. **Python routes and mounts** use the same matching as JavaScript. A `Blueprint` or `APIRouter` prefix, joined with a `register_blueprint` or `include_router` prefix, is put in front of each route path, and the note says "mounted at <prefix> by <file>:<line>". A router that is never mounted keeps its own path with the note "mount path unknown".
 
 ## 10. Worked examples (expected results for the three samples)
 
@@ -265,64 +291,90 @@ Edges: `client/index.html:6 -> client/app.js` (loads, Confirmed); `server/index.
 
 If the implementation produces anything different, the expectations here are reviewed first with the user, because they are the hand-written truth for 2C.
 
-## 11. The analysis run, state, and actions
+## 11. The analysis run and the `classifying` stage
 
-### 11.1 `analyzeProject(snapshot, { signal, yieldToMain, now })`
-1. Build the file facts from `snapshot.inventory.entries` (files only) and `snapshot.files`.
-2. In batches of 40 files (sorted by path), scan content (only for `loaded` files with content and a supported language, up to 2,000 files), then `await yieldToMain()` and check the abort signal and the 8 second limit.
-3. Build connections from the scans, then sort files (with the second pass), then assemble the result.
-4. On abort, throw an abort error and return nothing. On the time limit, stop scanning, mark the remaining files `needsReview` with "Not analysed: time limit.", and set `partial`.
-5. `yieldToMain` is injected: `() => new Promise(r => setTimeout(r, 0))` in the app, a counter in tests.
+### 11.1 `analyzeProject(snapshot, { signal, yieldToMain, now, onProgress })`
+1. Build the file facts from `snapshot.inventory.entries` (files only) and `snapshot.files`. Collect the manifest facts (`package.json` and `requirements.txt` dependency names).
+2. In batches of 40 files (sorted by path), scan the content of `loaded` files with a supported language (up to 2,000 files), call `onProgress({ done, total })`, then `await yieldToMain()` and check the abort signal and the 8 second limit.
+3. Build connections, then sort files (with the second pass), then assemble the result with `coverage.notScanned` (extension and count for every loaded code or markup file that is not scanned).
+4. **Partial reasons** are collected as plain sentences, one per limit reached, in this fixed order: files scanned (2,000), time (8 seconds), connections in total (5,000), connections per file (200), file results (20,000). Each names the limit and the amount missing. `coverage.partial` is true exactly when the list is not empty. The files not analysed because of time are marked Needs Review with "Not analysed: time limit."
+5. On abort, throw an abort error and return nothing. `yieldToMain` is injected: `() => new Promise(r => setTimeout(r, 0))` in the app, a counter in tests.
 
-### 11.2 State and actions
-- `understandingSlice.ts` holds the pure transitions: `uBegin(runId)`, `uProgress`, `uComplete(runId, result)`, `uFail(runId, message)`, `uCancel`, `uSetCorrection(path, labels)`, `uRemoveCorrection(path)`, `uClearCorrections()`, `uRestoreCorrections(map)`. Stale run ids are ignored, like ingestion runs.
-- `understandingActions.ts` wraps them with `withLog`: `understanding_started`, `understanding_done` ("N files sorted, M need review, K connections"), `understanding_failed`, `label_corrected` ("Labels for <path> set to <names>."), `label_reset`, `labels_cleared`. Entries hold paths, counts, and label names only.
-- `useStudioStore.ts` clears `understanding` (including corrections in memory) wherever `ai` and `work` are cleared.
+### 11.2 The classify stage inside the loading run (`useIngestion.ts` and the store)
+The server pipeline and `/api/repo` are unchanged and still emit no `classifying` events. The client owns the stage:
+
+```
+snapshot validated (existing step)
+  -> store.update(beginClassifying(runId))                 stage classifying = active, classifyProgress cleared
+  -> corrections = services.loadCorrections(snapshot)      matching repository only, existing paths only; never throws
+  -> result = await services.analyze(snapshot, { signal, onProgress })
+        onProgress -> store.update(classifyProgressed(runId, done, total))
+  -> store.update(finishClassifying(runId, 'done'))
+  -> store.update(completeIngestion(runId, snapshot, now, understandingDone(result, corrections)))   ONE update
+failure of analyze (not abort):
+  -> store.update(finishClassifying(runId, 'failed'))
+  -> store.update(completeIngestion(..., understandingFailed(message, corrections)))   loading still finishes
+abort: nothing more (cancel or dispose already updated the state)
+services.analyze missing: store.update(finishClassifying(runId, 'skipped')) and complete as before
+```
+
+- The order of stages on the Loading screen is: Resolve branch, Fetch file tree, Load source files, Classify files, Prepare preview. Display order is set in `LoadingScene.tsx`. The `IngestStage` enum order does not change.
+- `beginClassifying`, `classifyProgressed`, and `finishClassifying` ignore a stale `runId`, like every other ingestion action. `finishClassifying` never fails the run: it only sets the stage status.
+- For a **background** run (scoped folder reload) the same code runs, the Studio keeps showing the old data, and the reload banner is unchanged.
+- The one `completeIngestion` call is what makes the Studio open with the snapshot, the result, and the corrections together.
+
+### 11.3 Understanding state and actions
+- `understandingSlice.ts` holds the pure transitions: `uBegin(runId)`, `uProgress`, `uComplete(runId, result)`, `uFail(runId, message)`, `uCancel`, `uSetCorrection(path, labels)`, `uRemoveCorrection(path)`, `uClearCorrections()`. These serve the Studio re-run and the corrections. Stale run ids are ignored. `uSetCorrection` refuses with a message when 500 corrections exist and the path is new.
+- `understandingActions.ts` wraps them with `withLog`: `understanding_started`, `understanding_done` ("N files sorted, M need review, K connections"; "Partial result." when partial), `understanding_failed`, `label_corrected`, `label_reset`, `labels_cleared`. Entries hold paths, counts, and label names only. The loading run writes `understanding_done` or `understanding_failed` when it completes.
+- `useStudioStore.ts` clears `understanding` wherever `ai` and `work` are cleared (and sets it from the completion argument at `completeIngestion`).
 
 ## 12. Saved corrections (`correctionsStorage.ts`)
 
 - Key `patchbay.corrections.v1`. Record `{ version: 1, repoKey, savedAt, corrections: Record<path, Label[]> }`, strict. At most 500 paths, each at most 250 characters, each with 1 to 9 labels from the selectable set, and the whole text at most 64 KB.
-- `loadCorrections(storage)`, `saveCorrections`, `clearCorrectionsSlot`: never throw.
-- On restore, only paths that exist in the new snapshot's inventory are kept.
-- The controller uses the same **restore gate** as 2B: save only when the snapshot exists and `restoredFor === snapshot.id`.
+- `loadCorrections(storage, snapshot)` returns the matching corrections (same `repoKeyOf`, paths present in the inventory) or `{}`. It, `saveCorrections`, and `clearCorrectionsSlot` never throw.
+- **Saving.** The controller subscribes to the store and keeps `lastCorrections`, the corrections object it last saw. It saves only when `understanding.corrections` is a new object that came from a user action (set, remove, or clear) and a snapshot is loaded. At every `completeIngestion` it only updates `lastCorrections` and does not write, so loading never overwrites the slot of another repository. Because the corrections are delivered in the same update as the snapshot, no restore gate is needed.
 
 ## 13. The controller (`useUnderstanding.ts`)
 
 ```ts
 createUnderstandingController(studio, services): { actions, dispose }
 services: { storage, yieldToMain, now, analyze }       // analyze = analyzeProject in the app, a fake in tests
-actions: { run(): void; cancel(): void; setLabels(path, labels): void; removeCorrection(path): void; clearCorrections(): void }
+actions: { run(): void; cancel(): void; setLabels(path, labels): string | null; removeCorrection(path): void; clearCorrections(): void }
 ```
 
-- A studio-store subscriber: when the snapshot id changes, abort the current run, restore corrections (once for that id), then start a run with a new `AbortController`. When the snapshot is cleared, abort and do nothing else.
-- `run()` starts a new run only when none is running. `cancel()` aborts and returns the state to `idle`.
-- After every change, when the gate allows, corrections are saved (or the slot cleared when empty and a clear was asked for).
+- `run()` re-analyses the loaded snapshot (used by Run again and Try again). It starts only when none is running and a snapshot exists, creates an `AbortController`, and delivers progress and the result through the understanding actions. `cancel()` aborts it and returns the state to `idle`.
+- `setLabels` returns an error message when refused (the 500 limit, or an invalid set) and `null` otherwise.
+- A studio-store subscriber aborts a running re-analysis when the snapshot is replaced or cleared, and saves corrections as in section 12.
 - `dispose()` aborts, unsubscribes, and ignores later results.
 - `useUnderstanding()`: `useMemo` and an effect to dispose, like `useHarness`.
+- The loading run uses `analyzeProject` and `loadCorrectionsFor` directly through the ingestion services, not through this controller, so the stage is part of the one loading run and one `AbortController`.
 
-## 14. User interface (`UnderstandingSection` and children)
+## 14. User interface
 
-- **Header and state:** "Project understanding". A line for the state: "Analysing N of M files." with **Cancel**, "Analysis was cancelled." with **Run again**, "Analysis failed: <message>" with **Try again**, or "Analysis is up to date." (and "Partial result: <n> files not analysed." when partial).
-- **Summary** (a table): rows for each label, each area, each helper group, Needs Review, Ignored. Area Security reads 0 with the note "Security is checked by the scanner in sub-phase 2D."
-- **Needs Review** (a list): path, the first reason, and **Set labels**.
-- **Files**: filters (select for area or helper group, select for confidence, a "Needs Review only" checkbox, a text box), a table of 200 rows with **Show more**, columns Path, Labels, Confidence, Reason. A **Why?** `<details>` shows all reasons, and the earlier automatic reasons below "Before your change" when corrected. **Set labels** opens the editor.
-- **Label editor:** a labelled fieldset of checkboxes with plain names, **Save**, **Cancel**, and **Remove my change** when corrected. A hint line explains that you can choose several labels.
-- **Connections**: filters for kind (select), certainty (select), and a text box; a table of 200 rows with **Show more**, columns Kind, From, To, Certainty, Line, Note. Certainty is written "Confirmed", "Inferred", or "Broken".
-- **Coverage note** (a paragraph and list): files read, files sorted by path only, ignored, languages not scanned, alias imports not followed, external packages (first 20), and "The map is partial." when true.
+- **Loading screen:** the stage list reads Resolve branch, Fetch file tree, Load source files, Classify files, Prepare preview. "Classify files" shows "in progress (N of M files)" and then done, failed, or skipped. Nothing else on the Loading screen changes.
+- **`UnderstandingSection`** sits in Project info, below the Sandbox and the coverage panel. It shows, always: the heading "Project understanding", the state line ("Analysing N of M files." with **Cancel**, "Analysis was cancelled." with **Run again**, "Analysis failed: <message>" with **Try again**, or "Analysis is up to date."), the line "Partial result: <reasons>" when partial, and the **summary** table. Everything else is in collapsible `<details>` blocks that scroll inside themselves (at most 24 rem tall):
+  - **Needs Review (n)**: open when n > 0. Path, first reason, **Set labels**.
+  - **Files**: closed. Filters (area or helper group, confidence, "Needs Review only", a text box), a table of 200 rows with **Show more**, columns Path, Labels, Confidence, Reason, and a **Why?** disclosure per row. A row for a file type that is not scanned says "connections not scanned for this language".
+  - **Connections**: closed. Filters for kind, certainty, and a text box, a table of 200 rows with **Show more**, columns Kind, From, To, Certainty, Line, Note. Certainty is written "Confirmed", "Inferred", or "Broken".
+  - **What was and was not scanned**: closed. Files read, files sorted by path only, ignored, file types not scanned (extension and count), alias imports not followed, "Django URL files are not followed" when it applies, the external names (first 20), and every partial reason.
+- **Summary table:** rows for each label, each area, each helper group, Needs Review, and Ignored. The Security row reads "pending scan (2D)" and never a number.
+- **Label editor:** a labelled fieldset of checkboxes with plain names, **Save**, **Cancel**, and **Remove my change** when corrected. A refusal (the 500 limit) shows its message above the buttons.
 - **Clear my label corrections:** a button, shown when any correction exists.
-- Tables sit in a scroll box so the page never scrolls sideways. All text is React text.
+- All text is React text. No color, icon, transition, or animation. Tables have header cells and sit in a scroll box so the page never scrolls sideways.
 
 ## 15. Failure handling
 
 | Failure | Handling |
 |---|---|
 | A file's scan or sort throws | That file only is Needs Review, "Could not be analysed." |
-| Whole run throws | `failed` state with a short message, Try again, the rest of Project info works. |
-| Abort (snapshot change, Cancel, unmount) | The run stops, no partial result, state `idle` or cleared. |
-| Time limit | Partial result with the list of not-analysed files in Needs Review. |
-| Bounds hit (files, edges) | Partial map with counts in the note. |
-| Saved corrections bad, old, or from another repository | None restored, no message. |
+| Whole analysis throws during loading | The stage shows failed, loading finishes, the section shows the message and Try again. |
+| Whole analysis throws during a re-run | State `failed` with a short message and Try again. |
+| Abort (Cancel, snapshot change, unmount) | The run stops and no result is stored. During loading the whole run is cancelled. |
+| Any limit reached | Partial result with one plain-words reason per limit. |
+| 500 corrections reached | The new correction is refused with a message. |
+| Saved corrections bad, old, or for another repository | None restored, no message. |
 | Storage blocked or full | Corrections kept for this visit. |
+| `analyze` service missing | The stage is skipped and loading behaves as before. |
 | Slow pattern risk | Anchored, length-bounded patterns, long lines skipped, and a timing test on hostile input. |
 
 ## 16. Verification mapping
@@ -330,31 +382,33 @@ actions: { run(): void; cancel(): void; setLabels(path, labels): void; removeCor
 | Acceptance item (requirements section 6) | Where it is proved |
 |---|---|
 | 1. Skill-book | `tests/skillbook.test.ts` (C1) |
-| 2. Source scanner | `tests/sourceScan.test.ts` (C2) |
-| 3. Sorting | `tests/sortFiles.test.ts` (C3) |
-| 4. Connections | `tests/connectionMap.test.ts` (C4) |
-| 5. Samples | `tests/analyzeSamples.test.ts` (C5) |
-| 6. Analysis run | `tests/analyzeProject.test.ts` (C5) |
-| 7. State and corrections | `tests/understandingState.test.ts`, `tests/understandingView.test.ts` (C6) |
-| 8. Storage | `tests/correctionsStorage.test.ts` (C7) |
-| 9. Controller | `tests/understandingController.test.ts` (C7) |
-| 10. Components | `tests/understandingUi.test.tsx` (C8, C9) |
-| 11. Static checks | C1 to C9 acceptance, C10 |
-| 12. Regression | C6, C9, C10 |
-| 13. Browser run | C10 |
-| 14. Phase 2C gate | C10 |
+| 2. Source scanner | `tests/sourceScan.test.ts` (C2), `tests/sourceScanPy.test.ts` (C3) |
+| 3. Sorting | `tests/sortFiles.test.ts` (C4) |
+| 4. Connections | `tests/connectionMap.test.ts` (C5) |
+| 5. Samples | `tests/analyzeSamples.test.ts` (C6) |
+| 6. Analysis run and classify stage | `tests/analyzeProject.test.ts` (C6), `tests/classifyStage.test.ts` (C8) |
+| 7. State and corrections | `tests/understandingState.test.ts`, `tests/understandingView.test.ts` (C6, C7) |
+| 8. Storage | `tests/correctionsStorage.test.ts` (C9) |
+| 9. Controller | `tests/understandingController.test.ts` (C9), `tests/classifyStage.test.ts` (C8) |
+| 10. Components | `tests/understandingUi.test.tsx` (C10, C11) |
+| 11. Static checks | C1 to C11 acceptance, C12 |
+| 12. Regression | C7, C8, C11, C12 |
+| 13. Browser run | C12 |
+| 14. Phase 2C gate | C12 |
 
 ## 17. Risks and known limits
 
 - **It is a scanner, not a parser.** Odd formatting, code built from strings, or macros can be missed. Missed items are absent, not wrong, and the coverage note says what was scanned. Anything pattern-based is Inferred.
-- **Aliases and non-JS languages are not followed.** The note counts them. A repository that relies on them will show fewer connections, and says so.
-- **The extension alone never labels `.js` and `.ts`.** Many files will go to Needs Review in loosely organised repositories. That is deliberate (no guessing), and corrections make it quick to fix.
-- **Folder names are weak evidence.** They are weighted that way, and the reason always names the folder.
-- **Results are recomputed on every load.** Only corrections are saved. A very large repository stops at the 8 second limit with a partial result.
-- **Security is empty in the summary until 2D.**
-- **2D will extend `SKILLBOOK` and `Edge` use.** The skill-book type already reserves a place for `scan` skills.
+- **Python is basic.** Django URLs, class-based views, star imports, and dynamic imports are not read. Absolute imports that do not resolve are listed as external (they could also be the standard library). The note says so.
+- **Aliases and other languages are not followed.** Go, PHP, Java, and the rest show "connections not scanned for this language".
+- **The extension alone never labels `.js`, `.ts`, or `.py`.** Many files will go to Needs Review in loosely organised repositories. That is deliberate (no guessing), and corrections make it quick to fix. (`.py` is moderate Backend by `sort.ext.server-lang`; `.js` and `.ts` get nothing from the extension.)
+- **Loading is slower.** The stage adds up to 8 seconds for a very large repository, then shows a Partial result.
+- **The Loading screen order changes** (Classify after Load). Two existing store tests change with it.
+- **Results are recomputed on every load.** Only corrections are saved.
+- **Security is "pending scan (2D)"** until the scanner exists.
+- **2D will extend `SKILLBOOK` and use the edges.** The skill-book type already reserves a place for `scan` skills.
 - **`scripts/traceability/*` still do not exist.** Approvals are recorded in chat.
 
 ## 18. PLAN.md nodes
 
-Plan `P2C-UNDERSTAND`, feature `F5 — Project Understanding`, with nodes F5.1 (skill-book and limits), F5.2 (source scanner), F5.3 (sorting), F5.4 (connection map), F5.5 (analysis run, view helpers, samples), F5.6 (state, actions, store integration), F5.7 (saved corrections and controller), F5.8 (components), F5.9 (wiring into Project info and App). Full text is in `traceability/PLAN.md`.
+Plan `P2C-UNDERSTAND`, feature `F5 — Project Understanding`, with nodes F5.1 (skill-book and limits), F5.2 (scanner for JavaScript, HTML, CSS), F5.3 (Python scanner), F5.4 (sorting), F5.5 (connection map), F5.6 (analysis run, view helpers, samples), F5.7 (understanding state and actions), F5.8 (the `classifying` stage in the loading run), F5.9 (saved corrections and controller), F5.10 (section components), F5.11 (wiring into Project info and App). Full text is in `traceability/PLAN.md`.

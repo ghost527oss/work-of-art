@@ -284,7 +284,7 @@ Contract: One short list of safe actions (help, status, start, pause, resume, st
 > plan_id: `P2C-UNDERSTAND` — Project Understanding (spec `.kiro/specs/05-project-understanding/`). Active product phase: Phase 2, Sub-phase 2C. Status: draft for approval; no node is approved for modification. Depends on 2A (`P2A-SHELL`) and 2B (`P2B-HARNESS`) being built. Black-and-white wireframe, no animation, `AI_MODE=mock` only, no new dependency, no network and no AI call from any 2C code. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
 
 ## F5 — Project Understanding
-Contract: For the loaded repository, PatchBay works out offline what role each file plays (labels, confidence, and plain-English reasons from a built-in skill-book), puts unsure files in Needs Review, lets the user correct labels (saved, logged), and maps the real connections between files (imports, page loads, API calls and routes, settings names) with each link marked Confirmed, Inferred, or Broken. Results appear in a Project understanding section in Project info. No scanner findings, no Security label, no AI, no network.
+Contract: For the loaded repository, PatchBay works out offline what role each file plays (labels, confidence, and plain-English reasons from a built-in skill-book), puts unsure files in Needs Review, lets the user correct labels (saved, logged), and maps the real connections between files (imports, page loads, API calls and routes, settings names) for JavaScript, TypeScript, HTML, CSS, and basic Python, with each link marked Confirmed, Inferred, or Broken. The analysis is the real `classifying` stage of the Loading screen, after the sources are loaded. Results appear in a Project understanding section in Project info, below the Sandbox. Every limit reached makes the result Partial with a reason. Security is shown as "pending scan (2D)". No scanner findings, no AI, no network.
 
 ### F5.1 — Limits and skill-book v1
 - Inputs: none
@@ -294,68 +294,84 @@ Contract: For the loaded repository, PatchBay works out offline what role each f
 - Depends on: F1.1 (label set)
 - verify: `npm run typecheck && npx vitest run tests/skillbook.test.ts`
 
-### F5.2 — Source scanner
+### F5.2 — Source scanner: JavaScript, TypeScript, HTML, CSS
 - Inputs: a file path and its content
 - Outputs: imports, loads, routes, mounts, calls, config names, code patterns, alias imports, each with a line number
-- Invariants: pure and never throws; comments and decoy strings ignored; returns only specifiers, addresses, names, and markers (never source lines or setting values); bounded patterns; hostile 200 KB input finishes in under 1 second; no React, store, or network imports
+- Invariants: pure and never throws; comments and decoy strings ignored; returns only specifiers, addresses, names, and markers (never source lines or setting values); bounded patterns; hostile 200 KB input finishes in under 1 second; unsupported file types report `unsupported`; no React, store, or network imports
 - Files: `src/engine/sourceScan.ts`, `tests/sourceScan.test.ts`
 - Depends on: F5.1
 - verify: `npm run typecheck && npx vitest run tests/sourceScan.test.ts`
 
-### F5.3 — File sorting
+### F5.3 — Source scanner: basic Python
+- Inputs: a `.py` file path and its content
+- Outputs: the same shape as F5.2 for imports (absolute and relative), Flask and FastAPI routes with prefixes and mounts, `requests` and `httpx` calls, `os.environ` and `os.getenv` names
+- Invariants: `#` comments and triple-quoted bodies ignored; only decorators on names bound to a known app or router count as routes; Django URL files are flagged, not read; same limits and no-source-lines rule as F5.2
+- Files: `src/engine/sourceScanPy.ts`, `src/engine/sourceScan.ts`, `tests/sourceScanPy.test.ts`
+- Depends on: F5.1, F5.2
+- verify: `npm run typecheck && npx vitest run tests/sourceScanPy.test.ts tests/sourceScan.test.ts`
+
+### F5.4 — File sorting
 - Inputs: inventory files, scans, manifest facts, optional edges
 - Outputs: one `FileUnderstanding` per file entry
-- Invariants: no file dropped; a label exists only with at least one skill hit; no guessing (no clue gives `unknown`, Low, Needs Review); fixed confidence rule; strong helper labels suppress weaker area labels; Low label dropped next to Medium or High; `shared` only from imports by both sides; path-only files use no content skills; deterministic output; per-file failure isolated; every evidence id exists in the skill-book
+- Invariants: no file dropped; a label exists only with at least one skill hit; no guessing (no clue gives `unknown`, Low, Needs Review); fixed confidence rule; strong helper labels suppress weaker area labels; Low label dropped next to Medium or High; `shared` only from Confirmed imports by both sides and never from a folder or file name; path-only files use no content skills; deterministic output; per-file failure isolated; every evidence id exists in the skill-book
 - Files: `src/engine/sortFiles.ts`, `tests/sortFiles.test.ts`
-- Depends on: F5.1, F5.2
+- Depends on: F5.1, F5.2, F5.3
 - verify: `npm run typecheck && npx vitest run tests/sortFiles.test.ts`
 
-### F5.4 — Connection map
-- Inputs: scans, inventory paths, whether the tree is complete
-- Outputs: edges, external package names, map coverage counts
-- Invariants: real connections only; certainty Confirmed, Inferred, or Broken by the stated rules; a frontend-only repository is not Broken; route mounts resolved only through literal requires or imports; names only for settings; aliases counted not followed; bounded and deterministic; partial flag when a bound is hit
+### F5.5 — Connection map
+- Inputs: scans, inventory paths, whether the tree is complete, limits
+- Outputs: edges, external names, not-scanned counts, partial reasons
+- Invariants: real connections only; certainty Confirmed, Inferred, or Broken by the stated rules; a repository with no backend routes is not Broken; route mounts resolved only through literal requires, imports, or same-file bindings; unresolved absolute Python imports become external names; names only for settings; aliases counted not followed; bounded and deterministic; every limit reached adds a plain-words partial reason
 - Files: `src/engine/connectionMap.ts`, `tests/connectionMap.test.ts`
-- Depends on: F5.2
+- Depends on: F5.2, F5.3
 - verify: `npm run typecheck && npx vitest run tests/connectionMap.test.ts`
 
-### F5.5 — Analysis run, view helpers, sample expectations
-- Inputs: a snapshot, an abort signal, an injected yield and clock
+### F5.6 — Analysis run, view helpers, sample expectations
+- Inputs: a snapshot, an abort signal, an injected yield, clock, and progress callback
 - Outputs: `AnalysisResult`; `applyCorrections`, `summarize`, filters, area and helper tables
-- Invariants: batches of 40 with a yield between; 8 second limit gives a partial result; abort leaves nothing; one failing file isolated; the snapshot is never mutated; the three sample results equal the hand-written tables exactly; Security counts 0
+- Invariants: batches of 40 with a yield between; the 8 second limit and every other limit give a partial result with a reason each; abort leaves nothing; one failing file isolated; the snapshot is never mutated; the three sample results equal the hand-written tables exactly; Security is always `pending`, never a number
 - Files: `src/engine/analyzeProject.ts`, `src/engine/understandingView.ts`, `tests/analyzeProject.test.ts`, `tests/understandingView.test.ts`, `tests/analyzeSamples.test.ts`
-- Depends on: F5.3, F5.4
+- Depends on: F5.4, F5.5
 - verify: `npm run typecheck && npx vitest run tests/analyzeProject.test.ts tests/understandingView.test.ts tests/analyzeSamples.test.ts`
 
-### F5.6 — Understanding state and actions
+### F5.7 — Understanding state and actions
 - Inputs: run events, correction actions
 - Outputs: `StudioState.understanding`; whole-state actions with Log entries
-- Invariants: stale run ids ignored; corrections never start a run or change the result; log entries hold paths, counts, and label names only; state cleared with `ai` and `work`; existing tests pass unedited
+- Invariants: stale run ids ignored; corrections never start a run or change the result; the 501st correction is refused and none is dropped; log entries hold paths, counts, and label names only; state cleared with `ai` and `work`; existing tests pass unedited
 - Files: `src/store/understandingSlice.ts`, `src/store/understandingActions.ts`, `src/store/useStudioStore.ts`, `tests/understandingState.test.ts`
-- Depends on: F5.5, F1.7
+- Depends on: F5.6, F1.7
 - verify: `npm run typecheck && npx vitest run tests/understandingState.test.ts tests/store.test.ts tests/aiState.test.ts tests/workStore.test.ts`
 
-### F5.7 — Saved corrections and controller
+### F5.8 — The `classifying` stage in the loading run
+- Inputs: the validated snapshot in the loading run, optional `analyze` and `loadCorrections` services
+- Outputs: the stage active with progress, then done, failed, or skipped; one completion update carrying the snapshot, the result, and the corrections; the Loading screen listing "Classify files" after "Load source files"
+- Invariants: the server pipeline and `/api/repo` are unchanged; the stage uses the run's `AbortController`; Cancel stops the whole run; an analysis failure never fails loading; a missing `analyze` skips the stage and behaves as before; stale run ids ignored; only the two named `tests/store.test.ts` tests change; `preparing_preview` stays "not available yet"
+- Files: `src/types/contracts.ts`, `src/store/useStudioStore.ts`, `src/hooks/useIngestion.ts`, `src/components/LoadingScene.tsx`, `tests/store.test.ts`, `tests/classifyStage.test.ts`
+- Depends on: F5.6, F5.7, F1.7
+- verify: `npm run typecheck && npx vitest run tests/classifyStage.test.ts tests/store.test.ts tests/useIngestion.test.ts tests/understandingState.test.ts && npm run build`
+
+### F5.9 — Saved corrections and controller
 - Inputs: the studio store, a storage object, services
 - Outputs: record `patchbay.corrections.v1`; `createUnderstandingController`, `useUnderstanding`
-- Invariants: one slot keyed by repository; only paths and label names saved; strict schema and bounds; save only after restore for the current snapshot; restore only for a matching repository and existing paths; one run per snapshot, aborted on replace, clear, cancel, and dispose; Back to Start keeps the slot; no fetch or AI import
+- Invariants: one slot keyed by repository; only paths and label names saved; strict schema and bounds; loading a snapshot never writes the slot; restore only for a matching repository and existing paths; re-analysis aborted on replace, clear, cancel, and dispose; Back to Start keeps the slot; no fetch or AI import
 - Files: `src/store/correctionsStorage.ts`, `src/hooks/useUnderstanding.ts`, `tests/correctionsStorage.test.ts`, `tests/understandingController.test.ts`
-- Depends on: F5.6, F4.6 (`repoKeyOf`)
+- Depends on: F5.7, F4.6 (`repoKeyOf`)
 - verify: `npm run typecheck && npx vitest run tests/correctionsStorage.test.ts tests/understandingController.test.ts`
 
-### F5.8 — Section components
+### F5.10 — Section components
 - Inputs: props only
 - Outputs: `UnderstandingSection`, `FileLabelsTable`, `LabelEditor`, `ConnectionsTable`, styles
-- Invariants: text rendered as text; certainty shown in words; tables in scroll boxes with header cells; label editor offers the nine selectable labels with plain names; black and white only, no transition or animation; keyboard and touch usable
+- Invariants: text rendered as text; certainty shown in words; the Security row reads "pending scan (2D)"; Files, Connections, and the scanned note are collapsed by default and tables scroll inside themselves; a Partial line lists every reason; label editor offers the nine selectable labels with plain names; black and white only, no transition or animation; keyboard and touch usable
 - Files: `src/components/UnderstandingSection.tsx`, `src/components/FileLabelsTable.tsx`, `src/components/LabelEditor.tsx`, `src/components/ConnectionsTable.tsx`, `src/styles.css`, `tests/understandingUi.test.tsx`
-- Depends on: F5.5
+- Depends on: F5.6
 - verify: `npm run typecheck && npx vitest run tests/understandingUi.test.tsx`
 
-### F5.9 — Wiring into Project info and App
-- Inputs: the controller, the existing Project info
-- Outputs: the section between the coverage panel and the inventory
-- Invariants: no existing test edited; Screens 4 and 5 and the toolbar unchanged; ingestion, AI, shell, and harness behavior unchanged
-- Files: `src/components/ProjectInfo.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/styles.css`, `tests/understandingUi.test.tsx`
-- Depends on: F5.7, F5.8, F3.5
+### F5.11 — Wiring into Project info, Studio, App, and default services
+- Inputs: the controller, the existing Project info, the ingestion controller
+- Outputs: the section below the Sandbox and the coverage panel and above the inventory; the real `analyze` and `loadCorrections` in the default ingestion services
+- Invariants: no existing test edited beyond the two in F5.8; Screens 4 and 5 and the toolbar unchanged; ingestion, AI, shell, and harness behavior unchanged
+- Files: `src/components/ProjectInfo.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/hooks/useIngestion.ts`, `src/styles.css`, `tests/understandingUi.test.tsx`
+- Depends on: F5.8, F5.9, F5.10, F3.5
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): headless browser run of every item in `requirements.md` section 6, item 13; zero console errors
 
