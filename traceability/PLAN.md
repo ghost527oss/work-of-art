@@ -378,3 +378,103 @@ Contract: For the loaded repository, PatchBay works out offline what role each f
 ### F5 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2C gate (build-phases.md): no guessed labels; low-confidence files go to Needs Review
+
+---
+
+> plan_id: `P2D-CREW` — Scanner and Skeleton Crew (spec `.kiro/specs/06-scanner-skeleton-crew/`). Active product phase: Phase 2, Sub-phase 2D. Status: draft for approval; no node is approved for modification. Depends on 2A (`P2A-SHELL`), 2B (`P2B-HARNESS`), and 2C (`P2C-UNDERSTAND`) being built. Black-and-white wireframe, no animation, `AI_MODE=mock` only, no new dependency, no network and no AI call from any 2D code. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F6 — Scanner and Skeleton Crew
+Contract: An offline scanner with 16 built-in checks in four areas (Frontend, Backend, Security, APIs & Data) finds problems in the loaded files. Every finding shows its file, lines, a short redacted snippet, a plain explanation, why it matters, and a plan, with a severity, a Found or Possible certainty, and an honest fix label (one automatic fix, the rest Guided or Explanation only). No scores: only real counts and a list of what was and was not checked. The Skeleton Crew is an automatic run started by `start crew` that reuses the 2B controls, narrates each finding, proposes the one safe fix and waits for Approve or Reject, and verifies by checking again. Screen 4 shows the four-area map and the worker slots. Screen 5 shows one area's findings and narration. A command box serves both screens. No sandbox, no editor, no AI, no network.
+
+### F6.1 — Limits and the 16 scan skills
+- Inputs: none
+- Outputs: `SCAN_LIMITS`, `SKILLBOOK.scan` (16 skills), `scanSkillById`
+- Invariants: ids, areas, severities, certainties, and fix labels match the requirements table; exactly one automatic fix; plain-English text without banned jargon, scores, or "secure"; the book is frozen; the 31 sort skills are unchanged; data only
+- Files: `src/config/scanLimits.ts`, `src/skillbook/types.ts`, `src/skillbook/scanSkills.ts`, `src/skillbook/index.ts`, `tests/scanSkills.test.ts`
+- Depends on: F5.1
+- verify: `npm run typecheck && npx vitest run tests/scanSkills.test.ts tests/skillbook.test.ts`
+
+### F6.2 — Scan helpers, Frontend checks, APIs & Data checks
+- Inputs: file text and path
+- Outputs: `maskComments` export, snippet and id helpers, five checks
+- Invariants: comments ignored; snippets at most 12 lines of at most 200 characters with secrets redacted; ids stable per place and occurrence; bounded patterns; hostile input under 1 second; no React, store, or network imports
+- Files: `src/engine/sourceScan.ts`, `src/engine/scanText.ts`, `src/engine/scanFrontend.ts`, `src/engine/scanApi.ts`, `tests/scanChecks.test.ts`
+- Depends on: F6.1, F5.2
+- verify: `npm run typecheck && npx vitest run tests/scanChecks.test.ts tests/sourceScan.test.ts`
+
+### F6.3 — Security checks and the one automatic fix
+- Inputs: file text, inventory paths, a finding
+- Outputs: six checks; `buildTargetBlankFix`; `buildFixProposal`
+- Invariants: a secret value never appears in any finding text; `env-file` works for unread files and ignores example files; an automatic fix is offered only when its diff applies, the finding disappears, nothing new appears, and the diff holds no secret; otherwise the finding is Guided with a note; reverse then apply restores the text exactly
+- Files: `src/engine/scanSecurity.ts`, `src/engine/scanFix.ts`, `tests/scanChecks.test.ts`, `tests/scanSecrets.test.ts`, `tests/scanFix.test.ts`
+- Depends on: F6.1, F6.2, F4.1
+- verify: `npm run typecheck && npx vitest run tests/scanChecks.test.ts tests/scanSecrets.test.ts tests/scanFix.test.ts`
+
+### F6.4 — Backend checks and route mismatch
+- Inputs: file text, 2C edges
+- Outputs: four Backend checks and `scan.api.route-mismatch`
+- Invariants: Possible checks say what was not seen; a repository with no routes never gets a mismatch finding; one `no-auth-limit` finding per repository at the first write route; parameterised queries are not flagged; bounded patterns
+- Files: `src/engine/scanBackend.ts`, `tests/scanChecks.test.ts`
+- Depends on: F6.1, F6.2, F5.5
+- verify: `npm run typecheck && npx vitest run tests/scanChecks.test.ts`
+
+### F6.5 — Scan engine, view helpers, sample expectations
+- Inputs: a snapshot, the 2C result, effective content, an abort signal, injected yield and clock
+- Outputs: `ScanResult`; `scanProject`, `rescanPaths`, `scanFile`; counts, links, worker slots, and what-was-checked helpers
+- Invariants: batches of 40; limits give plain-words partial reasons; abort leaves nothing; a throwing check is isolated; deterministic order; applicability follows effective labels; incremental re-check changes only the given paths; the three sample results equal the hand-written findings; no score, grade, percentage, "secure", or "no problems"
+- Files: `src/engine/scanProject.ts`, `src/engine/scanView.ts`, `tests/scanProject.test.ts`, `tests/scanSamples.test.ts`, `tests/scanView.test.ts`
+- Depends on: F6.2, F6.3, F6.4, F4.3
+- verify: `npm run typecheck && npx vitest run tests/scanProject.test.ts tests/scanSamples.test.ts tests/scanView.test.ts`
+
+### F6.6 — Scan state, actions, store slice, Security row
+- Inputs: scan events
+- Outputs: `StudioState.scan`; whole-state actions with Log entries; the optional scan argument of `summarize`
+- Invariants: stale run ids ignored; log entries hold counts and titles only; state cleared with `ai`, `work`, and `understanding`; the Security row stays "pending scan (2D)" until a scan is done and then shows a count; existing tests pass unedited
+- Files: `src/store/scanSlice.ts`, `src/store/scanActions.ts`, `src/store/useStudioStore.ts`, `src/engine/understandingView.ts`, `src/components/UnderstandingSection.tsx`, `tests/scanState.test.ts`
+- Depends on: F6.5, F5.6, F5.7
+- verify: `npm run typecheck && npx vitest run tests/scanState.test.ts tests/store.test.ts tests/understandingView.test.ts tests/understandingUi.test.tsx tests/workStore.test.ts`
+
+### F6.7 — Crew script and run changes
+- Inputs: findings, the 2B run state, commands and ticks
+- Outputs: `buildCrewScript`, `narrate`; run kind `crew` with area, finding, propose, and verify steps; same-update re-check after approve, undo, and redo
+- Invariants: the practice run is unchanged and the 2B suite passes unedited; each finding narrated once under its primary area; at most 12 per area and 150 steps with "left out" notes; narration holds no code and no secret; the crew never changes anything without a decision; "verified" only after a real re-check; findings and applied fixes never disagree; the 2B invariants hold for both kinds
+- Files: `src/engine/crewScript.ts`, `src/store/workSlice.ts`, `src/store/workActions.ts`, `tests/crewScript.test.ts`, `tests/crewRun.test.ts`
+- Depends on: F6.3, F6.5, F6.6, F4.4, F4.5
+- verify: `npm run typecheck && npx vitest run tests/crewScript.test.ts tests/crewRun.test.ts tests/workState.test.ts tests/workActions.test.ts tests/workStore.test.ts`
+
+### F6.8 — Commands, saved-record guard, harness changes
+- Inputs: typed commands, the saved record, the harness timer
+- Outputs: `start`, `start practice`, `start crew`; the crew run and proposal not saved; the history secret guard; crew tick 1,000 ms; crew wording in the Stop bar and card
+- Invariants: only the 2B tests that assert `start` takes no argument change; a history diff with a secret prevents saving history and logs it; the practice-run record is unchanged; context diffs up to 2,000 characters round-trip and restore with fingerprint checks
+- Files: `src/engine/commands.ts`, `src/store/workStorage.ts`, `src/hooks/useHarness.ts`, `src/components/StopBar.tsx`, `src/components/ProposalCard.tsx`, `tests/commands.test.ts`, `tests/crewStorage.test.ts`, `tests/crewRun.test.ts`
+- Depends on: F6.7, F4.2, F4.6, F4.7
+- verify: `npm run typecheck && npx vitest run tests/commands.test.ts tests/crewStorage.test.ts tests/crewRun.test.ts tests/workStorage.test.ts tests/harnessController.test.ts tests/harnessUi.test.tsx`
+
+### F6.9 — Scan controller
+- Inputs: the studio store, services
+- Outputs: `createScanController`, `useScan`
+- Invariants: starts only when the 2C analysis is done and never during loading; one scan at a time; abort on cancel, snapshot change, and dispose; a label correction marks the scan out of date and starts nothing; no fetch or AI import
+- Files: `src/hooks/useScan.ts`, `tests/scanController.test.ts`
+- Depends on: F6.6
+- verify: `npm run typecheck && npx vitest run tests/scanController.test.ts`
+
+### F6.10 — Screen components and command box
+- Inputs: props only
+- Outputs: area map, worker slots, scan summary, what-was-checked, findings table and detail, narration, request trace, changes made, command box, styles
+- Invariants: text rendered as text; snippets escaped and redacted; no score, grade, percentage, "secure", or "no problems"; no Apply button; only Stop, Approve, and Reject act on changes; tables scroll in boxes; black and white only, no transition or animation
+- Files: `src/components/AreaMap.tsx`, `src/components/WorkerSlots.tsx`, `src/components/ScanSummary.tsx`, `src/components/WhatWasChecked.tsx`, `src/components/FindingsTable.tsx`, `src/components/FindingDetail.tsx`, `src/components/CrewNarration.tsx`, `src/components/RequestTrace.tsx`, `src/components/ChangesMade.tsx`, `src/components/CommandBar.tsx`, `src/styles.css`, `tests/crewUi.test.tsx`
+- Depends on: F6.5
+- verify: `npm run typecheck && npx vitest run tests/crewUi.test.tsx`
+
+### F6.11 — Wiring Screens 4 and 5
+- Inputs: the controllers, the harness, the stores
+- Outputs: the real Skeleton Crew and Domain screens, with no toolbar and with the command box and Stop bar
+- Invariants: the scan starts only when Screen 4 opens; the 2A, 2B, and 2C suites pass unedited apart from the named `start` tests; `open <panel>` from the command box returns to Screen 3
+- Files: `src/components/SkeletonCrewScreen.tsx`, `src/components/DomainScreen.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/styles.css`, `tests/crewUi.test.tsx`
+- Depends on: F6.8, F6.9, F6.10, F3.4, F3.5
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- manual gate (Unverified until run): headless browser run of every item in `requirements.md` section 6, item 15; zero console errors
+
+### F6 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Sub-phase 2D gate (build-phases.md): every finding shows its file, lines, snippet, and reason; no invented scores
