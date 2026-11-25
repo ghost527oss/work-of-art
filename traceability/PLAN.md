@@ -278,3 +278,87 @@ Contract: One short list of safe actions (help, status, start, pause, resume, st
 ### F4 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2B gate (build-phases.md): every command updates state predictably, survives a refresh (through restore), and handles repeated commands
+
+---
+
+> plan_id: `P2C-UNDERSTAND` — Project Understanding (spec `.kiro/specs/05-project-understanding/`). Active product phase: Phase 2, Sub-phase 2C. Status: draft for approval; no node is approved for modification. Depends on 2A (`P2A-SHELL`) and 2B (`P2B-HARNESS`) being built. Black-and-white wireframe, no animation, `AI_MODE=mock` only, no new dependency, no network and no AI call from any 2C code. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F5 — Project Understanding
+Contract: For the loaded repository, PatchBay works out offline what role each file plays (labels, confidence, and plain-English reasons from a built-in skill-book), puts unsure files in Needs Review, lets the user correct labels (saved, logged), and maps the real connections between files (imports, page loads, API calls and routes, settings names) with each link marked Confirmed, Inferred, or Broken. Results appear in a Project understanding section in Project info. No scanner findings, no Security label, no AI, no network.
+
+### F5.1 — Limits and skill-book v1
+- Inputs: none
+- Outputs: `UNDERSTANDING_LIMITS`, `SKILLBOOK` (version and 31 sort skills), `skillById`
+- Invariants: unique stable ids; every skill has strength, label from the existing label set, clue family, and a plain-English explanation without banned jargon; the book is frozen; data only; no React, store, engine, or network imports
+- Files: `src/config/understandingLimits.ts`, `src/skillbook/types.ts`, `src/skillbook/sortSkills.ts`, `src/skillbook/index.ts`, `tests/skillbook.test.ts`
+- Depends on: F1.1 (label set)
+- verify: `npm run typecheck && npx vitest run tests/skillbook.test.ts`
+
+### F5.2 — Source scanner
+- Inputs: a file path and its content
+- Outputs: imports, loads, routes, mounts, calls, config names, code patterns, alias imports, each with a line number
+- Invariants: pure and never throws; comments and decoy strings ignored; returns only specifiers, addresses, names, and markers (never source lines or setting values); bounded patterns; hostile 200 KB input finishes in under 1 second; no React, store, or network imports
+- Files: `src/engine/sourceScan.ts`, `tests/sourceScan.test.ts`
+- Depends on: F5.1
+- verify: `npm run typecheck && npx vitest run tests/sourceScan.test.ts`
+
+### F5.3 — File sorting
+- Inputs: inventory files, scans, manifest facts, optional edges
+- Outputs: one `FileUnderstanding` per file entry
+- Invariants: no file dropped; a label exists only with at least one skill hit; no guessing (no clue gives `unknown`, Low, Needs Review); fixed confidence rule; strong helper labels suppress weaker area labels; Low label dropped next to Medium or High; `shared` only from imports by both sides; path-only files use no content skills; deterministic output; per-file failure isolated; every evidence id exists in the skill-book
+- Files: `src/engine/sortFiles.ts`, `tests/sortFiles.test.ts`
+- Depends on: F5.1, F5.2
+- verify: `npm run typecheck && npx vitest run tests/sortFiles.test.ts`
+
+### F5.4 — Connection map
+- Inputs: scans, inventory paths, whether the tree is complete
+- Outputs: edges, external package names, map coverage counts
+- Invariants: real connections only; certainty Confirmed, Inferred, or Broken by the stated rules; a frontend-only repository is not Broken; route mounts resolved only through literal requires or imports; names only for settings; aliases counted not followed; bounded and deterministic; partial flag when a bound is hit
+- Files: `src/engine/connectionMap.ts`, `tests/connectionMap.test.ts`
+- Depends on: F5.2
+- verify: `npm run typecheck && npx vitest run tests/connectionMap.test.ts`
+
+### F5.5 — Analysis run, view helpers, sample expectations
+- Inputs: a snapshot, an abort signal, an injected yield and clock
+- Outputs: `AnalysisResult`; `applyCorrections`, `summarize`, filters, area and helper tables
+- Invariants: batches of 40 with a yield between; 8 second limit gives a partial result; abort leaves nothing; one failing file isolated; the snapshot is never mutated; the three sample results equal the hand-written tables exactly; Security counts 0
+- Files: `src/engine/analyzeProject.ts`, `src/engine/understandingView.ts`, `tests/analyzeProject.test.ts`, `tests/understandingView.test.ts`, `tests/analyzeSamples.test.ts`
+- Depends on: F5.3, F5.4
+- verify: `npm run typecheck && npx vitest run tests/analyzeProject.test.ts tests/understandingView.test.ts tests/analyzeSamples.test.ts`
+
+### F5.6 — Understanding state and actions
+- Inputs: run events, correction actions
+- Outputs: `StudioState.understanding`; whole-state actions with Log entries
+- Invariants: stale run ids ignored; corrections never start a run or change the result; log entries hold paths, counts, and label names only; state cleared with `ai` and `work`; existing tests pass unedited
+- Files: `src/store/understandingSlice.ts`, `src/store/understandingActions.ts`, `src/store/useStudioStore.ts`, `tests/understandingState.test.ts`
+- Depends on: F5.5, F1.7
+- verify: `npm run typecheck && npx vitest run tests/understandingState.test.ts tests/store.test.ts tests/aiState.test.ts tests/workStore.test.ts`
+
+### F5.7 — Saved corrections and controller
+- Inputs: the studio store, a storage object, services
+- Outputs: record `patchbay.corrections.v1`; `createUnderstandingController`, `useUnderstanding`
+- Invariants: one slot keyed by repository; only paths and label names saved; strict schema and bounds; save only after restore for the current snapshot; restore only for a matching repository and existing paths; one run per snapshot, aborted on replace, clear, cancel, and dispose; Back to Start keeps the slot; no fetch or AI import
+- Files: `src/store/correctionsStorage.ts`, `src/hooks/useUnderstanding.ts`, `tests/correctionsStorage.test.ts`, `tests/understandingController.test.ts`
+- Depends on: F5.6, F4.6 (`repoKeyOf`)
+- verify: `npm run typecheck && npx vitest run tests/correctionsStorage.test.ts tests/understandingController.test.ts`
+
+### F5.8 — Section components
+- Inputs: props only
+- Outputs: `UnderstandingSection`, `FileLabelsTable`, `LabelEditor`, `ConnectionsTable`, styles
+- Invariants: text rendered as text; certainty shown in words; tables in scroll boxes with header cells; label editor offers the nine selectable labels with plain names; black and white only, no transition or animation; keyboard and touch usable
+- Files: `src/components/UnderstandingSection.tsx`, `src/components/FileLabelsTable.tsx`, `src/components/LabelEditor.tsx`, `src/components/ConnectionsTable.tsx`, `src/styles.css`, `tests/understandingUi.test.tsx`
+- Depends on: F5.5
+- verify: `npm run typecheck && npx vitest run tests/understandingUi.test.tsx`
+
+### F5.9 — Wiring into Project info and App
+- Inputs: the controller, the existing Project info
+- Outputs: the section between the coverage panel and the inventory
+- Invariants: no existing test edited; Screens 4 and 5 and the toolbar unchanged; ingestion, AI, shell, and harness behavior unchanged
+- Files: `src/components/ProjectInfo.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/styles.css`, `tests/understandingUi.test.tsx`
+- Depends on: F5.7, F5.8, F3.5
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- manual gate (Unverified until run): headless browser run of every item in `requirements.md` section 6, item 13; zero console errors
+
+### F5 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Sub-phase 2C gate (build-phases.md): no guessed labels; low-confidence files go to Needs Review
