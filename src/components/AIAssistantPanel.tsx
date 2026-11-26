@@ -49,6 +49,7 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
   const edges = useStudioStore((s) => s.understanding.result?.edges);
   const finding = useMemo(() => scanFindings?.find((f) => f.id === findingId), [scanFindings, findingId]);
   const notSetUp = uiState.status.kind === 'live' && !uiState.status.ready;
+  const checking = uiState.status.kind === 'checking';
 
   // Leaving the panel (another panel opens, or it closes) drops a question that is waiting for the notice.
   useEffect(() => () => assistant.discardHeld?.(), [assistant]);
@@ -77,7 +78,7 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
       setInlineError('');
       return;
     }
-    if (ai.status === 'pending' || notSetUp) return;
+    if (ai.status === 'pending' || notSetUp || checking) return;
     const input: Omit<SendInput, 'bypassCache'> = {
       snapshot, instruction, taskType, selectedPaths, includeContent,
       ...(finding ? { finding: { path: finding.path, skillId: finding.skillId, firstLine: finding.firstLine }, findingId: finding.id } : {}),
@@ -210,7 +211,7 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
         )}
 
         <p>
-          <button type="submit" disabled={ai.status === 'pending' || overInstruction || notSetUp}>
+          <button type="submit" disabled={ai.status === 'pending' || overInstruction || notSetUp || checking}>
             Send
           </button>{' '}
           {ai.status === 'pending' && (

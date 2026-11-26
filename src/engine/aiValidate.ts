@@ -174,6 +174,7 @@ export function validateAIResult(request: AIRequest, result: unknown): ValidateR
     // An action may come only from an `act` request that carried no file text (design 13.1). The browser checks this too.
     if (request.taskType !== 'act') problems.push('an action response is valid only for the act task.');
     if (request.sourceContext !== undefined) problems.push('an action response is not allowed when file text was sent.');
+    if (request.connections !== undefined) problems.push('an action response is not allowed when connection facts were sent.');
     const needsStart = response.action === 'start';
     const needsPanel = response.action === 'open';
     if (needsStart && response.arg !== 'practice' && response.arg !== 'crew') problems.push('start needs the argument practice or crew.');

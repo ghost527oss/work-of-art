@@ -2,7 +2,7 @@
 // Connects the assistant controller to the harness: an AI `action` runs through the same path as a typed command, and a live
 // AI patch is checked and queued as the one waiting proposal. Nothing here applies a change; only Approve does.
 import { useEffect } from 'react';
-import { checkAIAction } from '../engine/aiActionPolicy';
+import { checkAIAction, stateRefusal } from '../engine/aiActionPolicy';
 import { checkAIProposal } from '../engine/aiProposal';
 import type { AIRequest, AIResult } from '../types/contracts';
 import { logAIAction, noteAIProposalRefused, queueAIProposal } from '../store/aiProposalActions';
@@ -33,6 +33,11 @@ export function createAIHandoff(
       const check = checkAIAction(request, response);
       if (!check.ok) {
         store.update((s) => addChatReply(s, 'AI action', check.reason, false));
+        return;
+      }
+      const refusal = stateRefusal(store.getState(), check.command);
+      if (refusal !== null) {
+        store.update((s) => addChatReply(s, 'AI action', refusal, false));
         return;
       }
       store.update((s) => logAIAction(s, check.line, services.now()));

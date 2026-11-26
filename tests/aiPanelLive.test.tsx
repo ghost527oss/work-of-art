@@ -156,3 +156,14 @@ describe('wireframe rules for the new parts', () => {
     expect(block).toContain('min-height: 44px');
   });
 });
+
+describe('review fix: Send waits for the status check', () => {
+  it('while the mode is being checked, Send is disabled', () => {
+    expect(render(stub({ kind: 'checking' }))).toMatch(/<button type="submit" disabled[^>]*>Send<\/button>/);
+  });
+  it('once the mode is known, Send is enabled (mock, live ready, unknown)', () => {
+    for (const s of [{ kind: 'mock' }, LIVE, { kind: 'unknown' }] as AIStatusState[]) {
+      expect(render(stub(s))).not.toMatch(/<button type="submit" disabled/);
+    }
+  });
+});

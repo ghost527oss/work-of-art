@@ -130,6 +130,8 @@ export function buildAIRequest(
 export interface BuildLiveRequestOptions extends BuildAIRequestOptions {
   finding?: FocusFinding | undefined;
   edges?: readonly Edge[] | undefined;
+  /** The practice copy's text for a path (so snippets match what an approved change would be applied to). */
+  contentOf?: ((path: string) => string | undefined) | undefined;
 }
 
 export type LiveBuildResult = { ok: true; request: AIRequest; notes: string[] } | { ok: false; message: string };
@@ -153,7 +155,9 @@ export function buildLiveRequest(
     paths: options.selectedPaths,
     finding: options.finding,
     includeContent: options.includeContent,
-    edges: options.edges,
+    // Connection facts come from file text, so they are never sent with a "Do something" request (an action may not follow file text).
+    edges: options.taskType === 'act' ? undefined : options.edges,
+    contentOf: options.contentOf,
   });
   if (!built.ok) return { ok: false, message: built.message };
   const c = built.context;

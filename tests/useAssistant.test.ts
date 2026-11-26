@@ -444,10 +444,10 @@ describe('Phase 3A: the first-request notice', () => {
     expect(t.ui.getState().noticeOpen).toBe(true);
     expect(t.calls).toHaveLength(0);
   });
-  it('a request sent before the status answer arrives also waits for the notice', () => {
+  it('a request sent before the status answer arrives is refused with a plain message and nothing is held or sent', () => {
     const t = setupLive();
-    t.actions.send(liveInput(t.store));
-    expect(t.ui.getState().noticeOpen).toBe(true);
+    expect(t.actions.send(liveInput(t.store))).toBe('Still checking the AI mode. Try again in a moment.');
+    expect(t.ui.getState().noticeOpen).toBe(false);
     expect(t.calls).toHaveLength(0);
   });
 });
@@ -691,5 +691,116 @@ describe('Phase 3A: the result hand-off and the Log', () => {
     expect(text).not.toContain('QUESTION_SENTINEL_77');
     expect(text).not.toContain('ANSWER_SENTINEL');
     expect(text).not.toContain('openai/gpt-oss-20b');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// @node: F11.8 review fixes (independent review, 2026-11-26)
+// ---------------------------------------------------------------------------
+
+import { runCommand } from '../src/store/workActions';
+import { practiceContent } from '../src/engine/practiceScript';
+import { loadedState, wctx } from './helpers/aiHarness';
+import { applyUnifiedDiff } from '../src/engine/diffApply';
+
+describe('review fix: snippets and saved answers follow the practice copy', () => {
+  const html = '<!doctype html>\n<html>\n<body>\n<h1>Shop</h1>\n<img src="logo.png">\n<p>Welcome to the little shop</p>\n</body>\n</html>\n';
+  async function liveWithPractice() {
+    const state = await loadedState({ 'index.html': html });
+    const store: Store<StudioState> = createStore(state);
+    const calls: Call[] = [];
+    let clock = 0;
+    const controller = createAssistantController(store, {
+      requestAssistant(request, { signal }) { const result = deferred<AIResult>(); calls.push({ request, signal, result }); return result.promise; },
+      now: () => ++clock, newId: () => `rf-${calls.length + 1}`,
+      fetchStatus: async () => ({ kind: 'live', ready: true, providers: [] }), cache: createAnswerCache(),
+    });
+    await controller.actions.refreshStatus!();
+    controller.actions.acceptNotice!();
+    return { store, calls, actions: controller.actions };
+  }
+  const ask = (t: Awaited<ReturnType<typeof liveWithPractice>>, over: Record<string, unknown> = {}) =>
+    t.actions.send({ snapshot: t.store.getState().snapshot!, instruction: 'What changed in this page?', taskType: 'explain', selectedPaths: ['index.html'], includeContent: true, ...over } as never);
+  const approveEdit = (t: Awaited<ReturnType<typeof liveWithPractice>>) => {
+    const diff = '--- a/index.html\n+++ b/index.html\n@@ -5,1 +5,1 @@\n-<img src="logo.png">\n+<img src="logo.png" alt="Shop logo">\n';
+    t.store.update((s) => ({ ...s, work: { ...s.work, proposal: { id: 'p', path: 'index.html', title: 't', diff, source: 'practice' as const } } }));
+    t.store.update((s) => runCommand(s, { name: 'approve' }, wctx()).state);
+  };
+
+  it('after an approved change, a new request sends the practice text, not the original', async () => {
+    const t = await liveWithPractice();
+    approveEdit(t);
+    expect(practiceContent(t.store.getState().snapshot!, t.store.getState().work.applied, 'index.html')).toContain('alt="Shop logo"');
+    ask(t);
+    const sent = t.calls[0]!.request.sourceContext![0]!.content;
+    expect(sent).toContain('alt="Shop logo"');
+    expect(sent).not.toContain('<img src="logo.png">\n');
+  });
+  it('a diff built from the sent snippet applies to the practice copy', async () => {
+    const t = await liveWithPractice();
+    approveEdit(t);
+    ask(t);
+    const sent = t.calls[0]!.request.sourceContext![0]!.content;
+    const practice = practiceContent(t.store.getState().snapshot!, t.store.getState().work.applied, 'index.html')!;
+    expect(practice).toBe(sent);
+    expect(applyUnifiedDiff(practice, '--- a/index.html\n+++ b/index.html\n@@ -6,1 +6,1 @@\n-<p>Welcome to the little shop</p>\n+<p>Hello</p>\n').ok).toBe(true);
+  });
+  it('Approve, Undo, and Redo each end the saved answers', async () => {
+    const t = await liveWithPractice();
+    ask(t, { includeContent: false });
+    t.calls[0]!.result.resolve({ requestId: t.calls[0]!.request.requestId, mode: 'live', response: { type: 'clarification', questions: ['q'] } });
+    await settle();
+    ask(t, { includeContent: false });
+    expect(t.calls).toHaveLength(1); // saved
+    approveEdit(t);
+    ask(t, { includeContent: false });
+    expect(t.calls).toHaveLength(2); // Approve ended the saved answers
+    t.calls[1]!.result.resolve({ requestId: t.calls[1]!.request.requestId, mode: 'live', response: { type: 'clarification', questions: ['q'] } });
+    await settle();
+    ask(t, { includeContent: false });
+    expect(t.calls).toHaveLength(2);
+    t.store.update((s) => runCommand(s, { name: 'undo' }, wctx()).state);
+    ask(t, { includeContent: false });
+    expect(t.calls).toHaveLength(3); // Undo ended them
+    t.calls[2]!.result.resolve({ requestId: t.calls[2]!.request.requestId, mode: 'live', response: { type: 'clarification', questions: ['q'] } });
+    await settle();
+    t.store.update((s) => runCommand(s, { name: 'redo' }, wctx()).state);
+    ask(t, { includeContent: false });
+    expect(t.calls).toHaveLength(4); // Redo ended them
+  });
+});
+
+describe('review fix: no hand-off for mock answers, and status changes drop a held request', () => {
+  it('a mock result is shown but never handed on (no queue, no action)', async () => {
+    const t = setupLive({ kind: 'mock' });
+    await t.actions.refreshStatus!();
+    let handed = 0;
+    t.actions.setResultHandler!(() => { handed++; });
+    t.actions.send(liveInput(t.store));
+    t.calls[0]!.result.resolve({ ...liveResult(t.calls[0]!.request.requestId), mode: 'mock', meta: undefined });
+    await settle();
+    expect(handed).toBe(0);
+    expect(t.store.getState().ai.status).toBe('done');
+  });
+  it('a live result is handed on exactly once', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    let handed = 0;
+    t.actions.setResultHandler!(() => { handed++; });
+    t.actions.send(liveInput(t.store)); t.actions.acceptNotice!();
+    t.calls[0]!.result.resolve(liveResult(t.calls[0]!.request.requestId));
+    await settle();
+    expect(handed).toBe(1);
+  });
+  it('unknown becoming mock drops the held request and the notice', async () => {
+    const t = setupLive({ kind: 'unknown' });
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    expect(t.ui.getState().noticeOpen).toBe(true);
+    t.setStatus({ kind: 'mock' });
+    await t.actions.refreshStatus!();
+    expect(t.ui.getState().noticeOpen).toBe(false);
+    t.actions.acceptNotice!();
+    expect(t.calls).toHaveLength(0);
   });
 });

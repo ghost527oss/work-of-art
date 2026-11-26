@@ -399,3 +399,12 @@ describe('validateAIResult: action responses', () => {
     expect(v({ type: 'action', action: 'pause', arg: 'crew', summary: 's' })).toBe(false);
   });
 });
+
+describe('validateAIResult: an action is not allowed with connection facts (review fix)', () => {
+  it('rejects it', () => {
+    const req: AIRequest = { requestId: 'req-1', instruction: 'x', taskType: 'act', selectedPaths: [], connections: ['a.js calls /x (confirmed, line 1)'] };
+    const res = { requestId: 'req-1', mode: 'live', response: { type: 'action', action: 'help', summary: 's' } } as unknown as AIResult;
+    expect(validateAIResult(req, res).ok).toBe(false);
+    expect(validateAIResult({ ...req, connections: undefined }, res).ok).toBe(true);
+  });
+});

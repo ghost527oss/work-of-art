@@ -11,10 +11,22 @@ export type ActionCheck = { ok: true; command: AIActionCommand; line: string } |
 const PANEL_ARGS: ReadonlySet<string> = new Set(['edit', 'chat', 'log', 'history', 'journal']);
 const ALLOWED: ReadonlySet<string> = new Set(AI_ACTION_NAMES);
 
+/**
+ * Rules that depend on the current state. A waiting proposal is the user's to decide: the AI may not stop (which rejects it).
+ * Undo and redo are already refused by the harness while a proposal waits.
+ */
+export function stateRefusal(state: { work: { proposal: unknown } }, command: AIActionCommand): string | null {
+  if (command.name === 'stop' && state.work.proposal !== null) {
+    return 'A change is waiting for your decision. Only you can reject it, so the AI cannot stop here.';
+  }
+  return null;
+}
+
 export function checkAIAction(request: AIRequest, response: AIResponse): ActionCheck {
   if (response.type !== 'action') return { ok: false, reason: 'That answer was not an action.' };
   if (request.taskType !== 'act') return { ok: false, reason: 'An action is allowed only for a "Do something" request.' };
   if (request.sourceContext !== undefined) return { ok: false, reason: 'An action is not allowed when file contents were sent, so file text cannot start one.' };
+  if (request.connections !== undefined) return { ok: false, reason: 'An action is not allowed when connection facts taken from file text were sent.' };
   if (!ALLOWED.has(response.action)) return { ok: false, reason: `The AI cannot run "${response.action}".` };
   const { action, arg } = response;
   if (action === 'start') {

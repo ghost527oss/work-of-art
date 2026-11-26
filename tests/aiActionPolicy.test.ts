@@ -65,3 +65,24 @@ describe('checkAIAction: where it may run', () => {
     expect(checkAIAction(act, action('pause', 'crew')).ok).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// @node: F11.9 review fixes (independent review, 2026-11-26)
+// ---------------------------------------------------------------------------
+
+import { stateRefusal } from '../src/engine/aiActionPolicy';
+
+describe('connection facts and waiting proposals', () => {
+  it('an action is refused when connection facts (taken from file text) were sent', () => {
+    const r = checkAIAction({ ...act, connections: ['a.js calls /api/x (confirmed, line 1)'] }, action('help'));
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.reason).toContain('connection facts');
+  });
+  it('stop is refused while a change waits for the user, because stop would reject it', () => {
+    const waiting = { work: { proposal: { id: 'p' } } };
+    const idle = { work: { proposal: null } };
+    expect(stateRefusal(waiting, { name: 'stop' })).toBe('A change is waiting for your decision. Only you can reject it, so the AI cannot stop here.');
+    expect(stateRefusal(idle, { name: 'stop' })).toBeNull();
+    for (const name of ['help', 'status', 'pause', 'resume', 'step', 'undo', 'redo'] as const) expect(stateRefusal(waiting, { name })).toBeNull();
+  });
+});

@@ -265,3 +265,29 @@ describe('AI actions run through the same path as typed commands', () => {
     expect(parseCommand('approve').kind).toBe('command'); // the typed word still works for the user
   });
 });
+
+describe('review fix: the AI cannot reject a waiting change by stopping', () => {
+  it('an AI "stop" while an AI change waits is refused; the change stays; the user sees why', async () => {
+    const t = await setup();
+    t.deliver();
+    const req: AIRequest = { requestId: 'r', instruction: 'stop everything', taskType: 'act', selectedPaths: [] };
+    t.handoff({ requestId: 'r', mode: 'live', response: { type: 'action', action: 'stop', summary: 's' } }, req, { fromCache: false });
+    expect(t.ran).toEqual([]);
+    expect(t.store.getState().work.proposal).not.toBeNull();
+    expect(t.store.getState().work.chat.at(-1)).toMatchObject({ ok: false, command: 'AI action', reply: 'A change is waiting for your decision. Only you can reject it, so the AI cannot stop here.' });
+    expect(t.store.getState().log.some((l) => l.message === 'AI asked for: stop')).toBe(false);
+  });
+  it('with nothing waiting, an AI stop still stops a run', async () => {
+    const t = await setup();
+    t.command('start');
+    t.handoff({ requestId: 'r', mode: 'live', response: { type: 'action', action: 'stop', summary: 's' } }, { requestId: 'r', instruction: 'stop', taskType: 'act', selectedPaths: [] }, { fromCache: false });
+    expect(t.ran).toEqual(['stop']);
+    expect(t.store.getState().work.run?.status).toBe('stopped');
+  });
+  it('the user can still reject a waiting AI change by typing stop', async () => {
+    const t = await setup();
+    t.deliver();
+    t.command('stop');
+    expect(t.store.getState().work.proposal).toBeNull();
+  });
+});

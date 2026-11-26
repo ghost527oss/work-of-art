@@ -326,3 +326,22 @@ describe('buildLiveRequest', () => {
     expect(r.ok && r.request.requestId).toMatch(/^ai-/);
   });
 });
+
+describe('buildLiveRequest: review fixes', () => {
+  const files = { 'index.html': '<script src="app.js"></script>', 'app.js': 'fetch("/api/x");\nconst a = 1;\n'.repeat(80) };
+  const snap = snapshotOf(files);
+  it('a "Do something" request carries no connection facts, even when edges are given', async () => {
+    const a = await analyze(files);
+    const base = { instruction: 'start it', selectedPaths: ['app.js'], includeContent: false, edges: a.edges };
+    const act = buildLiveRequest(snap, { ...base, taskType: 'act' }, 'i1');
+    const explain = buildLiveRequest(snap, { ...base, taskType: 'explain' }, 'i2');
+    if (!act.ok || !explain.ok) throw new Error('expected ok');
+    expect(act.request.connections).toBeUndefined();
+    expect(explain.request.connections?.length).toBeGreaterThan(0);
+  });
+  it('contentOf supplies the text the snippet is cut from', () => {
+    const r = buildLiveRequest(snap, { instruction: 'q', taskType: 'explain', selectedPaths: ['index.html'], includeContent: true, contentOf: (p) => (p === 'index.html' ? '<p>PRACTICE_TEXT</p>' : undefined) }, 'i3');
+    if (!r.ok) throw new Error(r.message);
+    expect(r.request.sourceContext![0]!.content).toBe('<p>PRACTICE_TEXT</p>');
+  });
+});

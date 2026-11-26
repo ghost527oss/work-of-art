@@ -28,7 +28,7 @@ import { PanelFrame } from './PanelFrame';
 import { JournalPanel } from './JournalPanel';
 import { useJournalModel, useJournalState, type ExportActions, type JournalActions } from '../hooks/useJournal';
 import { requestViewer } from '../edit/previewHandle';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ProjectInfo } from './ProjectInfo';
 import { SandboxPlaceholder } from './SandboxPlaceholder';
 import { SkeletonCrewScreen } from './SkeletonCrewScreen';
@@ -112,6 +112,10 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
   const work = useStudioStore((s) => s.work);
   const view = useShellView();
   const layout = useLayout((l) => l);
+  // A question held for the first-request notice is dropped when the AI panel is closed, collapsed, or replaced by another panel.
+  // (The panel stays mounted while hidden, so its own unmount cleanup does not run.)
+  const aiHidden = layout.openPanel !== 'ai' || layout.collapsed;
+  useEffect(() => { if (aiHidden) assistant.discardHeld?.(); }, [aiHidden, assistant]);
 
   if (!snapshot) return null;
 

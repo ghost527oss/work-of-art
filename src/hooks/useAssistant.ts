@@ -15,6 +15,7 @@ import {
   type BuildLiveRequestOptions, type AIRequest, type AIResult, AssistantError,
 } from '../engine/aiAssistant';
 import { cacheKey, createAnswerCache, type AnswerCache } from '../engine/aiCache';
+import { practiceContent } from '../engine/practiceScript';
 import { fetchAIStatus, type AIStatusState } from '../engine/aiStatus';
 import { createStore, studioStore, withLog, type Store, type StudioState } from '../store/useStudioStore';
 import { beginAIRequest, cancelAIRequest, clearAI, completeAIRequest, failAIRequest, reuseAIAnswer } from '../store/aiActions';
@@ -148,14 +149,23 @@ export function createAssistantController(
   }
 
   // A new or cleared repository ends the session cache and any held request.
+  // A change to the practice copy (Approve, Undo, Redo, an Edit pad change) also ends the saved answers: they describe older text.
   function subscribeSnapshot(): () => void {
     let lastSnapshot = store.getState().snapshot;
+    let lastApplied = store.getState().work.applied;
+    let lastUndone = store.getState().work.undone;
     return store.subscribe(() => {
-      const snap = store.getState().snapshot;
-      if (snap !== lastSnapshot) {
-        lastSnapshot = snap;
+      const s = store.getState();
+      if (s.snapshot !== lastSnapshot) {
+        lastSnapshot = s.snapshot;
+        lastApplied = s.work.applied;
+        lastUndone = s.work.undone;
         cache.clear();
         discardHeld();
+      } else if (s.work.applied !== lastApplied || s.work.undone !== lastUndone) {
+        lastApplied = s.work.applied;
+        lastUndone = s.work.undone;
+        cache.clear();
       }
     });
   }
@@ -167,7 +177,8 @@ export function createAssistantController(
   }
 
   function hand(result: AIResult, request: AIRequest, info: ResultInfo): void {
-    if (!handler) return;
+    // Mock answers are shown exactly as in Phase 2: nothing is queued or run for them.
+    if (!handler || result.mode !== 'live') return;
     try {
       handler(result, request, info);
     } catch (error) {
@@ -219,11 +230,14 @@ export function createAssistantController(
   const actions: AssistantActions = {
     send(input) {
       if (store.getState().ai.status === 'pending') return null; // ignore while pending
+      if (ui.getState().status.kind === 'checking') return 'Still checking the AI mode. Try again in a moment.';
       const mode = modeNow();
       const id = input.requestId ?? services.newId();
+      const current = store.getState();
+      const contentOf = (p: string): string | undefined => practiceContent(input.snapshot, current.work.applied, p);
       const built = mode === 'mock'
         ? buildAIRequest(input.snapshot, input, id)
-        : buildLiveRequest(input.snapshot, input, id);
+        : buildLiveRequest(input.snapshot, { ...input, contentOf: input.contentOf ?? contentOf }, id);
       if (!built.ok) return built.message;
       const request = built.request;
       const key = mode === 'live' ? cacheKey('live', request) : undefined;
@@ -276,7 +290,7 @@ export function createAssistantController(
       const next = await services.fetchStatus();
       if (mine !== epoch) return;
       ui.update((s) => ({ ...s, status: next }));
-      const modeChanged = (before === 'mock' || before === 'live') && next.kind !== before;
+      const modeChanged = next.kind !== before && before !== 'checking';
       if (modeChanged) {
         cache.clear();
         discardHeld();

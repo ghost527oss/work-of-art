@@ -22,6 +22,8 @@ export interface ContextInput {
   includeContent: boolean;
   /** Edges from the connection map (`understanding.result.edges`). */
   edges?: readonly Edge[] | undefined;
+  /** The text the user is working on now: the practice copy (the loaded file plus approved changes). Defaults to the loaded text. */
+  contentOf?: ((path: string) => string | undefined) | undefined;
 }
 
 export interface SnippetItem { filePath: string; content: string; startLine?: number }
@@ -120,7 +122,7 @@ export function buildContext(input: ContextInput): ContextResult {
         notes.push(`Snippets were sent for the first ${AI_LIMITS.maxContextFiles} files only.`);
         break;
       }
-      const raw = byPath.get(p)!.content;
+      const raw = input.contentOf ? input.contentOf(p) : byPath.get(p)!.content;
       if (typeof raw !== 'string') { notes.push(`No contents were available for "${p}".`); continue; }
       const text = normalizeEol(raw);
       let item: SnippetItem;
