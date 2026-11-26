@@ -86,7 +86,8 @@ export function saveSession(storage: KeyValueStorage | undefined, record: Sessio
   if (!storage) return null;
   try {
     if (!SessionRecordSchema.safeParse(record).success) return null;
-    const text = JSON.stringify(record);
+    const { version, savedAt, target, screen, preview, notes } = record;
+    const text = JSON.stringify({ version, savedAt, target, screen, preview, notes });
     if (text.length > L.recordBytes) return null;
     storage.setItem(SESSION_KEY, text);
     return text;
