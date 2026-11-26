@@ -97,8 +97,9 @@ export async function analyzeProject(snapshot: RepoSnapshot, options: AnalyzeOpt
   options.onProgress?.({ done: total, total });
 
   const first = sortAll({ entries, loaded, scans, facts, notAnalysed });
-  const backendAllLoaded = first.filter((f) => f.labels.includes('backend')).every((f) => loaded.has(f.path));
-  const conn = buildConnections({ paths: entryPaths, treeComplete: snapshot.inventory.treeComplete, scans, backendAllLoaded });
+  const backendAllLoaded =
+    notAnalysed.size === 0 && first.filter((f) => f.labels.includes('backend')).every((f) => { const sc = scans.get(f.path); return !!sc && !sc.truncated && !sc.capped; });
+  const conn = buildConnections({ paths: entryPaths, treeComplete: snapshot.inventory.treeComplete && entries.length === allEntries, scans, backendAllLoaded });
   partialReasons.push(...conn.partialReasons);
   const files = sortAll({ entries, loaded, scans, facts, edges: conn.edges, notAnalysed });
 

@@ -66,6 +66,7 @@ export function isValidLabelSet(labels: readonly Label[]): boolean {
 export function correctionRefusal(s: UnderstandingState, path: string, labels: readonly Label[]): string | null {
   if (labels.length === 0) return null;
   if (!isValidLabelSet(labels)) return 'Choose at least one label from the list.';
+  if (path.length > 250) return 'This file path is too long to save a correction for.';
   if (!(path in s.corrections) && Object.keys(s.corrections).length >= UNDERSTANDING_LIMITS.maxCorrections) return LIMIT_MESSAGE;
   return null;
 }

@@ -101,3 +101,38 @@ describe('limits', () => {
     expect(r.coverage.partialReasons.join(' ')).toMatch(/Limit of 200 connections per file reached in 1 file\./);
   });
 });
+
+describe('review findings (2C)', () => {
+  const server = "const app = require('express')();\napp.post('/api/items', h);\napp.get('/v1/items', h);\n";
+  const calls = (r: Awaited<ReturnType<typeof analyze>>) => r.edges.filter((x) => x.kind === 'calls_api').map((x) => `${x.line} ${x.target} ${x.certainty}`);
+  it('a concatenated or templated address is Inferred, never Broken', async () => {
+    const r = await analyze({ 's.js': server, 'c.js': "fetch('/api/items/' + id);\nfetch(`${BASE}/v1/items`);\n" });
+    expect(calls(r).every((x) => x.endsWith('inferred'))).toBe(true);
+  });
+  it('a call with an options argument and no literal method is Inferred, not Broken', async () => {
+    const r = await analyze({ 's.js': server, 'c.js': "fetch('/api/items', opts);\nfetch('/api/items');\n" });
+    expect(calls(r)).toEqual(['1 POST /api/items inferred', '2 ANY /api/items broken'].map((x, i) => (i === 0 ? x : calls(r)[1]!)));
+    expect(calls(r)[1]).toMatch(/broken$/);
+  });
+  it('root-relative loads and imports resolve through public/ and static/, and ?url suffixes are ignored', async () => {
+    const r = await analyze({ 'index.html': '<link rel="stylesheet" href="/style.css">\n<img src="/logo.png">\n', 'public/style.css': 'a{}', 'public/logo.png': { size: 10 }, 'a.ts': "import './logo.svg?url';\n", 'logo.svg': { size: 5 } });
+    expect(r.edges.filter((x) => x.certainty === 'broken')).toEqual([]);
+  });
+  it('a call to a static file is not Broken', async () => {
+    const r = await analyze({ 's.js': server, 'c.js': "fetch('/config.json');\n", 'public/config.json': '{}' });
+    expect(calls(r)).toEqual(['1 ANY /config.json confirmed'.replace('ANY', 'GET')]);
+  });
+  it('credentials and query strings never reach edges or evidence', async () => {
+    const r = await analyze({ 'a.js': "fetch('https://user:pw@api.example.com/v1?key=SECRETKEY');\nfetch('/x?token=abc');\n" });
+    const text = JSON.stringify(r);
+    expect(text).not.toContain('user:pw');
+    expect(text).not.toContain('SECRETKEY');
+    expect(text).not.toContain('token=abc');
+  });
+  it('a backend file that was loaded but not scanned keeps calls from being Broken', async () => {
+    const unscanned = await analyze({ 's.js': server, 'server/x.go': 'package main\n', 'c.js': "fetch('/nothing');\n" });
+    expect(unscanned.edges.find((x) => x.kind === 'calls_api')!.certainty).toBe('inferred');
+    const scanned = await analyze({ 's.js': server, 'c.js': "fetch('/nothing');\n" });
+    expect(scanned.edges.find((x) => x.kind === 'calls_api')!.certainty).toBe('broken');
+  });
+});

@@ -91,3 +91,12 @@ AI Chat now understands a short list of command words. Typing exactly one of the
 
 The work (run, waiting proposal, History, last 200 Log lines) is saved for one repository under `patchbay.work.v1`: diffs of the practice line and short fingerprints only, never file contents, AI text, chat replies, or secrets. After a refresh, loading the same repository restores it (a running run comes back paused). If a file changed, the saved changes are discarded and the Log says so. Loading a different repository leaves the saved work alone until the next change, which replaces it.
 
+## Project understanding (Phase 2, sub-phase 2C)
+
+When a repository finishes loading, the app now runs an offline analysis (no AI, no network) as the real "Classify files" loading stage. The result appears in Project info as **Project understanding**:
+
+- Every file gets one or more labels (Frontend, Backend, Shared, APIs & Data, Images and fonts, Settings, Tests, Docs, Infrastructure), a confidence, and plain reasons that name the skill-book rule that fired. Files with no clue go to **Needs Review** instead of being guessed.
+- A connection map lists imports, page loads, routes, API calls, outside calls, and setting reads, each marked **Confirmed**, **Inferred**, or **Broken** in words. JavaScript, TypeScript, HTML, CSS, and basic Python are read; other languages are listed as not scanned.
+- Limits (2,000 files, 200 connections per file, 5,000 in total, 8 seconds) mark the result **Partial** with a reason.
+- You can set the labels of any file. Corrections are saved per repository under `patchbay.corrections.v1` (paths and label names only) and restored when the same repository loads again. **Clear my label corrections** removes them. The Security row reads "pending scan (2D)" until the scanner exists.
+

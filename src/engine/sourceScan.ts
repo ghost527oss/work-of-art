@@ -112,7 +112,8 @@ function scanJs(content: string): ScanResult {
     if (close === -1) return null;
     return { value: masked.slice(open + 1, close), end: close };
   };
-  const addImport = (spec: string, offset: number) => {
+  const addImport = (spec0: string, offset: number) => {
+    const spec = spec0.startsWith('.') || spec0.startsWith('/') ? spec0.split(/[?#]/)[0]! : spec0;
     if (alias(spec)) { out.aliasImports++; return; }
     if (room()) out.imports.push({ spec: cut(spec), line: lineOf(offset) });
   };
@@ -154,12 +155,21 @@ function scanJs(content: string): ScanResult {
     const s = str(open);
     if (!s || !room()) return;
     const external = /^https?:\/\//i.test(s.value);
-    out.calls.push({ method, address: cut(s.value), line: lineOf(offset), unknown: s.value.includes('${'), external });
+    // Text after the closing quote that is not "," or ")" means the address is built at run time (for example "/a/" + id).
+    const next = /^\s*(.)/.exec(skeleton.slice(s.end + 1, s.end + 40))?.[1];
+    const concatenated = next !== undefined && next !== ',' && next !== ')';
+    out.calls.push({ method, address: cut(s.value), line: lineOf(offset), unknown: s.value.includes('${') || concatenated, external });
+  };
+  /** Whether the call has a second (options) argument after the address string. */
+  const hasOptions = (open: number): boolean => {
+    const s = str(open);
+    return !!s && /^\s*,/.test(skeleton.slice(s.end + 1, s.end + 40));
   };
   const callRe = /\b(fetch|axios|ky)(?:\.(get|post|put|patch|delete))?\s*\(\s*(['"`])/g;
   for (let m = callRe.exec(skeleton); m; m = callRe.exec(skeleton)) {
     const open = m.index + m[0].length - 1;
-    const method = m[2] ? m[2].toUpperCase() : (methodNear(open) ?? 'GET');
+    // Only a one-argument call is certainly GET. With options and no literal method the method is unknown.
+    const method = m[2] ? m[2].toUpperCase() : (methodNear(open) ?? (hasOptions(open) ? undefined : 'GET'));
     addCall(open, m.index, method);
   }
   const openRe = /\.open\s*\(\s*(['"])[A-Za-z]+\1\s*,\s*(['"`])/g;

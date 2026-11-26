@@ -34,6 +34,15 @@ describe('sorting rules', () => {
     expect(util.evidence.some((e) => e.description.includes('sort.ref.shared') && e.description.includes('web/page.tsx'))).toBe(true);
     expect(labelsOf(r, 'lib/other.js').labels).toEqual(['unknown']);
   });
+  it('a file imported only by frontend files is not shared', async () => {
+    const r = await analyze({
+      'package.json': '{"dependencies":{"react":"1"}}',
+      'web/a.tsx': "import { x } from '../lib/util';\nimport React from 'react';\n",
+      'web/b.tsx': "import { x } from '../lib/util';\nimport React from 'react';\n",
+      'lib/util.js': 'exports.x = 1;\n',
+    });
+    expect(labelsOf(r, 'lib/util.js').labels).toEqual(['unknown']);
+  });
   it('a file with no content is sorted by path only with the fixed reason, and a strong path clue can still be High', async () => {
     const r = await analyze({ 'img/a.png': { size: 100 } });
     const f = labelsOf(r, 'img/a.png');

@@ -46,6 +46,11 @@ function cutDetail(s: string): string {
   return redact(s.length > L.maxDetailChars ? s.slice(0, L.maxDetailChars) : s).text;
 }
 
+/** Host and path only: no credentials and no query string. */
+function safeAddress(a: string): string {
+  return a.replace(/^(https?:\/\/)[^@/?#]*@/i, '$1').split(/[?#]/)[0]!;
+}
+
 function pkgBase(spec: string): string {
   if (spec.startsWith('node:')) return spec;
   if (spec.startsWith('@')) return spec.split('/').slice(0, 2).join('/');
@@ -120,7 +125,7 @@ function contentHits(path: string, scan: ScanResult | undefined, facts: Manifest
       add('sort.syntax.route-def', scan.routes[0]!.path);
       add('sort.syntax.route-data', scan.routes[0]!.path);
     }
-    if (scan.calls.length > 0) add('sort.syntax.request-call', scan.calls[0]!.address);
+    if (scan.calls.length > 0) add('sort.syntax.request-call', safeAddress(scan.calls[0]!.address));
   }
   if (JS_FAMILY.has(ext) && facts.pkgFrontend && !facts.pkgServer && path.startsWith('src/')) add('sort.manifest.frontend-project', 'package.json lists a screen library');
   if ((JS_FAMILY.has(ext) && facts.pkgServer && !facts.pkgFrontend) || (ext === 'py' && facts.pyServer)) add('sort.manifest.backend-project', 'project lists a server library');

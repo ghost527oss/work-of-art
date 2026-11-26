@@ -171,7 +171,11 @@ export function buildConnections(input: ConnectionInput): ConnectionOutput {
       if (spec.startsWith('.') || spec.startsWith('/')) fileEdge('imports', from, imp.line, spec, resolveFile(paths, join(dir, spec)));
       else if (!spec.startsWith('node:')) externals.add(pkgBase(spec));
     }
-    for (const ld of scan.loads) fileEdge('loads', from, ld.line, ld.target, resolveFile(paths, join(dir, ld.target)));
+    for (const ld of scan.loads) {
+      let r = resolveFile(paths, join(dir, ld.target));
+      if (!r && ld.target.startsWith('/')) r = resolveFile(paths, join('public', ld.target.slice(1))) ?? resolveFile(paths, join('static', ld.target.slice(1)));
+      fileEdge('loads', from, ld.line, ld.target, r);
+    }
     for (const ev of scan.env) push({ kind: 'reads_config', from, line: ev.line, target: ev.name, certainty: 'confirmed' });
     const targets = new Map<string, string>();
     for (const b of scan.bindings) {
@@ -221,30 +225,39 @@ export function buildConnections(input: ConnectionInput): ConnectionOutput {
 
   // 3. calls
   const hasRoutes = routes.length > 0;
-  const host = (a: string) => /^https?:\/\/([^/?#]+)/i.exec(a)?.[1] ?? a.slice(0, 60);
+  const host = (a: string) => /^https?:\/\/(?:[^@/?#]*@)?([^/?#:]+)/i.exec(a)?.[1] ?? a.slice(0, 60);
   for (const from of files) {
     for (const c of scans.get(from)!.calls as ScanCall[]) {
       if (c.external) { push({ kind: 'calls_external', from, line: c.line, target: host(c.address), certainty: 'confirmed' }); continue; }
-      const method = c.method ?? 'GET';
+      const method = c.method;
+      const shown = method ?? 'ANY';
       const hits = routes.map((r) => ({ r, m: matches(r.path, c.address) })).filter((x) => x.m.ok);
-      const compatible = hits.filter((x) => !x.r.method || x.r.method === method);
+      const compatible = hits.filter((x) => !x.r.method || !method || x.r.method === method);
       const address = c.address.split(/[?#]/)[0]!;
-      if (hits.length > 0 && compatible.length === 0) {
-        push({ kind: 'calls_api', from, line: c.line, target: `${method} ${address}`, certainty: 'broken', note: 'method differs' });
+      const unknownNote = 'the address has a part that is not known until it runs';
+      if (hits.length > 0 && compatible.length === 0 && !c.unknown) {
+        push({ kind: 'calls_api', from, line: c.line, target: `${shown} ${address}`, certainty: 'broken', note: 'method differs' });
       } else if (compatible.length > 0) {
         const best = compatible[0]!;
-        const inferred = c.unknown || compatible.every((x) => x.r.unresolvedMount) || best.m.unknown;
+        const methodUnknown = !method && !!best.r.method;
+        const inferred = c.unknown || methodUnknown || compatible.every((x) => x.r.unresolvedMount) || best.m.unknown;
         push({
-          kind: 'calls_api', from, line: c.line, target: `${method} ${best.r.path}`, targetPath: best.r.file,
+          kind: 'calls_api', from, line: c.line, target: `${best.r.method ?? shown} ${best.r.path}`, targetPath: best.r.file,
           certainty: inferred ? 'inferred' : 'confirmed',
-          ...(inferred ? { note: best.r.unresolvedMount ? 'mount path unknown' : 'the address has a part that is not known until it runs' } : {}),
+          ...(inferred ? { note: best.r.unresolvedMount ? 'mount path unknown' : methodUnknown ? 'the request method is not known until it runs' : unknownNote } : {}),
         });
+      } else if (/\.[A-Za-z0-9]{1,6}$/.test(address) && !c.unknown) {
+        const file = resolveFile(paths, join('', address)) ?? resolveFile(paths, join('public', address.replace(/^\//, ''))) ?? resolveFile(paths, join('static', address.replace(/^\//, '')));
+        if (file) push({ kind: 'calls_api', from, line: c.line, target: `${shown} ${address}`, targetPath: file, certainty: 'confirmed', note: 'a static file' });
+        else push({ kind: 'calls_api', from, line: c.line, target: `${shown} ${address}`, certainty: 'inferred', note: 'this may be a static file that is not in the repository' });
+      } else if (c.unknown) {
+        push({ kind: 'calls_api', from, line: c.line, target: `${shown} ${address}`, certainty: 'inferred', note: unknownNote });
       } else if (!hasRoutes) {
-        push({ kind: 'calls_api', from, line: c.line, target: `${method} ${address}`, certainty: 'inferred', note: 'No backend routes were found in this repository; the route may live elsewhere.' });
+        push({ kind: 'calls_api', from, line: c.line, target: `${shown} ${address}`, certainty: 'inferred', note: 'No backend routes were found in this repository; the route may live elsewhere.' });
       } else if (input.backendAllLoaded) {
-        push({ kind: 'calls_api', from, line: c.line, target: `${method} ${address}`, certainty: 'broken', note: 'No route matches this address.' });
+        push({ kind: 'calls_api', from, line: c.line, target: `${shown} ${address}`, certainty: 'broken', note: 'No route matches this address.' });
       } else {
-        push({ kind: 'calls_api', from, line: c.line, target: `${method} ${address}`, certainty: 'inferred', note: 'A backend file was not read, so the route may exist.' });
+        push({ kind: 'calls_api', from, line: c.line, target: `${shown} ${address}`, certainty: 'inferred', note: 'A backend file was not read, so the route may exist.' });
       }
     }
   }

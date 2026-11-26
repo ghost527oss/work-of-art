@@ -380,6 +380,11 @@ Contract: For the loaded repository, PatchBay works out offline what role each f
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): headless browser run of every item in `requirements.md` section 6, item 13; zero console errors
 
+### F5 as built (2C)
+- Ignored files are those skipped for dependency, generated, minified, lock file, source map, or symlink reasons. Media and unsupported types stay sortable by path (the worked examples need `assets` for images).
+- A call is never Broken when its address or method is unknown at read time (concatenation, template prefix, options without a literal `method`). `backendAllLoaded` requires every Backend file to be scanned. `treeComplete` is false when the 20,000-file cap cut entries.
+- Credentials and query strings are removed from external hosts and request-call evidence. Paths over 250 characters cannot be corrected.
+
 ### F5 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2C gate (build-phases.md): no guessed labels; low-confidence files go to Needs Review
