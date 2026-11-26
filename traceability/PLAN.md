@@ -738,3 +738,80 @@ Contract: The Journal panel explains the loaded project at three reading levels 
 ### F9 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2F gate (build-phases.md): all earlier gates pass again, zero console errors
+
+---
+
+> plan_id: `P2G-SESSION` — Session Restore (spec `.kiro/specs/10-session-restore/`). Active product phase: Phase 2, Sub-phase 2G (the last sub-phase of Phase 2). Status: draft for approval; no node is approved for modification. Depends on 2A to 2F being built. PatchBay's own screens stay black-and-white wireframe with no animation, `AI_MODE=mock` only, no new dependency, no AI call, and no network use except the existing repository loading that a restore re-runs. The 2E-1 isolation files are read only. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F10 — Session Restore
+Contract: After a browser refresh PatchBay reloads the saved repository address through the normal Loading screen, then restores the screen and the Sandbox settings and lets the earlier sub-phases restore the layout, History, Log, paused practice run, label corrections, and reading level. A small session record (`patchbay.session.v1`) holds only the address, the screen, the Sandbox settings, and two counts. Cancel and failures keep everything and offer Retry, Resume, Reset session, and Back to Start. Back to Start deletes only the session record. Reset session (with confirmation) wipes the session, work, and corrections and keeps the preferences. A "Saved in this browser" block lists what is stored. The sub-phase ends with the Phase 2 exit tests: a refresh matrix, rapid-action tests, and a storage privacy test. Never any secret, file content, or AI text in storage.
+
+### F10.1 — Limits, record, storage helpers, saved-data inventory
+- Inputs: the studio, shell, and preview state; a storage object
+- Outputs: `SessionRecordSchema`, `validateTarget`, `toIngestTarget`, `loadSession`, `saveSession`, `clearSessionRecord`, `clearAllSession`, `describeSavedData`, `buildSessionRecord`
+- Invariants: strict schema with bounds and no extra or secret-like field; at most 4 KB; the record is never built while a load or restore runs or off the Studio; the mode, page, and component are saved only when the user chose them; storage helpers never throw; `clearAllSession` removes exactly the three session keys; the inventory shows sizes and fixed descriptions only
+- Files: `src/config/sessionLimits.ts`, `src/store/sessionRecord.ts`, `tests/sessionRecord.test.ts`, `tests/sessionBuild.test.ts`, `tests/savedData.test.ts`
+- Depends on: F3.1, F4.6
+- verify: `npm run typecheck && npx vitest run tests/sessionRecord.test.ts tests/sessionBuild.test.ts tests/savedData.test.ts`
+
+### F10.2 — Restore store and reset action
+- Inputs: restore events
+- Outputs: `SessionStoreState` and pure transitions; `resetSessionState`; the session Log lines
+- Invariants: transitions ignore a run that is not the pending one; failed and cancelled keep the record; the reset keeps the ingestion run counter and clears every slice and the log; Log lines hold names and counts only
+- Files: `src/store/sessionStore.ts`, `src/store/sessionActions.ts`, `tests/sessionStore.test.ts`
+- Depends on: F10.1
+- verify: `npm run typecheck && npx vitest run tests/sessionStore.test.ts tests/store.test.ts`
+
+### F10.3 — Persistence subscriber
+- Inputs: the studio, shell, and session stores
+- Outputs: record writes
+- Invariants: writes only when the content changed and never while a load runs, a restore is pending, or on the Start screen; never deletes; at most one write per distinct content under rapid changes; blocked storage never throws; subscriptions released
+- Files: `src/store/sessionPersistence.ts`, `tests/sessionPersistence.test.ts`
+- Depends on: F10.1, F10.2
+- verify: `npm run typecheck && npx vitest run tests/sessionPersistence.test.ts`
+
+### F10.4 — Controller, `ingestion.restore`, apply, Back to Start, Reset session
+- Inputs: the saved record, the ingestion controller, the stores
+- Outputs: automatic restore at startup, Resume, Cancel and failure handling, apply of the screen and Sandbox settings with Log lines, Back to Start, Reset session
+- Invariants: starts once per page load; a failed or cancelled restore leaves the record and the other slots untouched; apply happens once, only for the matching run and repository, after the preview is initialised or after 3,000 ms; Back to Start deletes only the session record; Reset session deletes exactly three keys and keeps the preferences; no automatic retry; no network call of its own
+- Files: `src/hooks/useIngestion.ts`, `src/hooks/useSessionRestore.ts`, `src/store/previewSlice.ts`, `src/store/previewActions.ts`, `src/hooks/usePreview.ts`, `tests/sessionApply.test.ts`, `tests/sessionReset.test.ts`, `tests/useIngestion.test.ts`
+- Depends on: F10.1, F10.2, F10.3, F5.8, F7.8, F7.9, F8.5
+- verify: `npm run typecheck && npx vitest run tests/sessionApply.test.ts tests/sessionReset.test.ts tests/useIngestion.test.ts tests/previewState.test.ts tests/previewController.test.ts`
+
+### F10.5 — Scan on Screen 5
+- Inputs: opening Screen 5
+- Outputs: the 2D scan `ensure()` also runs on Screen 5
+- Invariants: never on Screen 3 or during loading; no second scan when one exists or runs; only the one named 2D assertion changes
+- Files: `src/components/DomainScreen.tsx`, `tests/crewUi.test.tsx`, `tests/scanController.test.ts`
+- Depends on: F6.9, F6.11
+- verify: `npm run typecheck && npx vitest run tests/crewUi.test.tsx tests/scanController.test.ts`
+
+### F10.6 — Components
+- Inputs: props only
+- Outputs: `ResumeBanner`, `SavedDataPanel`, `ResetSessionButton` (with confirmation), `RestoreNotice`
+- Invariants: text rendered as text; only Yes, reset acts; no stored value shown, only sizes and fixed descriptions; black and white only, no transition or animation; no Apply, Approve, Reject, Pause, Resume, or Step button
+- Files: `src/components/ResumeBanner.tsx`, `src/components/SavedDataPanel.tsx`, `src/components/ResetSessionButton.tsx`, `src/components/RestoreNotice.tsx`, `src/styles.css`, `tests/sessionUi.test.tsx`
+- Depends on: F10.1, F10.2
+- verify: `npm run typecheck && npx vitest run tests/sessionUi.test.tsx`
+
+### F10.7 — Wiring and restore integration test
+- Inputs: the controller and components
+- Outputs: the Start, Loading, and Studio screens with the new controls; `useSessionRestore` and persistence in `App`
+- Invariants: no existing test edited beyond the one named in F10.5; Screens 4 and 5 unchanged; Back to Start and Reset session effects match the rules table; an end-to-end restore on the samples and a scoped load matches the pre-refresh state
+- Files: `src/components/StartScreen.tsx`, `src/components/LoadingScene.tsx`, `src/components/StudioLayout.tsx`, `src/components/ProjectInfo.tsx`, `src/App.tsx`, `src/styles.css`, `tests/sessionUi.test.tsx`, `tests/sessionRestore.test.ts`
+- Depends on: F10.4, F10.5, F10.6
+- verify: `npm run typecheck && npx vitest run && npm run build`
+
+### F10.8 — Phase 2 exit tests
+- Inputs: the whole app at store level with fakes
+- Outputs: the refresh matrix, the rapid-action test, and the storage privacy test
+- Invariants: for each scenario the restorable state after a refresh equals the state before and the non-restorable items are absent with their Log lines; 1,000 or more random actions with periodic refreshes keep every earlier invariant and bound the writes; only the five known keys are written and no stored value holds file content, a secret, an instruction, a preview document, or a snippet; no source file changes in this task
+- Files: `tests/refreshMatrix.test.ts`, `tests/phase2Rapid.test.ts`, `tests/storagePrivacy.test.ts`, `tests/helpers/sessionHarness.ts`
+- Depends on: F10.7
+- verify: `npm run typecheck && npx vitest run tests/refreshMatrix.test.ts tests/phase2Rapid.test.ts tests/storagePrivacy.test.ts`
+- manual gate (Unverified until run): the browser refresh matrix and the Phase 2 exit evidence in `requirements.md` section 6, items 14 and 15
+
+### F10 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Sub-phase 2G gate (build-phases.md): refresh returns to the same screen with the same work; no secrets or file contents in storage; a failed reload shows a clear error and a reset path
+- Phase 2 exit gate (build-phases.md, original): every interactive control updates state predictably; state survives a page refresh and handles rapid repeated clicks without desyncing or crashing
