@@ -89,7 +89,14 @@ export function buildJournal(input: JournalInput, level: Level): JournalModel {
   };
   const overview = buildOverview(facts, level).map((p) => ({ ...p, sentences: p.sentences.map(clean) }));
   const loaded = new Set(snap.files.filter((f) => typeof f.content === 'string').map((f) => f.path));
-  const { flows, hidden: flowsHidden } = buildFlows(a.edges, loaded, snap.inventory.entries, input.entryPath, a.coverage.aliasImportsNotFollowed);
+  const built = buildFlows(a.edges, loaded, snap.inventory.entries, input.entryPath, a.coverage.aliasImportsNotFollowed);
+  const flowsHidden = built.hidden;
+  // Every flow string is a fact too (paths, addresses, setting names, reasons): redact it.
+  const opt = (t?: string) => (t === undefined ? undefined : clean(t));
+  const flows: Flow[] = built.flows.map((f) => ({
+    ...f, id: clean(f.id), title: clean(f.title), stop: opt(f.stop), notes: f.notes.map(clean),
+    steps: f.steps.map((s) => ({ ...s, path: opt(s.path), target: opt(s.target), note: opt(s.note) })),
+  }));
 
   // Lessons from the project
   const bySkill = new Map<string, Finding[]>();

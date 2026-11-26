@@ -69,6 +69,16 @@ describe('Journal model', () => {
     expect(buildJournalMarkdown(m, snap)).not.toContain(SECRET);
   });
 
+  it('every fact string passes through redact(); hidden values are counted with the note', async () => {
+    const tok = 'ghp_' + 'M'.repeat(36);
+    const input = await inputFor(snapshotOf({ [`${tok}.html`]: '<img src="a.png">\n' }) as never);
+    const m = buildJournal(input, 'practical');
+    expect(JSON.stringify(m)).not.toContain(tok);
+    expect(JSON.stringify(m)).toContain('[REDACTED');
+    expect(m.hidden).toBeGreaterThan(0);
+    expect(m.notes).toContain(`${m.hidden} values were hidden.`);
+  });
+
   it('lessons are ordered by highest severity then id; at most 5 instances with a more count', async () => {
     const files: Record<string, string> = {};
     for (let i = 0; i < 7; i++) files[`p${i}.html`] = '<img src="a.png">\n';

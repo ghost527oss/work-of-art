@@ -28,6 +28,8 @@ describe('level record', () => {
     expect(loadLevel(undefined)).toBe('simple');
     expect(loadLevel({ getItem: () => { throw new Error('blocked'); }, setItem: () => undefined, removeItem: () => undefined })).toBe('simple');
     expect(LevelRecordSchema.safeParse({ version: 1, level: 'simple' }).success).toBe(true);
+    // over 1 KB is refused even when the record is otherwise valid (a valid record is about 30 characters)
+    expect(loadLevel(mem({ [LEVEL_KEY]: JSON.stringify({ version: 1, level: 'deeper' }) + ' '.repeat(1100) }))).toBe('simple');
   });
   it('saveLevel never throws on blocked or full storage', () => {
     expect(() => saveLevel({ getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); }, removeItem: () => undefined }, 'deeper')).not.toThrow();

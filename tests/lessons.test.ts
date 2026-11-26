@@ -44,4 +44,18 @@ describe('the playbook', () => {
     expect(checkLessonText('simple', 'Use the endpoint (x).')).toEqual(expect.arrayContaining(['jargon "endpoint"', 'code characters']));
     expect(checkLessonText('practical', 'This is safe and secure.')).toEqual(expect.arrayContaining([expect.stringContaining('banned')]));
   });
+  it('the R2.4 limits hold exactly at each level (hand-written edges)', () => {
+    const say = (n: number, words = 3) => Array.from({ length: n }, () => Array.from({ length: words }, () => 'word').join(' ') + '.').join(' ');
+    for (const [level, max, words] of [['simple', 3, 20], ['practical', 6, 28], ['deeper', 10, 35]] as const) {
+      expect(checkLessonText(level, say(max)), level).toEqual([]);
+      expect(checkLessonText(level, say(max + 1)), level).toEqual([`more than ${max} sentences`]);
+      expect(checkLessonText(level, say(1, words)), level).toEqual([]);
+      expect(checkLessonText(level, say(1, words + 1)).length, level).toBe(1);
+    }
+  });
+  it('every word of the R2.4 jargon list is caught at Simple (the list is written out here)', () => {
+    const list = ['regex', 'AST', 'parse', 'token', 'payload', 'sanitize', 'middleware', 'endpoint', 'schema', 'async', 'callback', 'DOM', 'XSS', 'CSRF', 'CORS', 'SQL injection', 'namespace', 'boilerplate'];
+    for (const w of list) expect(checkLessonText('simple', `Look at the ${w} here.`), w).toEqual([`jargon "${w}"`]);
+    expect(checkLessonText('practical', 'Look at the middleware here.')).toEqual([]);
+  });
 });

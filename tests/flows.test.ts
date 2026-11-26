@@ -10,6 +10,14 @@ const e = (kind: Edge['kind'], from: string, target: string, extra: Partial<Edge
 const flows = (edges: Edge[], loaded: string[] = [], alias = 0, inv: Array<{ path: string; reason: string }> = []) => buildFlows(edges, new Set(loaded), inv as never, undefined, alias);
 
 describe('honest stops', () => {
+  it('the fixed sentences are exactly the R4.4 text', () => {
+    expect(STOPS.broken).toBe('Stopped: no route matches this address (Broken).');
+    expect(STOPS.outside('api.x.test')).toBe('Stopped: this goes to an outside service (api.x.test), which PatchBay does not follow.');
+    expect(STOPS.notLoaded('a.js', 'too large')).toBe('Stopped: a.js was not loaded (too large).');
+    expect(STOPS.deep).toBe('Stopped: this goes more than 3 files deep, so PatchBay did not follow further.');
+    expect(STOPS.noRoutes).toBe('Stopped: no backend routes were found in this repository; the route may live elsewhere.');
+    expect(STOPS.noCaller).toBe('Nothing in the loaded files calls this route.');
+  });
   it('broken call, outside service, no routes, not loaded, deep, no caller, alias note', () => {
     expect(flows([e('calls_api', 'a.js', 'GET /x', { certainty: 'broken' })]).flows[0]!.stop).toBe(STOPS.broken);
     expect(flows([e('calls_external', 'a.js', 'api.stripe.com')]).flows[0]!.stop).toBe(STOPS.outside('api.stripe.com'));
