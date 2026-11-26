@@ -52,3 +52,88 @@ export function patchResult(request: AIRequest, edits: Edit[], over: Partial<AIR
 }
 
 export const IMG_FIXTURE = { 'index.html': '<!doctype html>\n<html>\n<body>\n<h1>Shop</h1>\n<img src="logo.png">\n<p>Welcome</p>\n</body>\n</html>\n' };
+
+// ---------------------------------------------------------------------------
+// A whole Phase 3A system in memory: the real client controller, the real /api/assistant handler, and fake providers.
+// ---------------------------------------------------------------------------
+import { handleAssistantRequest } from '../../api/assistant';
+import { createAIHandoff } from '../../src/hooks/useAIHandoff';
+import { createAssistantController, type AssistantController } from '../../src/hooks/useAssistant';
+import { fetchAIStatus } from '../../src/engine/aiStatus';
+import { requestAssistant } from '../../src/engine/aiAssistant';
+import { mergedFindings } from '../../src/engine/scanView';
+import { createStore, type Store } from '../../src/store/useStudioStore';
+import { makeFakeFetch, type FakeCall, type FakeStep } from './fakeProviders';
+import type { ActionName, CommandArg } from '../../src/engine/commands';
+
+export interface System {
+  store: Store<StudioState>;
+  controller: AssistantController;
+  actions: AssistantController['actions'];
+  calls: FakeCall[];
+  ran: string[];
+  finding: ReturnType<typeof mergedFindings>[number] | undefined;
+  /** Waits until no AI request is pending. */
+  settle(): Promise<void>;
+  send(over?: Record<string, unknown>): string | null;
+  command(text: string): void;
+  setEnv(env: Record<string, string | undefined>): void;
+}
+
+export async function makeSystem(opts: {
+  files?: Record<string, SampleFile>;
+  env?: Record<string, string | undefined>;
+  script: (call: FakeCall, index: number) => FakeStep | Promise<FakeStep>;
+  /** Skip the status check (the controller then treats the mode as mock). */
+  noStatus?: boolean;
+}): Promise<System> {
+  const state = await loadedState(opts.files ?? IMG_FIXTURE);
+  const store: Store<StudioState> = createStore(state);
+  let env: Record<string, string | undefined> = opts.env ?? { AI_MODE: 'live', GEMINI_API_KEY: 'KEY_G_sentinel', GROQ_API_KEY: 'KEY_Q_sentinel', OPENROUTER_API_KEY: 'KEY_O_sentinel' };
+  const fake = makeFakeFetch(opts.script);
+  const route = (async (input: RequestInfo | URL, init?: RequestInit) =>
+    handleAssistantRequest(new Request(new URL(String(input), 'http://localhost'), init), env, { fetchImpl: fake.fetch })) as typeof fetch;
+  let clock = 10_000;
+  let ids = 0;
+  const controller = createAssistantController(store, {
+    requestAssistant: (req, { signal }) => requestAssistant(req, { signal, fetchImpl: route }),
+    now: () => ++clock,
+    newId: () => `sys-${++ids}`,
+    ...(opts.noStatus ? {} : { fetchStatus: () => fetchAIStatus({ fetchImpl: route }) }),
+  });
+  const ran: string[] = [];
+  const harness = {
+    run: (name: ActionName, arg?: CommandArg) => {
+      ran.push(arg ? `${name} ${arg}` : name);
+      store.update((s) => runCommand(s, { name, ...(arg ? { arg } : {}) }, wctx()).state);
+    },
+  };
+  controller.actions.setResultHandler!(createAIHandoff(store, harness, { now: () => ++clock, newId: () => `aip-${++ids}` }));
+  const finding = mergedFindings(state)[0];
+  const sys: System = {
+    store, controller, actions: controller.actions, calls: fake.calls, ran, finding,
+    async settle() {
+      for (let i = 0; i < 200 && store.getState().ai.status === 'pending'; i++) await new Promise((r) => setTimeout(r, 1));
+      await new Promise((r) => setTimeout(r, 1));
+    },
+    send(over = {}) {
+      return controller.actions.send({
+        snapshot: store.getState().snapshot!, instruction: 'Add a description to the image', taskType: 'suggest_change',
+        selectedPaths: ['index.html'], includeContent: true,
+        ...(finding ? { finding: { path: finding.path, skillId: finding.skillId, firstLine: finding.firstLine }, findingId: finding.id } : {}),
+        edges: store.getState().understanding.result?.edges,
+        ...over,
+      } as never);
+    },
+    command(text) { store.update((s) => cmd(s, text).state); },
+    setEnv(next) { env = next; },
+  };
+  if (!opts.noStatus) await controller.actions.refreshStatus!();
+  return sys;
+}
+
+/** The model's JSON for a one-edit patch to index.html (line 5 is the image in IMG_FIXTURE). */
+export const modelPatch = (newText: string, over: Record<string, unknown> = {}) =>
+  JSON.stringify({ kind: 'patch', summary: 'Add a text description', path: 'index.html', edits: [{ start_line: 5, end_line: 5, new_text: newText }], tests: ['Run the checks'], risks: ['AI-written'], ...over });
+export const FIX_IMG = '<img src="logo.png" alt="Shop logo">';
+export const NO_FIX_IMG = '<img src="logo.png" class="logo">';
