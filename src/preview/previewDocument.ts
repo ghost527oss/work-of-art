@@ -152,12 +152,23 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       }
       if (name === 'noscript') { if (input.scripts) { count(report, 'noscript'); skipDepth = 'noscript'; } else { body.push('<div>'); open.push({ tag: 'div' }); } continue; }
       if (MEDIA_TAGS.has(name)) {
+        // Media is annotated too (2E-2), so a placeholder image can be selected and its start tag edited.
+        let mediaMarker = '';
+        if (annotate && elements.length < L.maxElements) {
+          const n = (tagCounts.get(name) ?? 0) + 1;
+          tagCounts.set(name, n);
+          const endLine = tok.line + (source.slice(tok.start, tok.end).match(/\n/g)?.length ?? 0);
+          const reason = input.approximate ? 'This element comes from a component picture, which is approximate.' : !/\.html?$/i.test(input.entryPath) ? 'Only plain HTML pages can be written to the practice copy.' : undefined;
+          elements.push({ id, path: input.entryPath, tag: name, line: tok.line, col: tok.col, startOffset: tok.start, endOffset: tok.end, endLine, key: `${input.entryPath}#${name}#${n}`, mappable: reason === undefined, ...(reason ? { reason } : {}) });
+          mediaMarker = ` data-pb="${id}"`;
+          id++;
+        }
         const src = attrs.find((a) => a.name === 'src')?.value ?? '';
         const p = name === 'img' ? resolve(input.entryPath, src, input.loaded) : undefined;
         const svg = p && /\.svg$/i.test(p) ? input.effective(p) : undefined;
         if (svg !== undefined && svg.length <= L.svgDataBytes) {
           const safe = svg.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+="[^"]*"/gi, '');
-          body.push(`<img src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(safe)}"${writeAttrs(attrs.filter((a) => ['alt', 'width', 'height', 'class', 'id', 'style'].includes(a.name)), 'img')}>`);
+          body.push(`<img src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(safe)}"${writeAttrs(attrs.filter((a) => ['alt', 'width', 'height', 'class', 'id', 'style'].includes(a.name)), 'img')}${mediaMarker}>`);
         } else {
           const w = attrs.find((a) => a.name === 'width')?.value ?? '120';
           const h = attrs.find((a) => a.name === 'height')?.value ?? '80';
@@ -165,7 +176,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
           report.placeholders.push(label);
           const keep = attrs.filter((a) => ['id', 'class'].includes(a.name));
           const own = sanitizeCss(attrs.find((a) => a.name === 'style')?.value ?? '');
-          body.push(`<span class="pb-img"${writeAttrs(keep, 'span')} style="${escapeAttr(own)};width:${/^\d{1,4}$/.test(w) ? w : 120}px;height:${/^\d{1,4}$/.test(h) ? h : 80}px">${escapeText(`image not loaded: ${label}`)}</span>`);
+          body.push(`<span class="pb-img"${writeAttrs(keep, 'span')} style="${escapeAttr(own)};width:${/^\d{1,4}$/.test(w) ? w : 120}px;height:${/^\d{1,4}$/.test(h) ? h : 80}px"${mediaMarker}>${escapeText(`image not loaded: ${label}`)}</span>`);
         }
         continue;
       }
