@@ -200,3 +200,21 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
   - The **real-key checklist** (design 14) is written into the report. Real-provider behaviour is stated as **Unverified** until you run it.
   - `PHASE_3A_REPORT.md` lists every number from real command output. Phase 3 stays active; it recommends nothing beyond "3A built, 3B not started". It does **not** change `Current Active Phase`.
 - **verify:** `npm run typecheck && npx vitest run && npm run build`
+
+---
+
+## Build report (as built, 3A)
+
+All twelve tasks were built in order, one commit each (L1 to L11, plus the L12 review fixes). Full numbers are in `PHASE_3A_REPORT.md`.
+
+- **Tests:** 113 files, 2,105 tests (baseline 92 files, 1,666 tests). `npm run typecheck`, `npx vitest run`, and `npm run build` pass. `npm audit`: 0 vulnerabilities. Runtime dependencies are still `react`, `react-dom`, and `zod`.
+- **Mutation checks:** 29 deliberate breakages; 28 were caught by tests, 1 (a panel switch keeping a held question) is an effect that server-render tests cannot run and was caught by the browser run.
+- **Browser run:** 43 of 43 checks on the built app with a fake provider server and the real `api/assistant` handler. Zero unexpected console errors.
+- **Independent review:** one reviewer (`semantic_reviewer`) read the diff and found 5 issues. All 5 were fixed. The custom `verification-agent` could not be run here (it is not an available sub-agent in Kiro Web), so that exact step is **Unverified**.
+- **Deviations from this spec as written:**
+  1. A `plan` answer with no selected file becomes a clarification; with a file it is accepted (design 9.2).
+  2. The static test checks provider host names only in `aiProviders.ts` and key-variable names in three files (design 17 said "provider names").
+  3. Stop also rejects a waiting AI change even with no run (R9.7), but an AI-requested `stop` is refused while a change waits (review).
+  4. Review fixes added: snippets come from the practice copy; saved answers end on Approve, Undo, Redo, and any practice change; the file list is a data block; "Do something" carries no connection facts; a held question is dropped when the AI panel is hidden; Send waits for the mode check; mock answers are never handed on.
+  5. `vite.config.ts` needed no change: its dev route already passes any method through.
+- **Unverified:** everything about real providers (see the report's checklist).

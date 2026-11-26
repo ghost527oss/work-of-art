@@ -873,7 +873,7 @@ Contract: After a browser refresh PatchBay reloads the saved repository address 
 
 ---
 
-> plan_id: `P3A-LIVE-CHAT` — Live AI in AI Chat (spec `.kiro/specs/11-live-ai-chat/`). Active product phase: Phase 3, Sub-phase 3A. Status: draft for approval; no node is approved for modification. Black-and-white wireframe, no animation, `AI_MODE=mock` stays the default, no new runtime dependency, free tiers only. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+> plan_id: `P3A-LIVE-CHAT` — Live AI in AI Chat (spec `.kiro/specs/11-live-ai-chat/`). Active product phase: Phase 3, Sub-phase 3A. Status: built (L1 to L12); see `PHASE_3A_REPORT.md`. Black-and-white wireframe, no animation, `AI_MODE=mock` stays the default, no new runtime dependency, free tiers only. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
 
 ## F11 — Live AI in AI Chat
 Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (Gemini, Groq, OpenRouter) through a Model Router, using a Context Engine that sends the smallest useful redacted context and a session cache. The AI can start safe actions and propose changes that enter the existing Approve, Reject, and Undo flow. Mock mode is unchanged. No change is applied without Approve, and only the practice copy changes.
@@ -970,3 +970,12 @@ Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Phase 3 exit gate (build-phases.md), with fake providers: a deliberate bug is found, a valid patch is proposed and verified; the fix attempts halt at 3; a 429 on the primary falls back to the backup
 - manual gate (Unverified until run): the browser run with a fake provider server, and your own real-key check (design section 14)
+
+### F11 as built (3A)
+- Defaults are Gemini `gemini-3.1-flash-lite` and `gemini-3.6-flash`, Groq `openai/gpt-oss-20b` and `openai/gpt-oss-120b`, OpenRouter `openrouter/free` for both tiers (verified against the providers' pages on 2026-11-26; real-key use is **Unverified**). Per attempt 7 s, whole request 14 s.
+- A `plan` answer with no selected file becomes a `clarification` (design 9.2 said "fewer than 2 files"; a plan for one file is accepted).
+- Stop rejects a waiting AI change even with no run (R9.7), but an AI-requested `stop` is refused while any change waits (review fix). `undo` and `redo` stay runnable by the AI (design 13.1); the harness already refuses them while a change waits.
+- The AI proposal's History title is the fixed text "AI-proposed change to <path>" so no AI text is saved. The byline and the model's summary are shown only.
+- Review fixes after the independent review: snippets are cut from the practice copy; the saved answers end on Approve, Undo, Redo, and any practice-copy change; file names sit inside a data block; a "Do something" request carries no connection facts; a held request is dropped when the AI panel is hidden; Send waits for the mode check; mock answers are never handed on.
+- Existing tests changed (design 4.3): `assistantApi`, `aiContracts`, `aiValidate`, `mockAssistant`, `aiAssistant`, `aiState`, `useAssistant`, `aiResponseView`, `harnessUi` (appended blocks, plus the 405 and 501 assertions in `assistantApi`).
+- Static test: provider host names appear only in `src/config/aiProviders.ts`; key variable names also appear in `liveAssistant.ts` and `aiNotes.ts` (setup text).

@@ -76,6 +76,18 @@ The endpoint:
 
 **Real providers are Unverified** until you run the real-key check in `.kiro/specs/11-live-ai-chat/design.md` section 14; the automated tests use fake providers.
 
+## Live AI in AI Chat (Phase 3, sub-phase 3A)
+
+With `AI_MODE=live`, AI Chat shows a banner (live, "Live AI is not set up.", or "Could not check the AI mode.") and a few new controls.
+
+- **Notice.** The first live question of a page session waits for you to press **OK** on a short notice (redacted pieces go to an outside company, free plans may use them, contents are off by default, nothing changes without Approve). Switching panels, Cancel, Stop, or `reset` drops the waiting question. A refresh forgets the OK.
+- **What the AI sees.** Your question, the file names, up to three one-line connection facts, and (only when "Include the contents of the selected files" is ticked) a few redacted lines around the point of interest. The server adds one or two playbook cards. Whole large files are not sent.
+- **Saved answers.** Asking the same thing about the same text again shows "Saved answer from earlier in this session." and sends nothing. **Ask again** sends a new request. Saved answers live in memory only and end on a refresh, a new repository, `reset`, a mode change, and any change to the practice copy.
+- **Which model answers.** Explanations and "Do something" use the light models. "Suggest a change" tries the heavy models first, then the light ones ("Answered by a lighter model; review carefully."). Each answer says who answered, and a calm line says who was busy ("Gemini was busy, so Groq answered.").
+- **About a finding.** Pick a scan finding to ask about its file and line. The AI can propose a change for it. A proposal is checked against the real file, shown as an "AI-proposed change" card, and applied to the practice copy only after you press Approve. Approve, Reject, Undo, and Redo work as for any change. After Approve the file is re-scanned and the Log says whether the finding is "no longer found" or "still found". At most 3 AI proposals are accepted per finding.
+- **Do something.** A sentence such as "start the crew" can run a safe action (`help`, `status`, `start practice`, `start crew`, `pause`, `resume`, `step`, `undo`, `redo`, `stop`, `open <panel>`). The AI can never approve, reject, or reset, can never stop while a change waits for your decision, and no action runs when file contents or connection facts were sent with the question.
+- **Typed command words** (`stop`, `approve`, `undo`...) never go to the AI.
+
 Verified by automated tests and by a headless-browser run. **Not yet verified:** a real Vercel deployment (including request cancellation), branch names containing `/` on the tree endpoint, and a physical phone.
 
 ## Studio shell (Phase 2, sub-phase 2A)
