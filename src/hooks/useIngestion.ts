@@ -1,5 +1,6 @@
 // @node: F1.7
 // @node: F5.8 (the classifying stage runs inside the loading run)
+// @node: F10.4 (restore: start a saved target as a foreground load)
 // Owns the AbortController for the current ingestion run, calls the ingestion service,
 // and dispatches the results to the store. Components call these actions; they never
 // touch the network or the controller themselves.
@@ -36,6 +37,7 @@ import { browserStorage } from '../store/layoutStorage';
 import { loadCorrectionsFor } from '../store/correctionsStorage';
 import { understandingDone, understandingFailed } from '../store/understandingSlice';
 import { doneMessage } from '../store/understandingActions';
+import { toIngestTarget, validateTarget, type SessionTarget } from '../store/sessionRecord';
 
 export interface IngestionActions {
   /** Parses and validates the text, then starts a run. Returns an error message, or null when a run started. */
@@ -47,6 +49,8 @@ export interface IngestionActions {
   cancel(): void;
   dismissError(): void;
   backToStart(): void;
+  /** 2G. Validates a saved session target like the Start screen does and starts it as a foreground load. Returns an error message, or null when a run started. */
+  restore(target: SessionTarget): string | null;
 }
 
 export interface IngestionServices {
@@ -192,6 +196,12 @@ export function createIngestionController(
     backToStart() {
       current?.abort();
       store.update((s) => reset(s));
+    },
+    restore(target) {
+      const problem = validateTarget(target);
+      if (problem) return problem;
+      run(toIngestTarget(target), false);
+      return null;
     },
   };
 
