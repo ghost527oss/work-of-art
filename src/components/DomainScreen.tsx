@@ -1,11 +1,13 @@
 // @node: F3.4
 // @node: F6.11 (live Screen 5 when `live` is given; otherwise the 2A empty page)
 // @node: F9.10 (Learn more passed to the finding detail)
+// @node: F10.5 (the scan also starts when Screen 5 opens, so a restore straight to Screen 5 has findings)
 // Screen 5 (Domain Debugging): one area. No toolbar here.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { areaCounts, findingsForArea, mergedFindings } from '../engine/scanView';
 import { isScanStale } from '../hooks/useScan';
 import type { HarnessActions } from '../hooks/useHarness';
+import type { ScanActions } from '../hooks/useScan';
 import { areaLabel, type AreaId } from '../store/shellView';
 import { useStudioStore } from '../store/useStudioStore';
 import { ChangesMade } from './ChangesMade';
@@ -21,6 +23,8 @@ export interface LiveDomain {
   onOpened(): void;
   /** 2F: opens the finding's lesson in the Journal on Screen 3. */
   onLearnMore?(lessonId: string): void;
+  /** 2G: when given, Screen 5 starts the scan like Screen 4 does. */
+  scan?: ScanActions;
 }
 
 export interface DomainScreenProps {
@@ -33,6 +37,11 @@ export interface DomainScreenProps {
 function LiveScreen5({ area, live }: { area: AreaId; live: LiveDomain }) {
   const state = useStudioStore((s) => s);
   const [selected, setSelected] = useState<string | undefined>();
+  const analysisStatus = state.understanding.status;
+  const snapshotId = state.snapshot?.id;
+  useEffect(() => {
+    live.scan?.ensure();
+  }, [live.scan, analysisStatus, snapshotId]);
   const result = state.scan.result;
   const merged = mergedFindings(state);
   const findings = findingsForArea(merged, area);

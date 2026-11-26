@@ -128,7 +128,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
         <div className="shell-left">
           {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
         </div>
-        <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} live={harness ? { harness, onOpened: shellActions.backToStudio, onLearnMore: journal?.actions.openLesson } : undefined} />
+        <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} live={harness ? { harness, onOpened: shellActions.backToStudio, onLearnMore: journal?.actions.openLesson, scan } : undefined} />
       </main>
     );
   }
