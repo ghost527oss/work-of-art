@@ -22,26 +22,24 @@ export function PanelFrame({ title, open, collapsed, width, onToggleCollapsed, o
   if (collapsed) classes.push('panel-collapsed');
   return (
     <aside className={classes.join(' ')} aria-label={title} hidden={!open}>
-      {collapsed ? (
-        <div className="panel-header">
-          <button type="button" aria-label={`Expand ${title}`} onClick={onToggleCollapsed}>
-            Expand
-          </button>
-        </div>
-      ) : (
-        <div className="panel-header">
-          <h2>{title}</h2>
-          <button type="button" onClick={onToggleCollapsed}>
-            Collapse
-          </button>{' '}
-          <button type="button" onClick={onToggleWidth}>
-            {width === 'narrow' ? 'Wide' : 'Narrow'}
-          </button>{' '}
-          <button type="button" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      )}
+      <div className="panel-header">
+        {!collapsed && <h2>{title}</h2>}
+        {/* One toggle button that keeps its place in the tree, so keyboard focus stays on it when the panel collapses or expands. */}
+        <button type="button" aria-label={collapsed ? `Expand ${title}` : undefined} onClick={onToggleCollapsed}>
+          {collapsed ? 'Expand' : 'Collapse'}
+        </button>
+        {!collapsed && (
+          <>
+            {' '}
+            <button type="button" onClick={onToggleWidth}>
+              {width === 'narrow' ? 'Wide' : 'Narrow'}
+            </button>{' '}
+            <button type="button" onClick={onClose}>
+              Close
+            </button>
+          </>
+        )}
+      </div>
       <div className="panel-body" hidden={collapsed}>
         {children}
       </div>

@@ -81,7 +81,14 @@ export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError,
         width={layout.width}
         onToggleCollapsed={() => layoutStore.update((s) => setCollapsed(s, !s.collapsed))}
         onToggleWidth={() => layoutStore.update(toggleWidth)}
-        onClose={() => layoutStore.update(closePanel)}
+        onClose={() => {
+          const id = open;
+          layoutStore.update(closePanel);
+          // Keep keyboard focus: move it to the toolbar button of the panel that was just closed.
+          if (id && typeof document !== 'undefined') {
+            requestAnimationFrame(() => document.querySelector<HTMLElement>(`nav.toolbar [data-panel="${id}"]`)?.focus());
+          }
+        }}
       >
         <div hidden={open !== 'ai'}>
           <AIAssistantPanel key={snapshot.id} snapshot={snapshot} assistant={assistant} />

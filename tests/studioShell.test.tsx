@@ -45,6 +45,10 @@ describe('StudioToolbar', () => {
     expect(html.match(/aria-pressed="false"/g)).toHaveLength(4);
     expect(html).toMatch(/<button type="button">Skeleton Crew<\/button>/);
   });
+  it('gives each panel button a data-panel id so focus can return to it', () => {
+    const html = toolbar(null);
+    for (const id of ['edit', 'ai', 'log', 'history', 'journal']) expect(html).toContain(`data-panel="${id}"`);
+  });
   it('shows nothing pressed when no panel is open', () => {
     expect(toolbar(null)).not.toContain('aria-pressed="true"');
   });
@@ -64,6 +68,13 @@ describe('PanelFrame', () => {
     expect(html).toContain('>Close<');
     expect(html).not.toContain('Expand');
     expect(html).not.toMatch(/<aside[^>]* hidden/);
+  });
+  it('the collapse/expand toggle is the same button in the same place in both states (keeps keyboard focus)', () => {
+    const expanded = frame();
+    const collapsed = frame({ collapsed: true });
+    const firstButton = (html: string) => html.match(/<button[^>]*>[^<]*<\/button>/)![0];
+    expect(firstButton(expanded)).toContain('>Collapse<');
+    expect(firstButton(collapsed)).toContain('>Expand<');
   });
   it('wide shows the Narrow button and the wide class', () => {
     const html = frame({ width: 'wide' });

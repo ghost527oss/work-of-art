@@ -1,5 +1,6 @@
 // @node: F3.5
-// The session log list (last 50 entries), moved out of the old Studio stub. Props only.
+// The session log list (last 50 entries), moved out of the old Studio stub, with a short note about
+// sub-phase 2B and an empty state. Props only.
 import type { SessionLogEntry } from '../types/contracts';
 
 const LOG_SHOWN = 50;

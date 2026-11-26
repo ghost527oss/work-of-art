@@ -69,3 +69,7 @@ The endpoint:
 
 
 Verified by automated tests and by a headless-browser run. **Not yet verified:** a real Vercel deployment (including request cancellation), branch names containing `/` on the tree endpoint, and a physical phone.
+
+## Studio shell (Phase 2, sub-phase 2A)
+
+After a repository or sample loads, the Studio has a left area (a Sandbox placeholder and Project info) and a vertical toolbar on the far right edge with six buttons: Edit, AI Chat, Log, History, Journal, and Skeleton Crew. The first five open a panel on the right (one at a time). A panel can collapse to a thin strip, switch between a narrow and a wide width, and close. Skeleton Crew opens an empty Screen 4, whose four area buttons open an empty Screen 5. The toolbar is hidden on both. The panel layout is saved in browser storage under `patchbay.studio-layout.v1` (four fields, no repository data). After a refresh the app returns to the Start screen; the saved layout is used the next time a repository loads.

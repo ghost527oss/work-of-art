@@ -23,7 +23,7 @@ export function StudioToolbar({ openPanel, onTogglePanel, onSkeleton }: StudioTo
   return (
     <nav className="toolbar" aria-label="Studio tools">
       {TOOLBAR_PANELS.map(({ id, label }) => (
-        <button key={id} type="button" aria-pressed={openPanel === id} onClick={() => onTogglePanel(id)}>
+        <button key={id} type="button" data-panel={id} aria-pressed={openPanel === id} onClick={() => onTogglePanel(id)}>
           {label}
         </button>
       ))}
