@@ -108,7 +108,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
     return (
       <main className="shell">
         <div className="shell-left">
-          {preview ? <SandboxPanel preview={preview} pad={editPad} /> : <SandboxPlaceholder />}
+          {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
         </div>
         <SkeletonCrewScreen onOpenArea={shellActions.openDomain} onBack={shellActions.backToStudio} live={harness && scan ? { harness, scan, onOpened: shellActions.backToStudio } : undefined} />
       </main>
@@ -119,7 +119,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
     return (
       <main className="shell">
         <div className="shell-left">
-          {preview ? <SandboxPanel preview={preview} pad={editPad} /> : <SandboxPlaceholder />}
+          {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
         </div>
         <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} live={harness ? { harness, onOpened: shellActions.backToStudio } : undefined} />
       </main>

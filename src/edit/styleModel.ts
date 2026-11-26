@@ -63,7 +63,7 @@ export function borderStyle(v: unknown): FieldResult {
 export const SHADOWS = { none: null, small: '0 1px 3px', medium: '0 4px 8px', large: '0 10px 24px' } as const;
 export type ShadowPreset = keyof typeof SHADOWS;
 export function shadow(preset: unknown, c: unknown): FieldResult {
-  if (typeof preset !== 'string' || !(preset in SHADOWS)) return { ok: false, error: 'Choose None, Small, Medium, or Large.' };
+  if (typeof preset !== 'string' || !Object.prototype.hasOwnProperty.call(SHADOWS, preset)) return { ok: false, error: 'Choose None, Small, Medium, or Large.' };
   const p = SHADOWS[preset as ShadowPreset];
   if (p === null) return { ok: true, decl: { prop: 'box-shadow', value: 'none' } };
   const col = color('box-shadow', c);

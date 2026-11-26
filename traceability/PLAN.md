@@ -664,6 +664,13 @@ Contract: In the Edit panel the user selects elements in the look-only preview (
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): the drawing browser run in `requirements.md` section 6, item 11
 
+### F8 as built (2E-2)
+- The Preview Only / Edit pad link uses a small `previewInfoStore` (plain data) and a `previewHandle` (the iframe, the layout re-check); the overlay reads the frame's current document at event time.
+- Placeholder images are annotated so their start tags can be edited; recorded sizes win over the placeholder's default size.
+- The edit key is `edit:<path>:<hash of the selected keys>` (fixed length). Undo removes the key, so editing after an undo or redo starts a new entry.
+- Existing styles containing quotes or `!important` are "too complex". Background selects the page's top-level elements (the body is not in the element table).
+- Existing tests edited (named): the 2E-1 workbench test (elements are now annotated, never mappable) and the preview stub in `tests/sandboxUi.test.tsx` (new `setEntry`).
+
 ### F8 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2E-2 gate (build-phases.md): no edit changes anything except the in-memory practice copy; unmapped changes never reach the code; every recorded change can be undone

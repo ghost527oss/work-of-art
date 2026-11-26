@@ -121,3 +121,12 @@ The preview is a locked iframe built from `srcdoc` by an allowlist re-serializer
 
 **Check layout** measures the look-only preview and adds measured findings ("Text that does not fit its box") next to the 2D findings, with the measured numbers and widths. The Skeleton Crew narrates them under Frontend. Nothing from the preview is saved.
 
+## Edit pad (Phase 2, sub-phase 2E-2)
+
+The **Edit** panel (Screen 3) is now an edit pad for the page in the Sandbox. Opening it pauses the practice run as before and turns preview scripts off. A clear overlay covers the preview so no page code ever gets your clicks.
+
+- **Select** (click, Shift-click to add), **Lasso** (drag a box), **Background** (the page's top-level elements), or **Pick from list** (no pointer needed). One selected element shows three drag handles to resize it.
+- The property form covers size, corners, spacing, border, shadow, text, and background (colours and a gradient). Every value is built from checked numbers, units, and colours; there is no free-form CSS anywhere.
+- On a plain HTML page, a change to an element whose start tag can be rewritten safely is **written to the practice copy at once** as a `style` change and recorded in History (no Approve step). A burst of changes to the same elements merges into one entry; one Undo reverses the burst. Everything else (component pictures, complex styles, SVG, a page that changed) is **Preview Only**, listed with the reason, and never saved.
+- After each change the layout is checked again; **Try a fix** proposes one of three fixed suggestions you can Keep or Discard. Undo and Redo buttons do exactly what the typed commands do.
+

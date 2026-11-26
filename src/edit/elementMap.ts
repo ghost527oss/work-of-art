@@ -33,7 +33,7 @@ export function mapElement(entry: ElementEntry, content: string | undefined, tab
   const st = startTag(content, entry);
   if (!st) return { ok: false, reason: REASONS.changed };
   const style = st.tok.attrs?.find((a) => a.name === 'style');
-  if (style && parseInlineStyle(style.value) === null) return { ok: false, reason: REASONS.complex };
+  if (style && (parseInlineStyle(style.value) === null || /["']|!important/i.test(style.value))) return { ok: false, reason: REASONS.complex };
   return { ok: true };
 }
 
@@ -45,12 +45,12 @@ export function rewriteStartTag(content: string, entry: ElementEntry, changes: r
   const attrs = st.tok.attrs ?? [];
   const styleAttr = attrs.find((a) => a.name === 'style');
   const existing = styleAttr ? parseInlineStyle(styleAttr.value) : [];
-  if (existing === null) return null;
+  if (existing === null || (styleAttr && /["']|!important/i.test(styleAttr.value))) return null;
   const value = serializeStyle(mergeStyle(existing, changes)).replace(/"/g, '');
   const text = st.text;
   let next: string;
   if (styleAttr) {
-    const re = /(\s)style\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i;
+    const re = /(\s)style\s*=\s*("[^"]*"|'[^']*'|[^\s>"']+)/i;
     const m = re.exec(text);
     if (!m) return null;
     next = text.slice(0, m.index) + `${m[1]}style="${value}"` + text.slice(m.index + m[0].length);

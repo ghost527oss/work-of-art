@@ -176,7 +176,10 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
           report.placeholders.push(label);
           const keep = attrs.filter((a) => ['id', 'class'].includes(a.name));
           const own = sanitizeCss(attrs.find((a) => a.name === 'style')?.value ?? '');
-          body.push(`<span class="pb-img"${writeAttrs(keep, 'span')} style="${escapeAttr(own)};width:${/^\d{1,4}$/.test(w) ? w : 120}px;height:${/^\d{1,4}$/.test(h) ? h : 80}px"${mediaMarker}>${escapeText(`image not loaded: ${label}`)}</span>`);
+          const mediaKey = `${input.entryPath}#${name}#${tagCounts.get(name) ?? 0}`;
+          const po = styleFor.get(mediaKey);
+          // Default size first, the page's own style after it, then Preview Only values, so recorded sizes win.
+          body.push(`<span class="pb-img"${writeAttrs(keep, 'span')} style="width:${/^\d{1,4}$/.test(w) ? w : 120}px;height:${/^\d{1,4}$/.test(h) ? h : 80}px;${escapeAttr(own)}${po ? escapeAttr(po) : ''}"${mediaMarker}>${escapeText(`image not loaded: ${label}`)}</span>`);
         }
         continue;
       }
@@ -229,7 +232,8 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
 function withExtraStyle(attrs: string, extra: string): string {
   const m = / style="([^"]*)"/.exec(attrs);
   const add = escapeAttr(extra.replace(/^;/, ''));
-  return m ? attrs.replace(m[0], ` style="${m[1]};${add}"`) : `${attrs} style="${add}"`;
+  // Slice by index: a string replacement would interpret "$&" and friends inside the page's own text.
+  return m ? `${attrs.slice(0, m.index)} style="${m[1]};${add}"${attrs.slice(m.index + m[0].length)}` : `${attrs} style="${add}"`;
 }
 
 function notesFrom(r: PreviewReport): string[] {

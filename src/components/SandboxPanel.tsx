@@ -57,6 +57,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
 
   keyRef.current = contentKey;
   useEffect(() => { preview.init(); }, [preview, snapshot]);
+  useEffect(() => () => { previewHandle.frame = null; previewHandle.recheck = null; previewHandle.pendingScroll = null; }, []);
 
   const build = useMemo<(PreviewBuild & { components?: Array<import('../preview/workbenchDocument').WorkbenchComponent>; chosen?: string }) | null>(() => {
     try {
@@ -140,7 +141,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
       {pv.layout.status === 'stopped' && <p role="alert">{pv.layout.message}</p>}
       {pv.layout.status === 'idle' && pv.layout.message && <p className="note">{pv.layout.message}</p>}
       {pv.mode === 'static' && pages.length > 1 && (
-        <p><label>Page <select value={pv.entryPath ?? ''} onChange={(e) => preview.setEntry(e.target.value)}>
+        <p><label>Page <select value={pv.entryPath ?? ''} onChange={(e) => { previewHandle.pendingScroll = null; pad?.clear(); preview.setEntry(e.target.value); }}>
           {[findEntryPage(pages) ?? pages[0]!, ...pages.filter((x) => x !== (findEntryPage(pages) ?? pages[0]))].map((p) => <option key={p} value={p}>{p}</option>)}
         </select></label></p>
       )}

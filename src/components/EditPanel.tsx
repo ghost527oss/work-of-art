@@ -79,6 +79,11 @@ function Pad({ pad, preview, harness }: Required<Omit<EditPanelProps, 'mode'>>) 
         items={edit.previewOnly} suggestions={edit.suggestions} existing={existing}
         onRemove={(c) => pad.removePreviewOnly((x) => x === c)} onRemoveAll={() => pad.removePreviewOnly(() => true)}
         onKeep={(c) => pad.keepSuggestion(c.elementKey, c.property)} onDiscard={(c) => pad.discardSuggestion(c.elementKey, c.property)}
+        stillThere={(c) => {
+          if (pv.layout.status !== 'done') return undefined;
+          const el = info.elements.find((e) => e.key === c.elementKey);
+          return !!el && pv.layout.findings.some((f) => f.path === el.path && f.firstLine === el.line);
+        }}
       />
       <LayoutFixList
         findings={layoutFindings} isWorkbench={pv.mode === 'workbench'} canCheck={!disabled && pv.mode === 'static'}

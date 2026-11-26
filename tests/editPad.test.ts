@@ -195,3 +195,69 @@ describe('geometry, edit state, suggestions', () => {
     expect(r.html).not.toContain('behavior');
   });
 });
+
+describe('review findings (2E-2)', () => {
+  const build = (html: string, previewStyles: Array<{ elementKey: string; property: string; value: string }> = []) => {
+    const r = buildStaticPreview({ entryPath: 'i.html', effective: () => html, loaded: new Set(['i.html']), scripts: false, nonce: '0123456789abcdef', origin: 'http://a', previewStyles });
+    if (!r.ok) throw new Error('x');
+    return r;
+  };
+  it('a page style containing $& cannot inject an attribute', () => {
+    for (const evil of ['$& onclick=alert(1) x', "$' onclick=1", '$` onclick=1']) {
+      const r = build(`<p style="color: red; --x: ${evil}">t</p>`, [{ elementKey: 'i.html#p#1', property: 'width', value: '10px' }]);
+      const tag = tokenizeHtml(r.html).find((t) => t.type === 'start' && t.name === 'p')!;
+      expect(tag.attrs!.map((a) => a.name), evil).toEqual(['style', 'data-pb']);
+    }
+  });
+  it('a recorded size on a placeholder image wins over the default size; Preview Only reaches images', () => {
+    const r = build('<img src="a.png" style="width: 300px">', [{ elementKey: 'i.html#img#1', property: 'height', value: '50px' }]);
+    expect(r.html).toMatch(/style="width:120px;height:80px;width: 300px;height:50px"/);
+    expect(r.elements[0]).toMatchObject({ tag: 'img', key: 'i.html#img#1', mappable: true });
+  });
+  it('a long selection still merges (the edit key is hashed to a fixed size)', async () => {
+    const { createEditController } = await import('../src/hooks/useEditPad');
+    const { createStore } = await import('../src/store/useStudioStore');
+    const html = '<!doctype html><body>' + Array.from({ length: 15 }, (_, i) => `<p id="p${i}">t</p>`).join('\n') + '</body>';
+    const snap2 = (await import('./helpers/analyzeFixture')).snapshotOf({ 'index.html': html });
+    const table2 = buildStaticPreview({ entryPath: 'index.html', effective: () => html, loaded: new Set(['index.html']), scripts: false, nonce: '0123456789abcdef', origin: 'http://a' });
+    if (!table2.ok) throw new Error('x');
+    const studio = createStore<StudioState>({ ...initialState(), experience: 'studio', snapshot: snap2 });
+    const info = createStore({ buildId: 1, editable: true, mode: 'static' as const, scope: 'index.html', path: 'index.html', elements: table2.elements, tableHash: hashText(html), ready: true });
+    let k = 0;
+    const c = createEditController(studio, info, { now: () => 1, newId: () => `n${++k}`, setTimer: () => 1, clearTimer: () => undefined, doc: () => null, recheck: async () => null });
+    c.actions.select(table2.elements.map((e) => e.key!));
+    c.actions.commit([{ prop: 'width', value: '10px' }]);
+    const next = practiceContent(snap2, studio.getState().work.applied, 'index.html')!;
+    const t3 = buildStaticPreview({ entryPath: 'index.html', effective: () => next, loaded: new Set(['index.html']), scripts: false, nonce: '0123456789abcdef', origin: 'http://a' });
+    if (!t3.ok) throw new Error('x');
+    info.setState({ ...info.getState(), elements: t3.elements, tableHash: hashText(next) });
+    c.actions.commit([{ prop: 'height', value: '10px' }]);
+    expect(studio.getState().work.applied).toHaveLength(1);
+    expect(studio.getState().work.applied[0]!.editKey!.length).toBeLessThanOrEqual(200);
+    c.dispose();
+  });
+  it('undo ends a merge burst', () => {
+    const el = table().find((e) => e.tag === 'button')!;
+    let n2 = 0;
+    const ctx2 = { now: 5, mode: 'self_editing' as const, newId: () => `m${++n2}` };
+    const w = rewriteStartTag(index, el, [{ prop: 'width', value: '200px' }])!;
+    let s = applyUserEdit({ ...initialState(), experience: 'studio', snapshot: snap }, { path: 'index.html', baseHash: hashText(index), newContent: w, editKey: 'k', title: 't' }, ctx2).state;
+    s = runCommandUndoRedo(s);
+    expect(s.work.applied[0]!.editKey).toBeUndefined();
+  });
+  it('existing styles with quotes or !important are not rewritten (too complex)', () => {
+    const el = table().find((e) => e.tag === 'button')!;
+    const html = index.replace('<button id="order" class="btn">', "<button id=\"order\" class=\"btn\" style=\"font-family: 'A B'\">");
+    const el2 = { ...el, endOffset: el.endOffset + " style=\"font-family: 'A B'\"".length };
+    expect(mapElement(el2, html, hashText(html))).toEqual({ ok: false, reason: REASONS.complex });
+    expect(S.shadow('toString', '#000000').ok).toBe(false);
+    expect(S.shadow('__proto__', '#000000').ok).toBe(false);
+  });
+});
+
+import { runCommand } from '../src/store/workActions';
+import { tokenizeHtml } from '../src/preview/htmlTokens';
+function runCommandUndoRedo(s: StudioState): StudioState {
+  const c = { now: 9, mode: 'self_editing' as const, newId: () => 'q' };
+  return runCommand(runCommand(s, { name: 'undo' }, c).state, { name: 'redo' }, c).state;
+}

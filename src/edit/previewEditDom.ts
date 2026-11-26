@@ -22,7 +22,8 @@ export function readRects(doc: Document, ids: readonly number[]): Rect[] {
     if (!el) continue;
     const r = el.getBoundingClientRect();
     const p = el.parentElement?.closest('[data-pb]');
-    const parentId = p ? Number(p.getAttribute('data-pb')) : undefined;
+    const pr = p?.getAttribute('data-pb');
+    const parentId = pr ? Number(pr) : undefined;
     out.push({ id, left: clamp(r.left), top: clamp(r.top), width: clamp(r.width), height: clamp(r.height), ...(Number.isInteger(parentId) ? { parentId } : {}) });
   }
   return out;
@@ -31,7 +32,9 @@ export function readRects(doc: Document, ids: readonly number[]): Rect[] {
 export function elementAtPoint(doc: Document, x: number, y: number, known: ReadonlySet<number>): number | undefined {
   const list = doc.elementsFromPoint(clamp(x), clamp(y));
   for (const el of list) {
-    const n = Number(el.getAttribute('data-pb'));
+    const raw = el.getAttribute('data-pb');
+    if (raw === null || raw === '') continue;
+    const n = Number(raw);
     if (Number.isInteger(n) && known.has(n)) return n;
   }
   return undefined;
@@ -59,4 +62,15 @@ export function setScroll(win: Window, pos: { x: number; y: number }): void {
 
 export function scrollPreview(win: Window, dx: number, dy: number): void {
   win.scrollBy(clamp(dx), clamp(dy));
+}
+
+/** The element's content-box size in px (what a "width"/"height" style sets), clamped. */
+export function contentSize(doc: Document, id: number): { width: number; height: number } | null {
+  const el = byId(doc, id);
+  const win = doc.defaultView;
+  if (!el || !win) return null;
+  const cs = win.getComputedStyle(el);
+  const w = parseFloat(cs.width);
+  const h = parseFloat(cs.height);
+  return { width: clamp(Number.isFinite(w) ? w : el.clientWidth), height: clamp(Number.isFinite(h) ? h : el.clientHeight) };
 }

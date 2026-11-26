@@ -1,6 +1,6 @@
 // @node: F8.7
 // Parts of the Edit pad: tools, selection details, the property form, the Preview Only list, and the layout block.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as S from '../edit/styleModel';
 import type { FieldResult, StyleDeclaration } from '../edit/styleModel';
 import type { ElementEntry } from '../preview/previewDocument';
@@ -47,9 +47,18 @@ function NumField({ label, unit, range, value, build, onCommit }: { label: strin
   );
 }
 
-function ColorField({ label, build, onCommit }: { label: string; build(v: string): FieldResult; onCommit: Commit }) {
+function ColorField({ label, build, onCommit, onLive }: { label: string; build(v: string): FieldResult; onCommit: Commit; onLive?: Commit }) {
   const id = `c-${label.replace(/\W+/g, '-').toLowerCase()}`;
-  return <p><label htmlFor={id}>{label}</label> <input id={id} type="color" onChange={(e) => { const r = build(e.target.value); if (r.ok) onCommit([r.decl]); }} /></p>;
+  const ref = useRef<HTMLInputElement | null>(null);
+  // React's onChange on a colour input fires on every movement; commit only on the native "change" event.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const h = () => { const r = build(el.value); if (r.ok) onCommit([r.decl]); };
+    el.addEventListener('change', h);
+    return () => el.removeEventListener('change', h);
+  }, [build, onCommit]);
+  return <p><label htmlFor={id}>{label}</label> <input ref={ref} id={id} type="color" onInput={(e) => { const r = build((e.target as HTMLInputElement).value); if (r.ok) onLive?.([r.decl]); }} /></p>;
 }
 
 export function PropertyForm({ disabled, onCommit, onResetGroup }: { disabled: boolean; onCommit: Commit; onResetGroup(props: string[]): void }) {
@@ -119,8 +128,10 @@ export function PropertyForm({ disabled, onCommit, onResetGroup }: { disabled: b
   );
 }
 
-export function PreviewOnlyList({ items, suggestions, existing, onRemove, onRemoveAll, onKeep, onDiscard }: {
+export function PreviewOnlyList({ items, suggestions, existing, onRemove, onRemoveAll, onKeep, onDiscard, stillThere }: {
   items: readonly PreviewOnlyChange[]; suggestions: readonly PreviewOnlyChange[]; existing: ReadonlySet<string>;
+  /** For a suggestion: true when the layout finding is still reported, false when gone, undefined before a re-check. */
+  stillThere?: (c: PreviewOnlyChange) => boolean | undefined;
   onRemove(c: PreviewOnlyChange): void; onRemoveAll(): void; onKeep(c: PreviewOnlyChange): void; onDiscard(c: PreviewOnlyChange): void;
 }) {
   return (
@@ -132,7 +143,7 @@ export function PreviewOnlyList({ items, suggestions, existing, onRemove, onRemo
             <li key={`${c.scope}|${c.elementKey}|${c.property}`}>{c.elementKey}: {c.property} {c.value}. {existing.has(c.elementKey) ? c.reason : 'element not found'} <button type="button" onClick={() => onRemove(c)}>Remove</button></li>
           ))}
           {suggestions.map((c) => (
-            <li key={`s|${c.elementKey}|${c.property}`}>Suggestion for {c.elementKey}: {c.property} {c.value}. <button type="button" onClick={() => onKeep(c)}>Keep</button> <button type="button" onClick={() => onDiscard(c)}>Discard</button></li>
+            <li key={`s|${c.elementKey}|${c.property}`}>Suggestion for {c.elementKey}: {c.property} {c.value}. {stillThere?.(c) === true ? 'Still there. ' : stillThere?.(c) === false ? 'Fixed in the preview. ' : ''}<button type="button" onClick={() => onKeep(c)}>Keep</button> <button type="button" onClick={() => onDiscard(c)}>Discard</button></li>
           ))}
         </ul>
       )}

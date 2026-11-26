@@ -64,13 +64,19 @@ export function createEditController(studio: Store<StudioState> = studioStore, i
     return keys.map((k) => els.find((e) => e.key === k)).filter((e): e is ElementEntry => !!e);
   };
 
-  function scheduleRecheck(): void {
+  function scheduleRecheck(tries = 0): void {
     if (disposed) return;
+    if (tries === 0 && lastCount === null) {
+      const l = studio.getState().preview.layout;
+      if (l.status === 'done') lastCount = l.findings.length;
+    }
     if (timer !== null) services.clearTimer(timer);
     timer = services.setTimer(() => {
       timer = null;
       void services.recheck().then((n) => {
-        if (disposed || n === null) return;
+        if (disposed) return;
+        // The preview may still be reloading after the change: try again a few times.
+        if (n === null) { if (tries < 5) scheduleRecheck(tries + 1); return; }
         if (lastCount !== null && n !== lastCount) {
           const was = lastCount;
           studio.update((s) => ({ ...s, ...withLog(s, services.now(), { action: 'layout_recheck', status: 'info', message: `Layout check: ${n} findings (was ${was}).` }) }));
@@ -125,7 +131,7 @@ export function createEditController(studio: Store<StudioState> = studioStore, i
         if (text === null) for (const e of mapped) toPreview(e, REASONS.changed);
         else if (text !== base) {
           const first = mapped[0]!;
-          const editKey = `edit:${path}:${mapped.map((e) => e.key).sort().join(',')}`;
+          const editKey = `edit:${path}:${hashText(mapped.map((e) => e.key).sort().join(','))}`;
           const title = `Style: ${first.tag} at ${path}:${first.line} (${decls.map((d) => d.prop).join(', ')})`;
           let reason: string | undefined;
           studio.update((s) => {

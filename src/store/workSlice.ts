@@ -245,7 +245,10 @@ export function appendEntry(w: WorkState, entry: HistoryEntry): WorkState {
 export function undoChange(w: WorkState): WorkState {
   if (undoRefusal(w) !== null) return w;
   const last = w.applied[w.applied.length - 1] as HistoryEntry;
-  return { ...w, applied: w.applied.slice(0, -1), undone: [...w.undone, last] };
+  // Undo ends a merge burst (2E-2): the entry no longer carries its edit key.
+  const { editKey: _k, ...plain } = last;
+  void _k;
+  return { ...w, applied: w.applied.slice(0, -1), undone: [...w.undone, plain] };
 }
 
 export function redoChange(w: WorkState): WorkState {

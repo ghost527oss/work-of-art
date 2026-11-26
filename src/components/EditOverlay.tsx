@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { previewHandle, previewInfoStore } from '../edit/previewHandle';
 import { hitTest, lassoSelect, resizeFromHandle, type Handle, type Rect } from '../edit/geometry';
-import { elementAtPoint, readRects, scrollPreview } from '../edit/previewEditDom';
+import { contentSize, elementAtPoint, readRects, scrollPreview } from '../edit/previewEditDom';
 import { size as sizeDecl } from '../edit/styleModel';
 import type { EditActions } from '../hooks/useEditPad';
 import type { ElementEntry } from '../preview/previewDocument';
@@ -24,7 +24,7 @@ export function EditOverlay({ selection, tool, enabled, pad }: EditOverlayProps)
   const frame = previewHandle.frame;
   const [rects, setRects] = useState<Rect[]>([]);
   const [lasso, setLasso] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const drag = useRef<{ handle: Handle; rect: Rect; x: number; y: number; last?: { width?: number; height?: number }; frame: number | null } | null>(null);
+  const drag = useRef<{ handle: Handle; rect: Rect; x: number; y: number; px: number; py: number; last?: { width?: number; height?: number }; frame: number | null } | null>(null);
   const known = useRef(new Map<number, string>());
   known.current = new Map(elements.filter((e) => e.key).map((e) => [e.id, e.key!]));
 
@@ -39,7 +39,8 @@ export function EditOverlay({ selection, tool, enabled, pad }: EditOverlayProps)
     return () => win?.removeEventListener('scroll', update);
   }, [frame, elements, selection, buildId, enabled]);
 
-  useEffect(() => () => { if (drag.current?.frame) cancelAnimationFrame(drag.current.frame); drag.current = null; }, [buildId]);
+  // A rebuild or unmount during a drag cancels it and removes the live size.
+  useEffect(() => () => { const d = drag.current; if (d?.frame) cancelAnimationFrame(d.frame); if (d) pad.cancelLive(['width', 'height']); drag.current = null; }, [buildId, pad]);
 
   if (!enabled || !frame) return null;
   // Always the frame's CURRENT document (it is replaced on every rebuild).
@@ -61,7 +62,13 @@ export function EditOverlay({ selection, tool, enabled, pad }: EditOverlayProps)
         const p = local(e);
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
         if (tool === 'lasso') { setLasso({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); return; }
-        if (tool === 'background') { const body = elements.find((x) => x.tag === 'body')?.key ?? elements[0]?.key; if (body) pad.select([body]); return; }
+        if (tool === 'background') {
+          // The page body is not an element of the table, so Background selects the outermost elements (the page's top level).
+          const all = readRects(doc, [...known.current.keys()]);
+          const top = all.filter((r) => r.parentId === undefined).map((r) => known.current.get(r.id)!).filter(Boolean);
+          pad.select(top);
+          return;
+        }
         const id = elementAtPoint(doc, p.x, p.y, new Set(known.current.keys())) ?? hitTest(readRects(doc, [...known.current.keys()]), p.x, p.y);
         const key = id !== undefined ? known.current.get(id) : undefined;
         if (!key) { if (!e.shiftKey) pad.clear(); return; }
@@ -71,11 +78,14 @@ export function EditOverlay({ selection, tool, enabled, pad }: EditOverlayProps)
         const p = local(e);
         if (lasso) { setLasso({ ...lasso, x1: p.x, y1: p.y }); return; }
         const d = drag.current;
-        if (!d || d.frame !== null) return;
+        if (!d) return;
+        d.px = p.x;
+        d.py = p.y;
+        if (d.frame !== null) return;
         d.frame = requestAnimationFrame(() => {
           if (!drag.current) return;
           drag.current.frame = null;
-          const next = resizeFromHandle(d.rect, d.handle, p.x - d.x, p.y - d.y);
+          const next = resizeFromHandle(d.rect, d.handle, d.px - d.x, d.py - d.y);
           drag.current.last = next;
           const decls = [next.width !== undefined ? sizeDecl('width', next.width, 'px') : null, next.height !== undefined ? sizeDecl('height', next.height, 'px') : null]
             .flatMap((r) => (r && r.ok ? [r.decl] : []));
@@ -111,7 +121,16 @@ export function EditOverlay({ selection, tool, enabled, pad }: EditOverlayProps)
           className={`edit-handle edit-handle-${h}`}
           aria-label={`Resize from the ${h === 'corner' ? 'corner' : `${h} edge`}`}
           style={{ left: h === 'bottom' ? single.left + single.width / 2 - 6 : single.left + single.width - 6, top: h === 'right' ? single.top + single.height / 2 - 6 : single.top + single.height - 6 }}
-          onPointerDown={(e) => { e.stopPropagation(); (e.currentTarget.parentElement as HTMLElement).setPointerCapture?.(e.pointerId); const p = local(e); drag.current = { handle: h, rect: single, x: p.x, y: p.y, frame: null }; }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            (e.currentTarget.parentElement as HTMLElement).setPointerCapture?.(e.pointerId);
+            const p = local(e);
+            // Start from the content-box size, which is what width/height set (no jump by padding or border).
+            const doc = docNow();
+            const cs = doc ? contentSize(doc, single.id) : null;
+            const rect = cs ? { ...single, width: cs.width, height: cs.height } : single;
+            drag.current = { handle: h, rect, x: p.x, y: p.y, px: p.x, py: p.y, frame: null };
+          }}
         />
       ))}
       {lasso && <div className="edit-lasso" style={{ left: Math.min(lasso.x0, lasso.x1), top: Math.min(lasso.y0, lasso.y1), width: Math.abs(lasso.x1 - lasso.x0), height: Math.abs(lasso.y1 - lasso.y0) }} />}
