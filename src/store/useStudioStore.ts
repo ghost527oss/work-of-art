@@ -1,5 +1,6 @@
 // @node: F1.7
 // @node: F4.5 (adds the `work` field)
+// @node: F5.7 (adds `understanding` and the classifying stage actions)
 // Shared application state for the experience stage, the ingestion run, the loaded
 // snapshot, and the session log. State changes are pure functions; the store is a small
 // subscribe/update container read with `useSyncExternalStore`.
@@ -24,6 +25,7 @@ import {
 } from '../types/contracts';
 
 import { idleAI, type AIState } from './aiSlice';
+import { idleUnderstanding, type UnderstandingState } from './understandingSlice';
 import { idleWork, type WorkState } from './workSlice';
 
 export type ExperienceStage = 'start' | 'loading' | 'studio';
@@ -50,6 +52,8 @@ export interface IngestionState {
   stageDetails: Partial<Record<IngestStage, string>>;
   /** Present only when both numbers are known. */
   progress?: { loaded: number; total: number };
+  /** Set only while the `classifying` stage is active and both numbers are known. */
+  classifyProgress?: { done: number; total: number };
   notices: string[];
   error?: ApiError;
 }
@@ -60,6 +64,7 @@ export interface StudioState {
   snapshot?: RepoSnapshot;
   ai: AIState;
   work: WorkState;
+  understanding: UnderstandingState;
   log: SessionLogEntry[];
   logSeq: number;
 }
@@ -74,7 +79,7 @@ function freshStages(): Record<IngestStage, StageStatus> {
   return {
     resolving_ref: 'pending',
     fetching_tree: 'pending',
-    classifying: NOT_YET_AVAILABLE_STAGES.includes('classifying') ? 'not_available' : 'pending',
+    classifying: 'pending',
     loading_sources: 'pending',
     preparing_preview: NOT_YET_AVAILABLE_STAGES.includes('preparing_preview') ? 'not_available' : 'pending',
   };
@@ -85,7 +90,7 @@ function idleIngestion(runId: number): IngestionState {
 }
 
 export function initialState(): StudioState {
-  return { experience: 'start', ingestion: idleIngestion(0), ai: idleAI(), work: idleWork(), log: [], logSeq: 0 };
+  return { experience: 'start', ingestion: idleIngestion(0), ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), log: [], logSeq: 0 };
 }
 
 export function describeTarget(target: IngestTarget): string {
@@ -134,7 +139,7 @@ export function beginIngestion(
 ): StudioState {
   if (state.ingestion.status === 'running') return state;
   const background = options.keepSnapshot === true && state.snapshot !== undefined;
-  const base: StudioState = background ? state : { ...state, snapshot: undefined, ai: idleAI(), work: idleWork() };
+  const base: StudioState = background ? state : { ...state, snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding() };
   return {
     ...base,
     experience: background ? 'studio' : 'loading',
@@ -182,11 +187,12 @@ export function applyEvent(state: StudioState, runId: number, event: IngestEvent
 }
 
 /** Stores a validated snapshot and moves to Studio. The only way `status` becomes `done`. */
-export function completeIngestion(state: StudioState, runId: number, snapshot: RepoSnapshot, now: number): StudioState {
+export function completeIngestion(state: StudioState, runId: number, snapshot: RepoSnapshot, now: number, understanding?: UnderstandingState): StudioState {
   if (!isCurrentRun(state, runId)) return state;
-  const { error: _error, progress: _progress, ...ing } = state.ingestion;
+  const { error: _error, progress: _progress, classifyProgress: _cp, ...ing } = state.ingestion;
   void _error;
   void _progress;
+  void _cp;
   const target = state.ingestion.target;
   const label = target ? describeTarget(target) : `${snapshot.owner}/${snapshot.name}`;
   return {
@@ -195,6 +201,7 @@ export function completeIngestion(state: StudioState, runId: number, snapshot: R
     snapshot,
     ai: idleAI(),
     work: idleWork(),
+    understanding: understanding ?? idleUnderstanding(),
     ingestion: { ...ing, status: 'done', background: false },
     ...withLog(state, now, {
       action: 'ingest_completed',
@@ -226,7 +233,7 @@ export function cancelIngestion(state: StudioState, now: number): StudioState {
   if (state.ingestion.background && state.snapshot) {
     return { ...state, experience: 'studio', ingestion: { ...idleIngestion(state.ingestion.runId), status: 'done' }, ...log };
   }
-  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), work: idleWork(), ingestion: idleIngestion(state.ingestion.runId), ...log };
+  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), ingestion: idleIngestion(state.ingestion.runId), ...log };
 }
 
 /**
@@ -240,7 +247,32 @@ export function dismissError(state: StudioState): StudioState {
 
 /** Returns to the Start screen and clears the snapshot. The session log is kept. */
 export function reset(state: StudioState): StudioState {
-  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), work: idleWork(), ingestion: idleIngestion(state.ingestion.runId) };
+  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), ingestion: idleIngestion(state.ingestion.runId) };
+}
+
+// ---------------------------------------------------------------------------
+// The client-owned `classifying` stage (sub-phase 2C)
+// ---------------------------------------------------------------------------
+
+/** Marks `classifying` active and clears its progress. Ignored for a stale run. */
+export function beginClassifying(state: StudioState, runId: number): StudioState {
+  if (!isCurrentRun(state, runId)) return state;
+  const { classifyProgress: _cp, ...ing } = state.ingestion;
+  void _cp;
+  return { ...state, ingestion: { ...ing, stages: { ...ing.stages, classifying: 'active' } } };
+}
+
+export function classifyProgressed(state: StudioState, runId: number, done: number, total: number): StudioState {
+  if (!isCurrentRun(state, runId) || state.ingestion.stages.classifying !== 'active') return state;
+  return { ...state, ingestion: { ...state.ingestion, classifyProgress: { done, total } } };
+}
+
+/** Sets the stage status only. It never fails the run. */
+export function finishClassifying(state: StudioState, runId: number, status: 'done' | 'failed' | 'skipped'): StudioState {
+  if (!isCurrentRun(state, runId)) return state;
+  const { classifyProgress: _cp, ...ing } = state.ingestion;
+  void _cp;
+  return { ...state, ingestion: { ...ing, stages: { ...ing.stages, classifying: status } } };
 }
 
 // ---------------------------------------------------------------------------

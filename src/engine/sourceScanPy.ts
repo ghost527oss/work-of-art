@@ -76,7 +76,7 @@ export function scanPython(path: string, content: string): ScanResult {
   const impRe = /^[ \t]*(?:import[ \t]+([\w.]+)(?:[ \t]+as[ \t]+\w+)?|from[ \t]+(\.*)([\w.]*)[ \t]+import[ \t]+([^\n#]*))/gm;
   const bindings = new Map<string, string>();
   for (let m = impRe.exec(skeleton); m; m = impRe.exec(skeleton)) {
-    if (!room()) { out.truncated = true; break; }
+    if (!room()) { out.capped = true; break; }
     const line = lineOf(m.index);
     if (m[1]) {
       out.imports.push({ spec: m[1], line, dots: 0, py: true });
@@ -151,6 +151,6 @@ export function scanPython(path: string, content: string): ScanResult {
     const s = lit(m.index + m[0].length - 1);
     if (s && /^\w+$/.test(s.value) && room()) out.env.push({ name: s.value, line: lineOf(m.index) });
   }
-  void path;
+  if (!room()) out.capped = true;
   return out;
 }

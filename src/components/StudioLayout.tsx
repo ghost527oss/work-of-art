@@ -9,6 +9,7 @@ import { layoutStore, useLayout } from '../hooks/useLayout';
 import { shellActions, useShellView } from '../hooks/useShell';
 import type { AssistantActions } from '../hooks/useAssistant';
 import type { HarnessActions } from '../hooks/useHarness';
+import type { UnderstandingActions } from '../hooks/useUnderstanding';
 import { closePanel, setCollapsed, toggleWidth, togglePanel, type PanelId } from '../store/layoutSlice';
 import { useStudioStore } from '../store/useStudioStore';
 import { AIAssistantPanel } from './AIAssistantPanel';
@@ -33,6 +34,8 @@ export interface StudioLayoutProps {
   assistant: AssistantActions;
   /** Sub-phase 2B. When absent the Studio looks as it did in 2A (no Stop bar). */
   harness?: HarnessActions;
+  /** Sub-phase 2C. When absent the Project understanding section is not shown. */
+  understanding?: UnderstandingActions;
 }
 
 const PANEL_TITLES: Record<PanelId, string> = {
@@ -59,7 +62,7 @@ function HarnessBar({ harness }: { harness: HarnessActions }) {
   );
 }
 
-export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness }: StudioLayoutProps) {
+export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding }: StudioLayoutProps) {
   const hasSnapshot = useStudioStore((s) => s.snapshot !== undefined);
   if (!hasSnapshot) return null;
   return (
@@ -73,12 +76,13 @@ export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError,
         onBack={onBack}
         assistant={assistant}
         harness={harness}
+        understanding={understanding}
       />
     </div>
   );
 }
 
-function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness }: StudioLayoutProps) {
+function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding }: StudioLayoutProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const log = useStudioStore((s) => s.log);
   const work = useStudioStore((s) => s.work);
@@ -115,7 +119,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
     <main className="shell">
       <div className={covered ? 'shell-left covered' : 'shell-left'}>
         <SandboxPlaceholder />
-        <ProjectInfo onLoadFolders={onLoadFolders} onCancel={onCancel} onRetry={onRetry} onDismissError={onDismissError} onBack={onBack} />
+        <ProjectInfo onLoadFolders={onLoadFolders} onCancel={onCancel} onRetry={onRetry} onDismissError={onDismissError} onBack={onBack} understanding={understanding} />
       </div>
       <PanelFrame
         title={PANEL_TITLES[open ?? 'ai']}

@@ -28,12 +28,14 @@ export interface ScanResult {
   patterns: { dom: boolean; handler: boolean; handlerMethods: string[] };
   aliasImports: number;
   truncated: boolean;
+  /** The 200-results-per-file limit was reached. */
+  capped: boolean;
   djangoUrls: boolean;
 }
 
 export function emptyScan(language: ScanResult['language'] = 'none'): ScanResult {
   return {
     language, imports: [], loads: [], routes: [], mounts: [], bindings: [], calls: [], env: [],
-    patterns: { dom: false, handler: false, handlerMethods: [] }, aliasImports: 0, truncated: false, djangoUrls: false,
+    patterns: { dom: false, handler: false, handlerMethods: [] }, aliasImports: 0, truncated: false, capped: false, djangoUrls: false,
   };
 }

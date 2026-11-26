@@ -1,4 +1,5 @@
 // @node: F1.7
+// @node: F5.8 (Classify files is listed after Load source files and shows its own progress)
 // Loading screen (Phase 1 wireframe). Every status shown here comes from real pipeline
 // events held in the store. Counts appear only when both numbers are known, and there is
 // no percentage anywhere.
@@ -10,8 +11,8 @@ import type { IngestStage } from '../types/contracts';
 const STAGES: ReadonlyArray<{ id: IngestStage; label: string }> = [
   { id: 'resolving_ref', label: 'Resolve branch' },
   { id: 'fetching_tree', label: 'Fetch file tree' },
-  { id: 'classifying', label: 'Classify files' },
   { id: 'loading_sources', label: 'Load source files' },
+  { id: 'classifying', label: 'Classify files' },
   { id: 'preparing_preview', label: 'Prepare preview' },
 ];
 
@@ -59,7 +60,12 @@ export function LoadingScene({ onCancel, onRetry, onSample, onBack }: LoadingSce
         {STAGES.map(({ id, label }) => {
           const status = ingestion.stages[id];
           const detail = ingestion.stageDetails[id];
-          const progress = id === 'loading_sources' && status === 'active' ? ingestion.progress : undefined;
+          const progress =
+            id === 'loading_sources' && status === 'active'
+              ? ingestion.progress && { loaded: ingestion.progress.loaded, total: ingestion.progress.total }
+              : id === 'classifying' && status === 'active' && ingestion.classifyProgress
+                ? { loaded: ingestion.classifyProgress.done, total: ingestion.classifyProgress.total }
+                : undefined;
           return (
             <li key={id} data-stage={id} data-status={status}>
               <strong>{label}</strong>: {STATUS_TEXT[status]}

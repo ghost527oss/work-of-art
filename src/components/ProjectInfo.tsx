@@ -1,10 +1,13 @@
 // @node: F3.5
+// @node: F5.11 (renders the Project understanding section between coverage and inventory)
 // The repository header, the scoped-reload status and error blocks, the coverage panel, and
 // the inventory table. Moved out of the old Studio stub with its markup and text unchanged.
 import { useState } from 'react';
 import { describeTarget, useStudioStore } from '../store/useStudioStore';
 import { formatResetTime } from './LoadingScene';
 import { CoveragePanel } from './CoveragePanel';
+import { UnderstandingSection } from './UnderstandingSection';
+import type { UnderstandingActions } from '../hooks/useUnderstanding';
 
 const PAGE = 500;
 
@@ -14,10 +17,13 @@ export interface ProjectInfoProps {
   onRetry(): void;
   onDismissError(): void;
   onBack(): void;
+  /** Sub-phase 2C. When absent the section is not shown (2A and 2B look). */
+  understanding?: UnderstandingActions;
 }
 
-export function ProjectInfo({ onLoadFolders, onCancel, onRetry, onDismissError, onBack }: ProjectInfoProps) {
+export function ProjectInfo({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, understanding }: ProjectInfoProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
+  const understandingState = useStudioStore((s) => s.understanding);
   const ingestion = useStudioStore((s) => s.ingestion);
   const [shown, setShown] = useState(PAGE);
 
@@ -73,6 +79,17 @@ export function ProjectInfo({ onLoadFolders, onCancel, onRetry, onDismissError, 
       )}
 
       <CoveragePanel snapshot={snapshot} busy={reloading} onLoadFolders={onLoadFolders} />
+
+      {understanding && (
+        <UnderstandingSection
+          state={understandingState}
+          onRun={understanding.run}
+          onCancel={understanding.cancel}
+          onSetLabels={(p, l) => understanding.setLabels(p, l)}
+          onRemove={understanding.removeCorrection}
+          onClear={understanding.clearCorrections}
+        />
+      )}
 
       <section aria-labelledby="inventory-heading">
         <h2 id="inventory-heading">Inventory ({entries.length} paths)</h2>

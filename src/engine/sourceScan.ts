@@ -200,7 +200,7 @@ function scanJs(content: string): ScanResult {
     out.patterns.handler = true;
     if (m[1] && !out.patterns.handlerMethods.includes(m[1])) out.patterns.handlerMethods.push(m[1]);
   }
-  if (!room()) out.truncated = true;
+  if (!room()) out.capped = true;
   return out;
 }
 

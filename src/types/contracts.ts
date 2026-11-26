@@ -89,7 +89,7 @@ export const IngestStageSchema = z.enum([
 export type IngestStage = z.infer<typeof IngestStageSchema>;
 
 /** Stages that are defined but not produced by this build (specs 03 and 02). */
-export const NOT_YET_AVAILABLE_STAGES: readonly IngestStage[] = ['classifying', 'preparing_preview'];
+export const NOT_YET_AVAILABLE_STAGES: readonly IngestStage[] = ['preparing_preview'];
 
 export const ApiErrorCodeSchema = z.enum([
   'invalid_request',

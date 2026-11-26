@@ -52,11 +52,11 @@ describe('initialState', () => {
     expect(s.ingestion).toMatchObject({ status: 'idle', runId: 0, background: false, notices: [] });
   });
 
-  it('marks classifying and preparing_preview as not available and the rest pending', () => {
+  it('marks only preparing_preview as not available and the rest pending', () => {
     expect(initialState().ingestion.stages).toEqual({
       resolving_ref: 'pending',
       fetching_tree: 'pending',
-      classifying: 'not_available',
+      classifying: 'pending',
       loading_sources: 'pending',
       preparing_preview: 'not_available',
     });
@@ -129,9 +129,9 @@ describe('applyEvent: stage status comes only from events', () => {
     expect(s.ingestion.stages.resolving_ref).toBe('skipped');
   });
 
-  it('never changes the two stages that do not exist yet', () => {
+  it('never changes the one stage that does not exist yet', () => {
     const { state, runId } = running();
-    for (const name of ['classifying', 'preparing_preview'] as const) {
+    for (const name of ['preparing_preview'] as const) {
       const s = applyEvent(state, runId, { type: 'stage', stage: name, status: 'started' }, 0);
       expect(s).toBe(state);
       expect(state.ingestion.stages[name]).toBe('not_available');

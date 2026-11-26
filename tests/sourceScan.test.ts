@@ -86,7 +86,7 @@ describe('robustness', () => {
     expect(long.calls.map((c) => c.address)).toEqual(['/z']);
     const many = scanSource('a.js', Array.from({ length: 500 }, (_, i) => `fetch('/r${i}');`).join('\n'));
     expect(many.calls.length).toBeLessThanOrEqual(200);
-    expect(many.truncated).toBe(true);
+    expect(many.capped).toBe(true);
   });
   it('the scanner source has no network or store imports', () => {
     for (const f of ['src/engine/sourceScan.ts', 'src/engine/sourceScanPy.ts', 'src/engine/scanTypes.ts']) {
