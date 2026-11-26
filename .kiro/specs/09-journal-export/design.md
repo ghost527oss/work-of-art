@@ -10,7 +10,8 @@ Implements `requirements.md` in this folder. Active product phase: **Phase 2, Su
 | Blueprint section 7 | Three change layers. The third, the exported change, is a download you apply yourself. The activity log can be exported as a clean summary. |
 | Your answers | Offline first. Honest about what was read. Patch export lives in 2F. Never save secrets. Three reading levels. |
 | 2E-2 | Edit pad changes are History entries tagged with an `editKey`. The export uses that to name their origin. |
-| Requirements section 7 (pending your answers) | Journal contents, the Simple default and the saved level, fixed lessons, the patch rules, the git format, the three downloads, Learn more, the full Phase 2 test, limits, the unused placeholder file. |
+| Your 2F answers | All ten approved. The lessons and concept cards are kept in one structured playbook file with tags and keywords and lookup functions, so more cases can be added and Phase 3 can read the matching cards directly. `PlaceholderPanel.tsx` is deleted. |
+| Requirements section 7 (earlier wording) | Journal contents, the Simple default and the saved level, fixed lessons, the patch rules, the git format, the three downloads, Learn more, the full Phase 2 test, limits, the unused placeholder file. |
 
 ## 2. Phase 2F compliance
 
@@ -40,10 +41,10 @@ All paths are relative to `work-of-art/`.
 | File | Responsibility |
 |---|---|
 | `src/config/journalLimits.ts` | Limits, provisional: 30 flows, 12 steps per flow, 8 files and 3 levels per request flow, 5 instances per lesson, 10 routes in the overview, 512 KB patch, 200 KB Journal download, 500 log entries, 3 diff context lines, 2,000 preview lines, a diff work limit of 4,000,000 steps. |
-| `src/skillbook/teachTypes.ts` | `Lesson`, `Level`. |
-| `src/skillbook/conceptLessons.ts` | The 12 concept lessons (data). |
-| `src/skillbook/checkLessons.ts` | The 17 check lessons and the sorting lesson (data). |
-| `src/skillbook/index.ts` (2C, 2D) | Gains `SKILLBOOK.teach` and `lessonById`. |
+| `src/skillbook/playbookSchema.ts` | The strict zod schema for a card and for the playbook, and the types `Card`, `Playbook`, `Level`. |
+| `src/skillbook/playbook.ts` | **The one playbook file:** `PLAYBOOK`, a typed constant with a version and the list of cards (12 concepts, 17 checks, the sorting card). Plain data. |
+| `src/skillbook/playbookLookup.ts` | `cardById`, `cardsForSkill`, `cardsByTag`, `searchCards`. Pure. Used by the Journal now and by the Phase 3 AI later. |
+| `src/skillbook/index.ts` (2C, 2D) | Re-exports `PLAYBOOK` and the lookups. |
 | `src/journal/lessonRules.ts` | `countSentences`, `longestSentence`, `JARGON`, `checkLessonText(level, text)`. Pure. Used by tests and by a development check. |
 | `src/journal/packageFacts.ts` | `readPackageFacts(files)`: the `package.json` name, script names, and dependency names. Pure. |
 | `src/journal/overview.ts` | `buildOverview(facts, level)`: the templates (section 7). Pure. |
@@ -66,7 +67,7 @@ All paths are relative to `work-of-art/`.
 ### 4.2 Modified
 | File | Change |
 |---|---|
-| `src/components/PlaceholderPanel.tsx` (2A) | No longer used after the Journal panel replaces it. It is **not deleted** unless you approve (question 10). |
+| `src/components/PlaceholderPanel.tsx` (2A) | **Deleted** in J10 (approved) once nothing imports it. |
 | `src/components/HistoryPanel.tsx` (2B) | Renders `ExportChanges` below the list. |
 | `src/components/LogPanel.tsx` (2A) | Renders `LogExportButtons`. |
 | `src/components/FindingDetail.tsx` (2D) | Adds the **Learn more** button. |
@@ -82,8 +83,13 @@ All paths are relative to `work-of-art/`.
 
 ```ts
 type Level = 'simple' | 'practical' | 'deeper'
-interface Lesson { id: string; title: string; kind: 'check' | 'concept' | 'sorting'; skillId?: string
-                   simple: string; practical: string; deeper: string; related: string[] }
+interface Card { id: string; kind: 'concept' | 'check' | 'sorting' | 'edge_case'; title: string
+                 summary: string                      // one line, at most 120 characters
+                 tags: string[]; keywords: string[]    // for lookups, for example ['backend', 'security']
+                 skillId?: string                      // check cards only
+                 levels: { simple: string; practical: string; deeper: string }
+                 related: string[] }
+interface Playbook { version: 1; cards: Card[] }
 
 interface OverviewFacts {            // gathered by journalModel from existing state, no new reads
   name: string; source: 'github' | 'sample'; owner: string; repo: string; ref: string
@@ -101,9 +107,9 @@ interface OverviewFacts {            // gathered by journalModel from existing s
 interface FlowStep { path?: string; line?: number; certainty?: 'confirmed' | 'inferred' | 'broken'; kind: string; label: string; stop?: string }
 interface Flow { id: string; kind: 'page' | 'request' | 'setting'; title: string; steps: FlowStep[]; notes: string[] }
 
-interface LessonView { lesson: Lesson; instances: { path: string; firstLine: number; lastLine: number; severity: string; certainty: string; fix: string; extra?: string }[]; more: number }
+interface LessonView { lesson: Card; instances: { path: string; firstLine: number; lastLine: number; severity: string; certainty: string; fix: string; extra?: string }[]; more: number }
 interface JournalModel { level: Level; overview: { id: string; title: string; sentences: string[] }[]; flows: Flow[]; flowsHidden: number
-                         lessons: LessonView[]; concepts: Lesson[]; hidden: number /* redacted values */; notes: string[] }
+                         lessons: LessonView[]; concepts: Card[]; hidden: number /* redacted values */; notes: string[] }
 
 interface PatchPlanFile { path: string; origins: ('user' | 'crew' | 'practice')[]; changes: number; hunks: number; added: number; removed: number
                           patch?: string; excluded?: string /* fixed reason */; defaultSelected: boolean }
@@ -111,10 +117,10 @@ interface PatchPlan { files: PatchPlanFile[]; previewOnlyCount: number }
 ```
 All plain data. Nothing here is saved except the reading level.
 
-## 6. Lessons (the skill-book teaching data)
+## 6. The playbook (the cards)
 
 ### 6.1 Format and rules
-`SKILLBOOK.teach` is an array of `Lesson`. The rules of requirements R2.4 are checked by `lessonRules.ts` in tests, for every lesson and level. Sentences are split on `.`, `!`, `?` followed by a space or the end, ignoring dots inside numbers and inside code spans. The jargon list and the code-character check apply only to the Simple level.
+`PLAYBOOK.cards` is an array of `Card`. The rules of requirements R2.4 are checked by `lessonRules.ts` in tests, for every lesson and level. Sentences are split on `.`, `!`, `?` followed by a space or the end, ignoring dots inside numbers and inside code spans. The jargon list and the code-character check apply only to the Simple level.
 
 ### 6.2 Worked examples (the tone and size every lesson follows)
 
@@ -130,8 +136,11 @@ All plain data. Nothing here is saved except the reading level.
 
 Every lesson ends in plain advice at its level and never claims that anything is safe, secure, or fixed.
 
-### 6.3 Authoring and review
-The lesson text is written once, as data, in the two files. A reviewer (you) reads them when the tasks are done. Changing a lesson changes only that data and the tests re-check the rules.
+### 6.3 One file, easy to expand, ready for Phase 3
+- **One file.** All cards live in `src/skillbook/playbook.ts`, in a fixed order (concepts, checks, sorting). A comment at the top of the file shows the shape of a card and how to add one. A TypeScript file is used instead of JSON so no project setting has to change and the compiler checks every card. It is still plain data: no code runs when it loads.
+- **Easy to expand.** A new card (for example a subtle backend, security, or design edge case) is one more entry. It gets the kind `edge_case` (reserved), tags, keywords, a summary, the three levels, and related ids. The tests validate every card with the same rules, so adding a card is safe.
+- **Ready for Phase 3.** The lookups return cards by id, by skill id, by tag, and by keywords, so the live AI can fetch the matching cards for a finding and use them while it reasons, reading the file directly with no database. 2F builds the lookups and no AI code. The cards are plain text, so they can be placed in a prompt as they are.
+- **Authoring and review.** The text is written once, as data. A reviewer (you) reads it when the tasks are done. Changing a card changes only that data, and the tests re-check the rules.
 
 ## 7. The overview (`overview.ts`)
 
@@ -295,7 +304,7 @@ A deterministic store-level test with fakes for timers, storage, and downloads. 
 
 | Acceptance item (requirements section 6) | Where it is proved |
 |---|---|
-| 1. Lesson data | `tests/lessons.test.ts`, `tests/lessonRules.test.ts` (J1, J2) |
+| 1. Playbook | `tests/playbook.test.ts`, `tests/lessonRules.test.ts` (J1, J2) |
 | 2. Overview | `tests/packageFacts.test.ts`, `tests/overview.test.ts` (J3) |
 | 3. Flows | `tests/flows.test.ts` (J4) |
 | 4. Lessons from your project | `tests/journalModel.test.ts` (J5) |

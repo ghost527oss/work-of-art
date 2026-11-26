@@ -18,7 +18,7 @@ Rules for every task:
 - A secret value, snippet, setting value, or command value must never appear in any Journal text, download, or Log entry. The patch is the only export that carries file lines, and a file with a likely secret in its diff is excluded. Tests use sentinel fixtures to prove it.
 - No score, grade, or percentage. Never "secure", "is safe", "no problems", or "all good" anywhere in the Journal, a lesson, or an export.
 - The **lesson text is data written by me and reviewed by you**. Any change to a lesson after review needs your approval.
-- Do not touch the files in design section 4.3. The files in design section 4.2 may change **only** as described there. `PlaceholderPanel.tsx` is **not deleted** without your explicit approval.
+- Do not touch the files in design section 4.3. The files in design section 4.2 may change **only** as described there. `PlaceholderPanel.tsx` is deleted in J10 (approved).
 - New CSS uses only `#000` and `#fff`, with no `transition` and no `animation`.
 - `scripts/traceability/*` still do not exist. Approval is recorded in this chat.
 
@@ -30,8 +30,8 @@ The spec on `spec/09-journal-export`, code on `feat/journal-export` from the spe
 
 | # | Node | Goal | Depends on |
 |---|---|---|---|
-| J1 | F9.1 | Limits, lesson types, writing-rule checker, and the 12 concept lessons | none |
-| J2 | F9.2 | The 17 check lessons and the sorting lesson | J1 |
+| J1 | F9.1 | Limits, the playbook schema and lookups, the writing-rule checker, and the 12 concept cards | none |
+| J2 | F9.2 | The 17 check cards and the sorting card in the playbook | J1 |
 | J3 | F9.3 | Package facts and the overview | J1 |
 | J4 | F9.4 | Flow traces | J1, 2C |
 | J5 | F9.5 | The Journal model and the Journal export | J2, J3, J4 |
@@ -44,30 +44,30 @@ The spec on `spec/09-journal-export`, code on `feat/journal-export` from the spe
 
 ---
 
-## J1. Limits, lesson types, the writing-rule checker, and the concept lessons
+## J1. Limits, the playbook schema and lookups, the writing-rule checker, and the concept cards
 - **plan_id:** P2F-JOURNAL  **node_id:** F9.1
-- **scope:** `src/config/journalLimits.ts`, `src/skillbook/teachTypes.ts`, `src/skillbook/conceptLessons.ts`, `src/skillbook/index.ts` (add `SKILLBOOK.teach` and `lessonById`), `src/journal/lessonRules.ts`, `tests/lessonRules.test.ts`, `tests/lessons.test.ts` (the concept group)
-- **goal:** Build design sections 5 (`Lesson`, `Level`), 6.1, and the 12 concept lessons (ids `concept.page`, `concept.stylesheet`, `concept.script`, `concept.import`, `concept.route`, `concept.api-call`, `concept.env-var`, `concept.request-flow`, `concept.validation`, `concept.secret`, `concept.layout`, `concept.label`) at three levels, following the worked examples in design section 6.2.
+- **scope:** `src/config/journalLimits.ts`, `src/skillbook/playbookSchema.ts`, `src/skillbook/playbook.ts` (the 12 concept cards and the file header comment), `src/skillbook/playbookLookup.ts`, `src/skillbook/index.ts` (re-export `PLAYBOOK` and the lookups), `src/journal/lessonRules.ts`, `tests/lessonRules.test.ts`, `tests/playbook.test.ts` (the concept group and the schema and lookup groups)
+- **goal:** Build design sections 5 (`Card`, `Playbook`, `Level`), 6.1, 6.3, and the 12 concept cards (ids `concept.page`, `concept.stylesheet`, `concept.script`, `concept.import`, `concept.route`, `concept.api-call`, `concept.env-var`, `concept.request-flow`, `concept.validation`, `concept.secret`, `concept.layout`, `concept.label`) at three levels, following the worked examples in design section 6.2.
 - **acceptance:**
   - `lessonRules` counts sentences and words correctly on a hand-checked table (abbreviations, numbers with dots, `?` and `!`, text in quotes, an empty string); `checkLessonText` reports the sentence count, the longest sentence, any jargon word, and any code character at the Simple level.
   - All 12 concept lessons exist with unique ids, a title, and all three levels; every level meets the R2.4 rules (Simple: at most 3 sentences, at most 20 words per sentence, no jargon-list word, no backticks, parentheses, braces, or angle brackets; Practical: at most 6 and 28; Deeper: at most 10 and 35); every `related` id exists; no lesson contains a command, a URL, or any phrase in R6.4.
   - The two worked examples in the design are present word for word.
-  - `SKILLBOOK.teach` and `lessonById` work; the sort and scan skills are unchanged (their tests pass).
+  - The playbook passes `PlaybookSchema` (strict: unknown fields rejected, version 1, ids unique, summary at most 120 characters, tags and keywords non-empty, `skillId` only on check cards). `cardById`, `cardsForSkill`, `cardsByTag` (case-insensitive), and `searchCards` (all words must match a keyword, tag, or title, ranked by the number of matches, ties by id) return the right cards on a hand-written table, including no match. A fixture `edge_case` card added to a test copy is validated, returned by the lookups, and a deliberately broken card (missing level, duplicate id, unknown related id, over-long summary, unknown field) is rejected. The header comment of `playbook.ts` shows the shape of a card and how to add one. The sort and scan skills are unchanged (their tests pass).
   - `journalLimits.ts` holds the design values and `provisional: true`.
   - The files import nothing from React, stores, the engine, or the network.
-- **verify:** `npm run typecheck && npx vitest run tests/lessonRules.test.ts tests/lessons.test.ts tests/skillbook.test.ts tests/scanSkills.test.ts`
+- **verify:** `npm run typecheck && npx vitest run tests/lessonRules.test.ts tests/playbook.test.ts tests/skillbook.test.ts tests/scanSkills.test.ts`
 
-## J2. The 17 check lessons and the sorting lesson
+## J2. The 17 check cards and the sorting card
 - **plan_id:** P2F-JOURNAL  **node_id:** F9.2
-- **scope:** `src/skillbook/checkLessons.ts`, `src/skillbook/index.ts` (register them), `tests/lessons.test.ts` (the check and sorting groups)
-- **goal:** One lesson per scan skill (ids `lesson.scan.<area>.<name>`, `skillId` set) and the sorting lesson `lesson.sorting.unsure`, at three levels, following design section 6.2. The `target-blank` lesson is the worked example word for word.
+- **scope:** `src/skillbook/playbook.ts` (add the 17 check cards and the sorting card), `tests/playbook.test.ts` (the check and sorting groups)
+- **goal:** One card per scan skill (ids `lesson.scan.<area>.<name>`, `skillId` set, tags that include its area and a topic) and the sorting card `lesson.sorting.unsure`, each with a one-line summary, keywords, and the three levels, following design section 6.2. The `target-blank` lesson is the worked example word for word.
 - **acceptance:**
   - Exactly 17 check lessons, one per skill id in `SKILLBOOK.scan` (a test derives the expected set from the skill-book and fails on a missing or extra lesson), plus the sorting lesson.
   - Every lesson passes the R2.4 rules at every level; every `related` id exists; every lesson explains what the problem is, why it matters, and what to do, at its level; none claims that anything is secure or safe, gives a score, or contains a command, a URL, a code snippet, or any phrase in R6.4 (there is no exception list).
   - The `hardcoded-secret` lesson never includes an example secret. The `layout-overflow` lesson says the finding was measured in the preview.
   - The Simple level of every lesson avoids the jargon list (printed in the failure message on a violation).
   - The report includes the full lesson text for your review (it is data in the files).
-- **verify:** `npm run typecheck && npx vitest run tests/lessons.test.ts tests/lessonRules.test.ts`
+- **verify:** `npm run typecheck && npx vitest run tests/playbook.test.ts tests/lessonRules.test.ts`
 
 ## J3. Package facts and the overview
 - **plan_id:** P2F-JOURNAL  **node_id:** F9.3
@@ -165,11 +165,11 @@ The spec on `spec/09-journal-export`, code on `feat/journal-export` from the spe
 
 ## J10. Wiring and the full Phase 2 test
 - **plan_id:** P2F-JOURNAL  **node_id:** F9.10
-- **scope:** `src/components/StudioLayout.tsx`, `src/components/HistoryPanel.tsx`, `src/components/LogPanel.tsx`, `src/components/FindingDetail.tsx`, `src/App.tsx`, `src/styles.css` (only to fix a class from J9), `tests/journalUi.test.tsx` (append wiring tests), `tests/phase2Flow.test.ts`, and **the existing tests only where named here:** the 2A tests that assert the Journal placeholder text (`tests/studioShell.test.tsx` and `tests/studioLayout.test.tsx`, only those assertions) and the 2B test that lists the History panel's buttons (`tests/harnessUi.test.tsx`, only that assertion)
+- **scope:** `src/components/StudioLayout.tsx`, `src/components/HistoryPanel.tsx`, `src/components/LogPanel.tsx`, `src/components/FindingDetail.tsx`, `src/App.tsx`, `src/components/PlaceholderPanel.tsx` (**delete**, approved, only after a search shows nothing imports it), `src/styles.css` (only to fix a class from J9), `tests/journalUi.test.tsx` (append wiring tests), `tests/phase2Flow.test.ts`, and **the existing tests only where named here:** the 2A tests that assert the Journal placeholder text (`tests/studioShell.test.tsx` and `tests/studioLayout.test.tsx`, only those assertions) and the 2B test that lists the History panel's buttons (`tests/harnessUi.test.tsx`, only that assertion)
 - **goal:** Render the Journal panel for the Journal toolbar button, add `ExportChanges` to the History panel and `LogExportButtons` to the Log panel, add **Learn more** to the finding detail, call `useJournal()` in `App`, and write the full Phase 2 test of design section 14.
 - **acceptance:**
   - **The existing suite passes with no edit** except the named assertions, and the report shows the diff of each.
-  - With a seeded store and `react-dom/server`: the Journal button opens a Journal panel (no placeholder text); the History panel shows the Export changes section only when History has entries; the Log panel shows the two download buttons; Screens 4 and 5 show **Learn more** on a finding detail; `PlaceholderPanel.tsx` is imported nowhere (and still present).
+  - With a seeded store and `react-dom/server`: the Journal button opens a Journal panel (no placeholder text); the History panel shows the Export changes section only when History has entries; the Log panel shows the two download buttons; Screens 4 and 5 show **Learn more** on a finding detail; `PlaceholderPanel.tsx` is deleted, no file imports it, and typecheck and build pass.
   - **Learn more:** with fake stores, pressing it sets the focus lesson, opens the Journal panel, and moves to Screen 3; for a measured finding it opens the layout-overflow lesson.
   - **`tests/phase2Flow.test.ts`** runs the pipeline in design section 14 and asserts everything listed there, including the three exports built from the same final state, no sentinel secret or snippet or setting value in any Journal or Log export, the patch's file self-check, the saved 2B record round trip, and the invariants of each earlier spec (it reuses the invariant checkers from the 2B, 2D, and 2E-2 tests).
   - `StudioLayout` and the panels import no engine module they did not need before, apart from types and the new components.

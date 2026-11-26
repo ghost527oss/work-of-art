@@ -656,19 +656,19 @@ Contract: The Journal panel explains the loaded project at three reading levels 
 
 ### F9.1 — Limits, lesson rules, concept lessons
 - Inputs: none
-- Outputs: `JOURNAL_LIMITS`; `SKILLBOOK.teach` with 12 concept lessons; `checkLessonText`
-- Invariants: every lesson has three levels that meet the Simple, Practical, and Deeper writing rules; no jargon at Simple; no command, URL, code snippet, or banned phrase; every related id exists; data only
-- Files: `src/config/journalLimits.ts`, `src/skillbook/teachTypes.ts`, `src/skillbook/conceptLessons.ts`, `src/skillbook/index.ts`, `src/journal/lessonRules.ts`, `tests/lessonRules.test.ts`, `tests/lessons.test.ts`
+- Outputs: `JOURNAL_LIMITS`; the playbook schema, the one playbook file with the 12 concept cards, and the lookups `cardById`, `cardsForSkill`, `cardsByTag`, `searchCards`; `checkLessonText`
+- Invariants: all cards live in one structured file with a version, tags, keywords, and a one-line summary; a strict schema and the same tests validate every card, so new cards (including the reserved `edge_case` kind) are easy to add safely; every card has three levels that meet the Simple, Practical, and Deeper writing rules; no jargon at Simple; no command, URL, code snippet, or banned phrase; every related id exists; the lookups let Phase 3 read matching cards directly with no database; data only
+- Files: `src/config/journalLimits.ts`, `src/skillbook/playbookSchema.ts`, `src/skillbook/playbook.ts`, `src/skillbook/playbookLookup.ts`, `src/skillbook/index.ts`, `src/journal/lessonRules.ts`, `tests/lessonRules.test.ts`, `tests/playbook.test.ts`
 - Depends on: F5.1, F6.1
-- verify: `npm run typecheck && npx vitest run tests/lessonRules.test.ts tests/lessons.test.ts tests/skillbook.test.ts tests/scanSkills.test.ts`
+- verify: `npm run typecheck && npx vitest run tests/lessonRules.test.ts tests/playbook.test.ts tests/skillbook.test.ts tests/scanSkills.test.ts`
 
-### F9.2 — Check lessons and the sorting lesson
+### F9.2 — Check cards and the sorting card
 - Inputs: the 17 scan skills
-- Outputs: 17 check lessons and one sorting lesson at three levels
+- Outputs: 17 check cards and one sorting card in the playbook, at three levels
 - Invariants: exactly one lesson per scan skill; the secret lesson never shows an example secret; the layout lesson says the finding was measured; no claim of security, no score
-- Files: `src/skillbook/checkLessons.ts`, `src/skillbook/index.ts`, `tests/lessons.test.ts`
+- Files: `src/skillbook/playbook.ts`, `tests/playbook.test.ts`
 - Depends on: F9.1
-- verify: `npm run typecheck && npx vitest run tests/lessons.test.ts tests/lessonRules.test.ts`
+- verify: `npm run typecheck && npx vitest run tests/playbook.test.ts tests/lessonRules.test.ts`
 
 ### F9.3 — Package facts and the overview
 - Inputs: loaded files and existing results
@@ -729,8 +729,8 @@ Contract: The Journal panel explains the loaded project at three reading levels 
 ### F9.10 — Wiring and the full Phase 2 test
 - Inputs: the Studio, the panels, the finding detail
 - Outputs: the Journal for the Journal button; export sections in History and Log; Learn more on findings; the end-to-end test
-- Invariants: only the named placeholder and History-button assertions in existing tests change; `PlaceholderPanel.tsx` is not deleted without approval; the end-to-end test shows History, practice copy, findings, and exports agree and no secret appears in any export
-- Files: `src/components/StudioLayout.tsx`, `src/components/HistoryPanel.tsx`, `src/components/LogPanel.tsx`, `src/components/FindingDetail.tsx`, `src/App.tsx`, `src/styles.css`, `tests/journalUi.test.tsx`, `tests/phase2Flow.test.ts`
+- Invariants: only the named placeholder and History-button assertions in existing tests change; `PlaceholderPanel.tsx` is deleted (approved) once nothing imports it; the end-to-end test shows History, practice copy, findings, and exports agree and no secret appears in any export
+- Files: `src/components/StudioLayout.tsx`, `src/components/HistoryPanel.tsx`, `src/components/LogPanel.tsx`, `src/components/FindingDetail.tsx`, `src/App.tsx`, `src/components/PlaceholderPanel.tsx` (delete), `src/styles.css`, `tests/journalUi.test.tsx`, `tests/phase2Flow.test.ts`
 - Depends on: F9.9, F3.5, F6.11, F7.10, F8.8
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): the `git apply` check, the browser run, and the Phase 2 regression in `requirements.md` section 6, items 6, 14, and 15

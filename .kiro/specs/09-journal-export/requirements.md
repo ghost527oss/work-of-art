@@ -13,7 +13,7 @@ In simple words: the Log says what PatchBay did. The Journal explains why and ho
 
 ### In scope
 - **The Journal panel** (replacing the 2A placeholder): reading level picker, Application overview, flow traces, lessons from your project's findings, a concept list, and a Journal download.
-- **Teaching text** in the skill-book: fixed written lessons for the 17 checks and for 12 concepts, each at the three levels.
+- **The playbook:** one structured file holding fixed written cards for the 17 checks, 12 concepts, and the sorting step, each at the three levels, with tags and keywords so it is easy to expand and ready for Phase 3 to read.
 - **Overview** and **flow traces** generated offline from the 2C connections, 2D findings, 2E-1 preview mode, and `package.json` names.
 - **Patch export (layer 3):** a git-style `.patch` file of your approved changes, with a file chooser, a preview, and honest exclusions.
 - **Log export:** a Markdown summary and a JSON copy of the session log.
@@ -36,7 +36,7 @@ In simple words: the Log says what PatchBay did. The Journal explains why and ho
 
 - **Journal:** the panel that explains the project and the findings. The Log is separate and says what happened.
 - **Reading level:** **Simple**, **Practical**, or **Deeper**.
-- **Lesson:** a fixed piece of teaching text with the three levels, tied to a check, a concept, or the sorting step.
+- **Card (lesson):** one entry of the playbook: a fixed piece of teaching text with the three levels, tied to a check, a concept, or the sorting step. The playbook is the one file that holds all cards.
 - **Concept card:** a lesson about an idea (for example "What is an API route?").
 - **Flow:** a step-by-step path through the project (a page flow, a request flow, or a setting flow).
 - **Honest stop:** a flow step that says why the path ends (a file was not loaded, no route matches, an outside service).
@@ -101,7 +101,10 @@ In simple words: the Log says what PatchBay did. The Journal explains why and ho
 
 ### R5. Lessons and concept cards
 1. THE SYSTEM SHALL hold a **lesson** for each of the 17 checks (ids `lesson.scan.<area>.<name>` matching the skill ids), for each of the 12 concepts below, and one lesson for the sorting step ("Why PatchBay was unsure about some files"), each at three levels. Concepts: `concept.page` (a web page), `concept.stylesheet`, `concept.script`, `concept.import`, `concept.route`, `concept.api-call`, `concept.env-var`, `concept.request-flow`, `concept.validation`, `concept.secret`, `concept.layout`, `concept.label`.
-2. THE lessons live in the skill-book as data (`SKILLBOOK.teach`) so they are fixed, reviewed text. The Journal SHALL NOT generate teaching text on its own.
+2. THE lessons and the concept cards SHALL live together in **one structured playbook file**, `src/skillbook/playbook.ts`, as plain data with a version number: a list of **cards**. Each card has an id, a kind (`concept`, `check`, `sorting`, and the reserved kind `edge_case` for later), a title, tags (the areas and topics it belongs to, such as `backend`, `security`, `design`, `layout`, `api`), keywords, a one-line summary (at most 120 characters), the three levels of text, the ids of related cards, and, for a check card, the skill id. The file SHALL be checked by a strict schema.
+   - PatchBay SHALL expose lookup functions on the playbook: `cardById`, `cardsForSkill(skillId)`, `cardsByTag(tag)`, and `searchCards(words)`. The Journal uses them now. In Phase 3, the live AI will read the matching cards through the same functions, directly from the file, with no external database. 2F adds no AI code.
+   - Adding more cards (more subtle backend, security, and design cases) SHALL mean adding entries to the file. Tests SHALL check every card automatically (schema, unique ids, writing rules, related ids, summary length), so a new card cannot break the rules unnoticed.
+   - THE Journal SHALL NOT generate teaching text on its own. Cards of a kind the Journal does not show (such as `edge_case`) SHALL be ignored by the Journal, and returned by the lookups.
 3. **Lessons from your project** SHALL list one lesson for each check that has at least one finding (text or measured), ordered by the most severe finding first. Each shows: the title, the text at the chosen level, **In your project** (at most 5 instances: file and lines, severity, certainty, and fix label in words, with **Open in viewer**), and "<n> more are listed on the area screen." when there are more.
 4. WHEN at least one file needs review, THE SYSTEM SHALL add the sorting lesson with up to 5 of those files and the first reason PatchBay gave for each.
 5. EVERY instance line SHALL show only the path, the line range, and fixed words. For `scan.security.hardcoded-secret` it SHALL show the kind of secret in plain words and SHALL NEVER show a value. Lessons SHALL NEVER show a code snippet. (The viewer shows redacted code when the user opens it.)
@@ -186,7 +189,7 @@ In simple words: the Log says what PatchBay did. The Journal explains why and ho
 
 The spec is satisfied when all of the following hold:
 
-1. **Lesson data tests:** the 17 check lessons and 12 concept lessons and the sorting lesson exist, with unique ids matching the skills and concepts, a title, and all three levels; the writing rules of R2.4 hold for every lesson at every level (sentence counts, word counts, jargon list, code characters at Simple); every `related` id exists; the banned phrases of R6.4 appear in no lesson; no lesson contains a command, a URL, or a code snippet.
+1. **Playbook tests:** the playbook passes its strict schema; the 17 check cards and 12 concept cards and the sorting card exist, with unique ids matching the skills and concepts, a title, and all three levels; the writing rules of R2.4 hold for every lesson at every level (sentence counts, word counts, jargon list, code characters at Simple); every `related` id exists; the banned phrases of R6.4 appear in no lesson; no lesson contains a command, a URL, or a code snippet; the lookups return the right cards (`cardById`, `cardsForSkill`, `cardsByTag`, `searchCards`); a card added to a test copy of the playbook (a fixture `edge_case` card) is validated by the same checks, is returned by the lookups, and is ignored by the Journal; a deliberately broken card (missing level, duplicate id, unknown related id, over-long summary) fails the checks.
 2. **Overview tests:** hand-written expected overview text for the three bundled samples at all three levels; a project with no `package.json`; a partial analysis; no scan yet ("pending"); every Simple template is within the Simple limits when filled with long values (a stress test); the "describes only the files PatchBay read" sentence is always present; no secret or value sentinel appears; the `package.json` reader ignores script commands and dependency versions (sentinel test) and survives bad JSON.
 3. **Flow tests:** the page, request, and setting flows for the three samples written out by hand (the full-stack request flow has the steps listed in the design; the React sample's flow ends with the "no backend routes were found" stop); every honest stop sentence on a fixture; the 3-level, 8-file, 12-step, 20-request, and 30-flow limits with their notes; alias import notes; deterministic order.
 4. **Lessons-from-your-project tests:** instance lists for the sample findings (the static sample's image check, the React sample's button check, the full-stack sample's authentication check) and a fixture with several findings: order by severity, at most 5 instances, the "<n> more" line, the secret check showing the kind and never a value; the sorting lesson with up to 5 files and their reasons; concept cards with working `related` links.
@@ -205,6 +208,8 @@ The spec is satisfied when all of the following hold:
 
 ## 7. Open questions for approval
 
+**Status: all ten approved by the user. Question 3 came with a request: keep the lessons and concept cards in one clean, structured playbook file that is easy to expand and that the Phase 3 AI can read directly (done in R5.2). Question 10: delete `PlaceholderPanel.tsx` (approved).**
+
 1. **What the Journal contains (R1, R3, R4, R5).** Application overview, flow traces, lessons for the findings PatchBay actually found, and 12 concept cards. It does **not** explain each of your own edits. Approve, or add something?
 2. **Reading levels (R2).** Simple is the default. The level is saved as a small preference (the only thing the Journal saves). The writing rules are checked by tests. Approve?
 3. **Lessons are fixed, written text (R5.2).** No AI. AI-written explanations come in Phase 3. Approve?
@@ -214,4 +219,4 @@ The spec is satisfied when all of the following hold:
 7. **"Learn more" on findings (R5.7).** From a finding on Screen 4 or 5 it takes you back to Screen 3 and opens the lesson. Approve?
 8. **The full Phase 2 test (acceptance items 12 and 15).** A store-level end-to-end test, plus re-running every earlier browser run and the isolation test. The overall Phase 2 exit stays with 2G. Approve?
 9. **Limits (R4, R7, R9, R12):** 30 flows, 12 steps per flow, 5 instances per lesson, a 512 KB patch, a 200 KB Journal download, 500 log entries, 3 lines of diff context. Approve as placeholders?
-10. **The old placeholder file.** After 2F, `PlaceholderPanel.tsx` is no longer used. Delete it (needs your OK), or keep it?
+10. **The old placeholder file.** After 2F, `PlaceholderPanel.tsx` is no longer used. **Approved: delete it** (task J10).
