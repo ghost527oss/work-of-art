@@ -1,0 +1,37 @@
+// @node: F5.1
+// The sort skills as data (version 1). Each is a reason a beginner can read.
+import type { SortSkill } from './types';
+
+export const SORT_SKILLS: readonly SortSkill[] = [
+  { id: 'sort.ext.image', title: 'Image, font, or media file', strength: 'strong', label: 'assets', family: 'name', explain: 'Pictures, fonts, and media files are assets that the project shows but does not run.' },
+  { id: 'sort.name.test', title: 'Test file name or folder', strength: 'strong', label: 'tests', family: 'name', explain: 'The name or folder says this file checks that other code works.' },
+  { id: 'sort.ext.docs', title: 'Document file', strength: 'strong', label: 'documentation', family: 'name', explain: 'Text and Markdown files explain the project to people.' },
+  { id: 'sort.folder.docs', title: 'Docs folder', strength: 'moderate', label: 'documentation', family: 'folder', explain: 'Files inside a docs folder are usually written for people to read.' },
+  { id: 'sort.name.infra', title: 'Deployment or build file', strength: 'strong', label: 'infrastructure', family: 'name', explain: 'This file tells a service how to build or run the project.' },
+  { id: 'sort.name.config', title: 'Settings file', strength: 'strong', label: 'configuration', family: 'name', explain: 'This file holds settings for the project or its tools.' },
+  { id: 'sort.ext.data-file', title: 'Data or settings format', strength: 'moderate', label: 'configuration', family: 'name', explain: 'Files in this format usually hold settings.' },
+  { id: 'sort.ext.markup', title: 'Web page file', strength: 'moderate', label: 'frontend', family: 'name', explain: 'Files ending in .html, .vue, or .svelte describe what appears on screen, so they belong to the frontend.' },
+  { id: 'sort.ext.style', title: 'Style file', strength: 'moderate', label: 'frontend', family: 'name', explain: 'Style files control how a page looks, so they belong to the frontend.' },
+  { id: 'sort.ext.jsx', title: 'Screen piece file', strength: 'moderate', label: 'frontend', family: 'name', explain: 'Files ending in .jsx or .tsx hold screen pieces, so they belong to the frontend.' },
+  { id: 'sort.ext.server-lang', title: 'Server language file', strength: 'moderate', label: 'backend', family: 'name', explain: 'This language is mostly used to write the part of an app that runs on a server.' },
+  { id: 'sort.ext.schema', title: 'Data shape file', strength: 'strong', label: 'api_data', family: 'name', explain: 'This format describes how data is stored or exchanged.' },
+  { id: 'sort.folder.frontend', title: 'Screen folder', strength: 'weak', label: 'frontend', family: 'folder', explain: 'The folder name suggests screens or static pages.' },
+  { id: 'sort.folder.backend', title: 'Server folder', strength: 'moderate', label: 'backend', family: 'folder', explain: 'The folder name suggests code that runs on a server.' },
+  { id: 'sort.folder.service', title: 'Services folder', strength: 'weak', label: 'backend', family: 'folder', explain: 'A services folder usually holds helper code for a server.' },
+  { id: 'sort.folder.data', title: 'Data folder', strength: 'moderate', label: 'api_data', family: 'folder', explain: 'The folder name suggests data storage or data shapes.' },
+  { id: 'sort.folder.client-api', title: 'Client API folder', strength: 'weak', label: 'api_data', family: 'folder', explain: 'An api folder below the top usually holds code that talks to a server.' },
+  { id: 'sort.import.frontend', title: 'Uses a screen library', strength: 'strong', label: 'frontend', family: 'import', explain: 'The file imports a library that builds screens.' },
+  { id: 'sort.import.server', title: 'Uses a server library', strength: 'strong', label: 'backend', family: 'import', explain: 'The file imports a library that runs a web server.' },
+  { id: 'sort.import.node', title: 'Uses server-only tools', strength: 'moderate', label: 'backend', family: 'import', explain: 'The file imports tools that only work on a server computer.' },
+  { id: 'sort.import.db', title: 'Uses a database library', strength: 'moderate', label: 'api_data', family: 'import', explain: 'The file imports a library that talks to a database.' },
+  { id: 'sort.import.http-client', title: 'Uses a request library', strength: 'moderate', label: 'api_data', family: 'import', explain: 'The file imports a library that sends requests to servers.' },
+  { id: 'sort.syntax.dom', title: 'Touches the web page', strength: 'moderate', label: 'frontend', family: 'syntax', explain: 'The file uses the page or browser directly, so it runs in the browser.' },
+  { id: 'sort.syntax.handler', title: 'Answers requests', strength: 'strong', label: 'backend', family: 'syntax', explain: 'The file has a function that answers requests from a browser.' },
+  { id: 'sort.syntax.route-def', title: 'Defines a route', strength: 'strong', label: 'backend', family: 'syntax', explain: 'The file defines an address that a server answers.' },
+  { id: 'sort.syntax.route-data', title: 'Serves data on a route', strength: 'moderate', label: 'api_data', family: 'syntax', explain: 'The file defines an address that sends or receives data.' },
+  { id: 'sort.syntax.request-call', title: 'Sends a request', strength: 'moderate', label: 'api_data', family: 'syntax', explain: 'The file sends a request to a server address.' },
+  { id: 'sort.manifest.frontend-project', title: 'Project uses a screen library', strength: 'weak', label: 'frontend', family: 'manifest', explain: 'The project settings list a screen library and no server library.' },
+  { id: 'sort.manifest.backend-project', title: 'Project uses a server library', strength: 'weak', label: 'backend', family: 'manifest', explain: 'The project settings list a server library and no screen library.' },
+  { id: 'sort.ref.loaded-by-html', title: 'Loaded by a web page', strength: 'moderate', label: 'frontend', family: 'reference', explain: 'A web page loads this file, so it runs in the browser.' },
+  { id: 'sort.ref.shared', title: 'Used by both sides', strength: 'moderate', label: 'shared', family: 'reference', explain: 'Both frontend files and backend files import this file.' },
+];
