@@ -646,3 +646,95 @@ Contract: In the Edit panel the user selects elements in the look-only preview (
 ### F8 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2E-2 gate (build-phases.md): no edit changes anything except the in-memory practice copy; unmapped changes never reach the code; every recorded change can be undone
+
+---
+
+> plan_id: `P2F-JOURNAL` — Journal and Export (spec `.kiro/specs/09-journal-export/`). Active product phase: Phase 2, Sub-phase 2F. Status: draft for approval; no node is approved for modification. Depends on 2A to 2E-2 being built. PatchBay's own screens stay black-and-white wireframe with no animation, `AI_MODE=mock` only, no new dependency, no network and no AI call. The Journal and the exports only read existing state. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F9 — Journal and Export
+Contract: The Journal panel explains the loaded project at three reading levels (Simple, Practical, Deeper) using fixed lessons and facts PatchBay already holds: an application overview, step-by-step flow traces that stop honestly, lessons for the findings that were actually found, and 12 concept cards. Three downloads leave PatchBay as local files only: a git-style patch of the approved applied changes (combined per file, verified, with honest exclusions), a log summary (Markdown and JSON), and a Journal copy (Markdown). The only new saved item is the reading level. No AI, no network, no push to GitHub, no repository change. The sub-phase ends with the full Phase 2 regression test.
+
+### F9.1 — Limits, lesson rules, concept lessons
+- Inputs: none
+- Outputs: `JOURNAL_LIMITS`; `SKILLBOOK.teach` with 12 concept lessons; `checkLessonText`
+- Invariants: every lesson has three levels that meet the Simple, Practical, and Deeper writing rules; no jargon at Simple; no command, URL, code snippet, or banned phrase; every related id exists; data only
+- Files: `src/config/journalLimits.ts`, `src/skillbook/teachTypes.ts`, `src/skillbook/conceptLessons.ts`, `src/skillbook/index.ts`, `src/journal/lessonRules.ts`, `tests/lessonRules.test.ts`, `tests/lessons.test.ts`
+- Depends on: F5.1, F6.1
+- verify: `npm run typecheck && npx vitest run tests/lessonRules.test.ts tests/lessons.test.ts tests/skillbook.test.ts tests/scanSkills.test.ts`
+
+### F9.2 — Check lessons and the sorting lesson
+- Inputs: the 17 scan skills
+- Outputs: 17 check lessons and one sorting lesson at three levels
+- Invariants: exactly one lesson per scan skill; the secret lesson never shows an example secret; the layout lesson says the finding was measured; no claim of security, no score
+- Files: `src/skillbook/checkLessons.ts`, `src/skillbook/index.ts`, `tests/lessons.test.ts`
+- Depends on: F9.1
+- verify: `npm run typecheck && npx vitest run tests/lessons.test.ts tests/lessonRules.test.ts`
+
+### F9.3 — Package facts and the overview
+- Inputs: loaded files and existing results
+- Outputs: `OverviewFacts`; the overview parts at each level
+- Invariants: only `package.json` names are read (never script commands or versions); every sentence comes from a template; Inferred facts are worded "probably" only at Practical and Deeper; facts are redacted and counted; the overview says it describes only the files PatchBay read; pure
+- Files: `src/journal/packageFacts.ts`, `src/journal/overview.ts`, `tests/packageFacts.test.ts`, `tests/overview.test.ts`
+- Depends on: F9.1, F5.6, F6.5, F7.4
+- verify: `npm run typecheck && npx vitest run tests/packageFacts.test.ts tests/overview.test.ts`
+
+### F9.4 — Flow traces
+- Inputs: the 2C connections and the inventory
+- Outputs: page, request, route, and setting flows with honest stops
+- Invariants: a step is always a real connection with its certainty word; every stop uses a fixed sentence; bounded and deterministic; cycles do not loop; setting values are never shown
+- Files: `src/journal/flows.ts`, `tests/flows.test.ts`
+- Depends on: F9.1, F5.5
+- verify: `npm run typecheck && npx vitest run tests/flows.test.ts`
+
+### F9.5 — Journal model and Journal export
+- Inputs: the overview facts, flows, findings (text and measured), Needs Review files, the level
+- Outputs: `JournalModel`; the Journal Markdown
+- Invariants: lessons only for findings that exist; at most 5 instances each with a "more" count; secrets named by kind only; no snippets; the same inputs give the same model object; builds in under 500 ms for 2,000 files; the export is cut at a section boundary above 200 KB
+- Files: `src/journal/journalModel.ts`, `src/export/journalExport.ts`, `tests/journalModel.test.ts`, `tests/journalExport.test.ts`
+- Depends on: F9.2, F9.3, F9.4
+- verify: `npm run typecheck && npx vitest run tests/journalModel.test.ts tests/journalExport.test.ts`
+
+### F9.6 — Multi-hunk diff and the patch export
+- Inputs: loaded originals, effective content, applied History entries
+- Outputs: unified diffs with several hunks; the patch plan; the patch text
+- Invariants: every diff applies with two independent appliers and reverses exactly; each file is verified before it is offered; files with partial content, special-character paths, no net change, a failed self-check, a likely secret, or past the size limit are excluded with fixed reasons; only applied entries are exported, never Preview Only or undone changes; files with practice changes are unchecked by default; nothing is mutated
+- Files: `src/export/diffLines.ts`, `src/export/unifiedDiff.ts`, `src/export/patchExport.ts`, `tests/diffLines.test.ts`, `tests/unifiedDiff.test.ts`, `tests/patchExport.test.ts`
+- Depends on: F4.1, F8.2, F8.4
+- verify: `npm run typecheck && npx vitest run tests/diffLines.test.ts tests/unifiedDiff.test.ts tests/patchExport.test.ts tests/diffApply.test.ts`
+
+### F9.7 — Log export, names, download helper, export actions
+- Inputs: the session log, History, counts, a clock
+- Outputs: log Markdown and JSON; file names; a safe download helper; export Log entries
+- Invariants: every string redacted with a note; no snippet, diff, value, or file content; downloads are `text/plain` Blobs with no navigation and the URL released; a failed download writes no Log entry; Log entries hold counts and the level only
+- Files: `src/export/logExport.ts`, `src/export/exportName.ts`, `src/export/download.ts`, `src/store/exportActions.ts`, `tests/logExport.test.ts`, `tests/download.test.ts`, `tests/exportActions.test.ts`
+- Depends on: F9.5
+- verify: `npm run typecheck && npx vitest run tests/logExport.test.ts tests/download.test.ts tests/exportActions.test.ts`
+
+### F9.8 — Preference and the Journal store
+- Inputs: the chosen reading level; lesson focus requests
+- Outputs: the saved level (`patchbay.journal.v1`); `openLesson`
+- Invariants: strict record; bad or blocked storage gives Simple without error; nothing else is saved; the focus lesson is never saved; `openLesson` opens the Journal panel on Screen 3
+- Files: `src/store/journalPrefs.ts`, `src/hooks/useJournal.ts`, `tests/journalPrefs.test.ts`
+- Depends on: F3.1, F3.2, F4.5
+- verify: `npm run typecheck && npx vitest run tests/journalPrefs.test.ts tests/layoutState.test.ts`
+
+### F9.9 — Components
+- Inputs: props only
+- Outputs: the Journal panel and parts; the History export section; the Log export buttons; the export button
+- Invariants: text rendered as text; the level buttons use `aria-pressed`; export buttons disabled with their reason; no Apply, Approve, Reject, Pause, Resume, or Step button added; black and white only, no transition or animation
+- Files: `src/components/JournalPanel.tsx`, `src/components/LevelPicker.tsx`, `src/components/OverviewSection.tsx`, `src/components/FlowsSection.tsx`, `src/components/LessonsSection.tsx`, `src/components/ConceptsSection.tsx`, `src/components/JournalDownload.tsx`, `src/components/ExportChanges.tsx`, `src/components/LogExportButtons.tsx`, `src/components/ExportButton.tsx`, `src/styles.css`, `tests/journalUi.test.tsx`
+- Depends on: F9.5, F9.6, F9.7, F9.8
+- verify: `npm run typecheck && npx vitest run tests/journalUi.test.tsx`
+
+### F9.10 — Wiring and the full Phase 2 test
+- Inputs: the Studio, the panels, the finding detail
+- Outputs: the Journal for the Journal button; export sections in History and Log; Learn more on findings; the end-to-end test
+- Invariants: only the named placeholder and History-button assertions in existing tests change; `PlaceholderPanel.tsx` is not deleted without approval; the end-to-end test shows History, practice copy, findings, and exports agree and no secret appears in any export
+- Files: `src/components/StudioLayout.tsx`, `src/components/HistoryPanel.tsx`, `src/components/LogPanel.tsx`, `src/components/FindingDetail.tsx`, `src/App.tsx`, `src/styles.css`, `tests/journalUi.test.tsx`, `tests/phase2Flow.test.ts`
+- Depends on: F9.9, F3.5, F6.11, F7.10, F8.8
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- manual gate (Unverified until run): the `git apply` check, the browser run, and the Phase 2 regression in `requirements.md` section 6, items 6, 14, and 15
+
+### F9 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Sub-phase 2F gate (build-phases.md): all earlier gates pass again, zero console errors
