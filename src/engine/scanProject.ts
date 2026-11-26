@@ -11,7 +11,7 @@ import { scanErrorLeak, scanInputValidation, scanSqlConcat } from './scanBackend
 import type { Finding, RawFinding, ScanResult, Severity } from './scanFindingTypes';
 import { scanButtonName, scanImgAlt, scanListenerCleanup } from './scanFrontend';
 import { isEnvPath, scanCorsWildcard, scanDangerousHtml, scanEval, scanSecrets, scanTargetBlank } from './scanSecurity';
-import { makeCtx, makeFindingId, snippetFor, type FileCtx } from './scanText';
+import { makeCtx, makeFindingId, redactedLine, snippetFor, type FileCtx } from './scanText';
 import { extOf, maskComments } from './sourceScan';
 import { applyCorrections } from './understandingView';
 import type { AnalysisResult, FileUnderstanding, Label } from './understandTypes';
@@ -86,6 +86,14 @@ function applicable(path: string, labels: readonly Label[], hasCalls: boolean): 
   });
 }
 
+/** A secret's snippet shows only the line before and the line itself, redacted. A private key shows a marker only. */
+function secretSnippet(lines: readonly string[], raw: RawFinding): string[] {
+  const out: string[] = [];
+  for (let n = Math.max(1, raw.firstLine - 2); n < raw.firstLine; n++) out.push(redactedLine(lines, n));
+  out.push(raw.extra === 'a private key' ? '[REDACTED:private_key]' : redactedLine(lines, raw.firstLine));
+  return out;
+}
+
 function toFinding(raw: RawFinding, lines: readonly string[], seen: Map<string, number>): Finding {
   const skill = scanSkillById(raw.skillId)!;
   const firstText = lines[raw.firstLine - 1] ?? '';
@@ -96,7 +104,7 @@ function toFinding(raw: RawFinding, lines: readonly string[], seen: Map<string, 
   return {
     id: makeFindingId(raw.skillId, raw.path, firstText, k), skillId: raw.skillId, primary: skill.primary, areas, severity: skill.severity,
     certainty: skill.certainty, fix: skill.fix, path: raw.path, firstLine: raw.firstLine, lastLine: raw.lastLine,
-    snippet: snippetFor(lines, raw.firstLine, raw.lastLine), ...(raw.extra ? { extra: raw.extra } : {}),
+    snippet: raw.skillId === 'scan.security.hardcoded-secret' ? secretSnippet(lines, raw) : snippetFor(lines, raw.firstLine, raw.lastLine), ...(raw.extra ? { extra: raw.extra } : {}),
   };
 }
 
@@ -217,7 +225,7 @@ export async function scanProject(inputs: ScanInputs, options: ScanOptions = {})
   const per = new Map<string, number>();
   const dropped = new Map<string, number>();
   const capped: Finding[] = [];
-  for (const f of all.slice().sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || (a.path < b.path ? -1 : 1) || a.firstLine - b.firstLine)) {
+  for (const f of all.slice().sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || (a.path === b.path ? 0 : a.path < b.path ? -1 : 1) || a.firstLine - b.firstLine)) {
     const n = per.get(f.skillId) ?? 0;
     if (n >= L.maxPerCheck) { dropped.set(f.skillId, (dropped.get(f.skillId) ?? 0) + 1); continue; }
     per.set(f.skillId, n + 1);

@@ -18,6 +18,8 @@ export interface RunStep {
   /** Crew runs (2D): the area a step belongs to, and the finding it narrates or fixes. */
   area?: 'frontend' | 'backend' | 'security' | 'api_data';
   findingId?: string;
+  /** Crew runs: the first line of the finding when the script was built (used to re-match and to verify). */
+  line?: number;
 }
 
 export const PRACTICE_COMMENT = 'PRACTICE: example change from the practice run (no AI)';

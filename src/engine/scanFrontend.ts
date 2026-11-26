@@ -9,8 +9,9 @@ const MAX_HITS = 100;
 
 export function scanImgAlt(ctx: FileCtx): RawFinding[] {
   const out: RawFinding[] = [];
-  const re = new RegExp(`<img\\b([^>]{0,${N}})>`, 'gi');
-  for (let m = re.exec(ctx.masked); m && out.length < MAX_HITS; m = re.exec(ctx.masked)) {
+  const re = new RegExp(`<img\\b((?:=>|[^>]){0,${N}})>`, 'gi');
+  const src = /\.(?:html?|vue)$/i.test(ctx.path) ? ctx.masked : ctx.code;
+  for (let m = re.exec(src); m && out.length < MAX_HITS; m = re.exec(src)) {
     const attrs = m[1]!;
     if (/\balt\b/i.test(attrs) || /\{\s*\.\.\./.test(attrs)) continue;
     out.push(at(ctx, 'scan.frontend.img-alt', m.index, m.index + m[0].length));
@@ -21,7 +22,7 @@ export function scanImgAlt(ctx: FileCtx): RawFinding[] {
 export function scanButtonName(ctx: FileCtx): RawFinding[] {
   const out: RawFinding[] = [];
   const named = (attrs: string) => /\baria-label(?:ledby)?\b|\btitle\b|\{\s*\.\.\./i.test(attrs);
-  const re = new RegExp(`<button\\b([^>]{0,${N}}?)(\\/)?>(?:([\\s\\S]{0,200}?)<\\/button>)?`, 'gi');
+  const re = new RegExp(`<button\\b((?:=>|[^>]){0,${N}}?)(\\/)?>(?:([\\s\\S]{0,200}?)<\\/button>)?`, 'gi');
   for (let m = re.exec(ctx.masked); m && out.length < MAX_HITS; m = re.exec(ctx.masked)) {
     const attrs = m[1]!;
     const selfClosing = m[2] === '/';

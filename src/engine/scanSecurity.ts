@@ -12,8 +12,11 @@ const KIND_WORDS: Record<SecretKind, string> = {
 };
 
 /** Scans the raw text (comments can leak too). The value is never stored: only the kind in words. */
+const PLACEHOLDER = /change[-_ ]?me|your[-_ ]|example|placeholder|replace|xxxx|todo|enter your|<[a-z_ -]+>/i;
+
 export function scanSecrets(ctx: FileCtx): RawFinding[] {
   const out: RawFinding[] = [];
+  if (/\.(?:example|sample|template|dist)$/.test(ctx.path)) return out;
   const lines = ctx.text.split('\n');
   let offset = 0;
   for (let i = 0; i < lines.length && out.length < 100; i++) {
@@ -22,7 +25,7 @@ export function scanSecrets(ctx: FileCtx): RawFinding[] {
       if (/-----BEGIN [A-Z ]{0,30}PRIVATE KEY-----/.test(line)) out.push(at(ctx, 'scan.security.hardcoded-secret', offset, offset + line.length + 1, 'a private key'));
       else {
         const r = redact(line);
-        if (r.count > 0) out.push(at(ctx, 'scan.security.hardcoded-secret', offset, offset + line.length + 1, KIND_WORDS[r.kinds[0]!] ?? 'a secret'));
+        if (r.count > 0 && !(r.kinds.length === 1 && r.kinds[0] === 'assignment' && PLACEHOLDER.test(line))) out.push(at(ctx, 'scan.security.hardcoded-secret', offset, offset + line.length + 1, KIND_WORDS[r.kinds[0]!] ?? 'a secret'));
       }
     }
     offset += line.length + 1;
@@ -33,7 +36,8 @@ export function scanSecrets(ctx: FileCtx): RawFinding[] {
 export function scanDangerousHtml(ctx: FileCtx): RawFinding[] {
   const out: RawFinding[] = [];
   const re = /\bdangerouslySetInnerHTML\b|\.innerHTML\s*=(?!=)|\binsertAdjacentHTML\s*\(|\bdocument\.write(?:ln)?\s*\(|\bv-html\b/g;
-  for (let m = re.exec(ctx.masked); m && out.length < 100; m = re.exec(ctx.masked)) out.push(at(ctx, 'scan.security.dangerous-html', m.index, m.index + m[0].length));
+  const src = ctx.path.endsWith('.vue') || /\.html?$/i.test(ctx.path) ? ctx.masked : ctx.code;
+  for (let m = re.exec(src); m && out.length < 100; m = re.exec(src)) out.push(at(ctx, 'scan.security.dangerous-html', m.index, m.index + m[0].length));
   return out;
 }
 
@@ -41,18 +45,19 @@ export function scanEval(ctx: FileCtx): RawFinding[] {
   const out: RawFinding[] = [];
   const py = ctx.path.endsWith('.py');
   const re = py ? /(?<![\w.])(?:eval|exec)\s*\(/g : /(?<![\w.$])eval\s*\(|\bnew\s+Function\s*\(/g;
-  for (let m = re.exec(ctx.masked); m && out.length < 100; m = re.exec(ctx.masked)) out.push(at(ctx, 'scan.security.eval', m.index, m.index + m[0].length));
+  const src = /\.html?$/i.test(ctx.path) ? ctx.masked : ctx.code;
+  for (let m = re.exec(src); m && out.length < 100; m = re.exec(src)) out.push(at(ctx, 'scan.security.eval', m.index, m.index + m[0].length));
   return out;
 }
 
 export function scanTargetBlank(ctx: FileCtx): RawFinding[] {
   const out: RawFinding[] = [];
-  const re = new RegExp(`<a\\b([^>]{0,${N}})>`, 'gi');
+  const re = new RegExp(`<a\\b((?:=>|[^>]){0,${N}})>`, 'gi');
   for (let m = re.exec(ctx.masked); m && out.length < 100; m = re.exec(ctx.masked)) {
     const attrs = m[1]!;
-    if (!/\btarget\s*=\s*(?:\{\s*)?["']_blank["']/i.test(attrs)) continue;
-    const rel = /\brel\s*=\s*(?:\{\s*)?["']([^"']*)["']/i.exec(attrs);
-    if (rel && /noopener/i.test(rel[1]!)) continue;
+    if (!/(?<![\w:-])target\s*=\s*(?:\{\s*)?["']_blank["']/i.test(attrs)) continue;
+    const rel = /(?<![\w:-])rel\s*=\s*(?:\{\s*)?["']([^"']*)["']/i.exec(attrs);
+    if (rel && /noopener|noreferrer/i.test(rel[1]!)) continue;
     out.push(at(ctx, 'scan.security.target-blank', m.index, m.index + m[0].length));
   }
   return out;

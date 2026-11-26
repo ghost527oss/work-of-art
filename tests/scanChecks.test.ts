@@ -130,3 +130,37 @@ describe('applicability and hygiene', () => {
     }
   });
 });
+
+describe('review findings (2D)', () => {
+  it('a private key body never reaches a snippet', async () => {
+    const key = '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAsecretbody1\nsecretbody2secretbody2\n-----END RSA PRIVATE KEY-----\n';
+    const r = await scanFiles({ 'src/k.js': `const a = 1;\nconst k = \`${key}\`;\n` });
+    const f = r.result.findings.find((x) => x.skillId === 'scan.security.hardcoded-secret')!;
+    expect(JSON.stringify(f)).not.toContain('secretbody');
+    expect(f.snippet).toContain('[REDACTED:private_key]');
+  });
+  it('data-target and data-rel are not the attributes', async () => {
+    const r = await scanFiles({ 'a.html': '<a data-target="_blank" href="x">x</a>\n<a target="_blank" data-rel="k" href="y">y</a>\n<a target="_blank" rel="noreferrer" href="z">z</a>\n' });
+    expect(ids(r)).toEqual(['scan.security.target-blank@a.html:2']);
+    const { buildTargetBlankFix } = await import('../src/engine/scanFix');
+    const diff = buildTargetBlankFix('<a target="_blank" data-rel="k" href="y">y</a>\n', { path: 'a.html', firstLine: 1, lastLine: 1 })!;
+    expect(diff).toContain('data-rel="k" rel="noopener noreferrer"'.slice(0, 11));
+    expect(diff).not.toContain('data-rel="k noopener');
+  });
+  it('placeholders in example env files and UI text are not secrets', async () => {
+    const r = await scanFiles({ '.env.example': 'JWT_SECRET=change-me-please\nAPI_KEY=your-key-here\n', 'src/a.js': "const t = { password: 'Enter your password' };\n" });
+    expect(ids(r).filter((x) => x.includes('hardcoded-secret'))).toEqual([]);
+  });
+  it('text inside strings is not code', async () => {
+    const r = await scanFiles({ 'src/a.js': "const a = 'eval(x)';\nconst b = \"x.innerHTML = 1\";\nconst c = \"<img src='a'>\";\n" });
+    expect(ids(r)).toEqual([]);
+  });
+  it('an arrow function inside a tag does not hide the alt attribute', async () => {
+    const r = await scanFiles({ 'package.json': '{"dependencies":{"react":"1"}}', 'src/A.tsx': "import React from 'react';\nexport const A = () => <img onError={() => x()} alt=\"a\" />;\n" });
+    expect(ids(r)).toEqual([]);
+  });
+  it('insecure-url skips private and IPv6 local hosts; other fetch methods are not fetch', async () => {
+    const r = await scanFiles({ 'a.js': "fetch('http://[::1]:3000/x');\nfetch('http://10.0.0.5/x');\nfetch('http://192.168.1.2/x');\ncache.fetch(k);\n" });
+    expect(ids(r)).toEqual([]);
+  });
+});

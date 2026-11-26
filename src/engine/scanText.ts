@@ -3,7 +3,7 @@
 import { SCAN_LIMITS as L } from '../config/scanLimits';
 import { hashText } from './diffApply';
 import { redact } from './redact';
-import { lineIndex } from './sourceScan';
+import { lineIndex, maskJs } from './sourceScan';
 import type { RawFinding } from './scanFindingTypes';
 
 export interface FileCtx {
@@ -12,11 +12,14 @@ export interface FileCtx {
   text: string;
   /** Comments blanked, line breaks kept. */
   masked: string;
+  /** Like `masked`, and for JavaScript-family files the contents of strings are blanked too. */
+  code: string;
   lineOf: (offset: number) => number;
 }
 
 export function makeCtx(path: string, text: string, masked: string): FileCtx {
-  return { path, text, masked, lineOf: lineIndex(text) };
+  const code = /\.(?:js|jsx|mjs|cjs|ts|tsx)$/i.test(path) ? maskJs(text).skeleton : masked;
+  return { path, text, masked, code, lineOf: lineIndex(text) };
 }
 
 /** A raw finding spanning the match from `start` to `end` (offsets). */
@@ -24,6 +27,12 @@ export function at(ctx: FileCtx, skillId: string, start: number, end: number, ex
   const first = ctx.lineOf(start);
   const last = ctx.lineOf(Math.max(start, end - 1));
   return { skillId, path: ctx.path, firstLine: first, lastLine: last, ...(extra ? { extra } : {}) };
+}
+
+/** One line, redacted and cut to 200 characters. */
+export function redactedLine(lines: readonly string[], n: number): string {
+  const line = redact((lines[n - 1] ?? '').replace(/\r$/, '')).text;
+  return line.length > L.snippetLineChars ? `${line.slice(0, L.snippetLineChars)}...` : line;
 }
 
 /** Lines first-2 .. last+2, at most 12 lines, each redacted and cut to 200 characters. */

@@ -22,10 +22,10 @@ export function buildCrewScript(result: ScanResult, filesScanned = result.covera
     steps.push({ kind: 'area', area, title: `${areaName(area)} crew${more > 0 ? `: ${more} more findings are listed on the area screen but not narrated.` : ''}` });
     for (const f of shown) {
       const skill = scanSkillById(f.skillId)!;
-      steps.push({ kind: 'finding', area, findingId: f.id, path: f.path, title: `${skill.title} in ${f.path}`, skill: skill.id });
+      steps.push({ kind: 'finding', area, findingId: f.id, path: f.path, line: f.firstLine, title: `${skill.title} in ${f.path}`, skill: skill.id });
       if (f.fix === 'auto') {
-        steps.push({ kind: 'propose', area, findingId: f.id, path: f.path, title: `Propose a fix for ${skill.title} in ${f.path}`, skill: skill.id });
-        steps.push({ kind: 'verify', area, findingId: f.id, path: f.path, title: `Verify the fix in ${f.path}`, skill: skill.id });
+        steps.push({ kind: 'propose', area, findingId: f.id, path: f.path, line: f.firstLine, title: `Propose a fix for ${skill.title} in ${f.path}`, skill: skill.id });
+        steps.push({ kind: 'verify', area, findingId: f.id, path: f.path, line: f.firstLine, title: `Verify the fix in ${f.path}`, skill: skill.id });
       }
     }
   }

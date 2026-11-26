@@ -143,7 +143,8 @@ function crewStepAndLog(state: StudioState, ctx: WorkCtx): StudioState {
   const inputs = scanInputsOf(state);
   if (!before || !step || !inputs) return state;
   const findings = state.scan.result?.findings ?? [];
-  const finding = step.findingId ? findings.find((f) => f.id === step.findingId) : undefined;
+  // Ids can shift after an earlier fix (same text, new counter), so fall back to skill, path, and line.
+  const finding = step.findingId ? (findings.find((f) => f.id === step.findingId && (step.line === undefined || f.firstLine === step.line)) ?? findings.find((f) => f.skillId === step.skill && f.path === step.path && f.firstLine === step.line)) : undefined;
   const build: ProposalBuilder = () => {
     if (!finding) return null;
     const content = inputs.effective(finding.path);
@@ -175,10 +176,13 @@ function crewStepAndLog(state: StudioState, ctx: WorkCtx): StudioState {
     }
     const text = inputs.effective(step.path);
     const skillId = finding?.skillId ?? step.skill;
-    const still = applied && skillId && text !== undefined ? scanFile(inputs, step.path, text).some((f) => f.skillId === skillId) : false;
+    const line = step.line ?? finding?.firstLine;
+    const still = applied && skillId && text !== undefined ? scanFile(inputs, step.path, text).some((f) => f.skillId === skillId && f.firstLine === line) : false;
     entries.push(!applied || !skillId
       ? { action: 'run_verify', status: 'info', message: `Nothing to verify for ${step.path}: no change was applied.`, affectedPaths: [step.path] }
-      : still
+      : text === undefined
+        ? { action: 'run_verify', status: 'failed', message: `failed: ${step.path} could not be checked again.`, affectedPaths: [step.path] }
+        : still
         ? { action: 'run_verify', status: 'failed', message: `failed: the check still reports this problem in ${step.path}.`, affectedPaths: [step.path] }
         : { action: 'run_verify', status: 'verified', message: `Verified: the check no longer reports this problem in ${step.path}.`, affectedPaths: [step.path] });
   }
@@ -365,7 +369,7 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
       return accept(s, label, name === 'undo' ? 'Undone.' : 'Redone.');
     }
     case 'reset': {
-      const s0: StudioState = { ...state, work: idleWork(), log: [] };
+      const s0: StudioState = refreshFindings({ ...state, work: idleWork(), log: [] }, [...new Set([...w.applied, ...w.undone].map((e) => e.path))]);
       const s = logAll(s0, ctx.now, [{ action: 'work_reset', status: 'info', message: 'Work reset.' }]);
       return accept(s, label, 'Work reset.', [{ type: 'cancel_ai' }, { type: 'clear_slot' }]);
     }

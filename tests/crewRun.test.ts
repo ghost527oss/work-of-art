@@ -164,3 +164,30 @@ describe('running the crew', () => {
     expect(s.work.run!.status).toBe('finished');
   });
 });
+
+describe('review findings (2D)', () => {
+  it('two identical links: fixing the first does not make the second look gone', async () => {
+    const two = { 'a.html': '<a href="x" target="_blank">x</a>\n<a href="x" target="_blank">x</a>\n' };
+    let s = cmd(await fx(two), 'start crew').state;
+    for (let i = 0; i < 30 && s.work.run!.status !== 'finished'; i++) {
+      if (s.work.proposal) s = cmd(s, 'approve').state;
+      else s = tick(s);
+    }
+    expect(s.work.applied).toHaveLength(2);
+    expect(s.log.some((e) => e.message === 'This finding is already gone.')).toBe(false);
+    expect(s.log.filter((e) => e.status === 'verified')).toHaveLength(2);
+  });
+  it('reset restores the findings of the original content', async () => {
+    let s = cmd(await fx(AUTO), 'start crew').state;
+    while (!s.work.proposal) s = tick(s);
+    s = cmd(cmd(s, 'approve').state, 'pause').state;
+    expect(s.scan.result!.findings).toEqual([]);
+    s = cmd(s, 'reset').state;
+    expect(s.scan.result!.findings.map((f) => f.skillId)).toEqual(['scan.security.target-blank']);
+  });
+  it('the crew cannot start on a stale scan', async () => {
+    const s = await fx(AUTO);
+    const stale = { ...s, understanding: { ...s.understanding, corrections: { 'a.html': ['backend' as const] } } };
+    expect(crewStartState(stale, false)).toEqual({ enabled: false, reason: 'Scan again first: your labels changed.' });
+  });
+});

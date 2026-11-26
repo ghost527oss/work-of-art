@@ -5,6 +5,7 @@ import type { AnalysisResult } from '../engine/understandTypes';
 import { scanProject, labelsKeyOf, type ScanInputs, type ScanOptions } from '../engine/scanProject';
 import type { ScanResult } from '../engine/scanFindingTypes';
 import { practiceContent } from '../engine/practiceScript';
+import { isActive } from '../store/workSlice';
 import { beginScan, cancelScan, completeScan, failScan, progressScan } from '../store/scanActions';
 import { studioStore, type Store, type StudioState } from '../store/useStudioStore';
 
@@ -50,7 +51,7 @@ export function createScanController(studio: Store<StudioState> = studioStore, s
 
   function start(): void {
     const s = studio.getState();
-    if (disposed || !s.snapshot || s.understanding.status !== 'done' || !s.understanding.result || s.scan.status === 'running') return;
+    if (disposed || !s.snapshot || s.understanding.status !== 'done' || !s.understanding.result || s.scan.status === 'running' || isActive(s.work.run) || s.work.proposal !== null) return;
     const snapshot = s.snapshot;
     const analysis: AnalysisResult = s.understanding.result;
     const corrections = s.understanding.corrections;

@@ -100,3 +100,12 @@ When a repository finishes loading, the app now runs an offline analysis (no AI,
 - Limits (2,000 files, 200 connections per file, 5,000 in total, 8 seconds) mark the result **Partial** with a reason.
 - You can set the labels of any file. Corrections are saved per repository under `patchbay.corrections.v1` (paths and label names only) and restored when the same repository loads again. **Clear my label corrections** removes them. The Security row reads "pending scan (2D)" until the scanner exists.
 
+## Scanner and Skeleton Crew (Phase 2, sub-phase 2D)
+
+Skeleton Crew (Screen 4) scans the loaded files offline with 16 checks (no AI, no network) and groups findings into four areas: Frontend, Backend, Security, and APIs & Data. Every finding shows the file, the lines, a redacted snippet, a plain explanation, why it matters, and whether it was **Found** or only **Possible**. There are no scores. A clean scan never says the project is secure: the page lists what was and was not checked.
+
+- **Screen 4:** a map of the four areas with real counts and links, four worker boxes (workers take turns), a **Start Crew** button, a command box, and a "What was and was not checked" list.
+- **Screen 5:** one area with its findings table, a Details view, the crew narration, the pending proposal card, the changes made, and (for APIs & Data) the request trace.
+- **`start crew`** (or the button) runs the crew through the findings with the same controls as the practice run (`pause`, `resume`, `step`, `stop`, Edit auto-pause). Only one fix exists, **Auto-supported**: adding `rel="noopener noreferrer"` to a link. It is offered only when it applies exactly, the check no longer fires, nothing new appears, and the change holds no secret. You approve or reject it; it changes only the in-memory practice copy.
+- Approving, undoing, or redoing re-checks the affected file in the same update. The crew run and its proposal are never saved; applied fixes come back through History.
+

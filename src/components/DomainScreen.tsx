@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { findingsForArea } from '../engine/scanView';
 import { areaCounts } from '../engine/scanView';
+import { isScanStale } from '../hooks/useScan';
 import type { HarnessActions } from '../hooks/useHarness';
 import { areaLabel, type AreaId } from '../store/shellView';
 import { useStudioStore } from '../store/useStudioStore';
@@ -41,6 +42,7 @@ function LiveScreen5({ area, live }: { area: AreaId; live: LiveDomain }) {
     <>
       <CommandBar onSubmit={live.harness.submitText} replies={state.work.chat} onOpened={live.onOpened} />
       <p>{state.scan.status === 'done' ? `High ${counts.high}, Medium ${counts.medium}, Low ${counts.low}.` : 'No scan result yet.'}</p>
+      {result && isScanStale(state) && <p className="partial">Out of date: labels changed. Open Skeleton Crew and press Scan again.</p>}
       {result?.partial && <p className="partial">Partial result: {result.partialReasons.join(' ')}</p>}
       <FindingsTable area={area} findings={findings} selectedId={selected} onDetails={setSelected} />
       {selectedFinding && <FindingDetail finding={selectedFinding} />}

@@ -485,6 +485,11 @@ Contract: An offline scanner with 16 built-in checks in four areas (Frontend, Ba
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): headless browser run of every item in `requirements.md` section 6, item 15; zero console errors
 
+### F6 as built (2D)
+- The four per-area check files are small functions over masked text (`ctx.masked`) and a string-blanked variant (`ctx.code`) so text inside strings and comments does not fire a check. `crewStartState` also refuses a stale scan (labels changed).
+- Screens 4 and 5 keep their 2A props and render the live content only when `live` is given. The 2B run gained `kind`; `Proposal` gained `source`; `HistoryEntry` gained an optional `area` (saved, a plain word).
+- Existing tests edited as named by the design or forced by new required fields: `tests/commands.test.ts` (`start` takes one word), and type-only additions in `tests/workState.test.ts` and `tests/workStore.test.ts`.
+
 ### F6 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2D gate (build-phases.md): every finding shows its file, lines, snippet, and reason; no invented scores

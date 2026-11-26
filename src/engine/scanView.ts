@@ -4,6 +4,7 @@ import { SKILLBOOK } from '../skillbook';
 import { AREAS, type AreaId } from '../store/shellView';
 import type { StudioState } from '../store/useStudioStore';
 import { isActive } from '../store/workSlice';
+import { labelsKeyOf } from './scanProject';
 import type { Finding, ScanResult, Severity } from './scanFindingTypes';
 import type { AnalysisResult, FileUnderstanding } from './understandTypes';
 
@@ -51,6 +52,7 @@ export function linksBetweenAreas(analysis: AnalysisResult, files: readonly File
 export const CREW_START_REFUSALS = {
   noSnapshot: 'Load a repository first.',
   noScan: 'Open Skeleton Crew and wait for the scan first.',
+  stale: 'Scan again first: your labels changed.',
   active: 'A run is already active. Type stop first.',
   closeEdit: 'Close the Edit panel first.',
 } as const;
@@ -61,6 +63,7 @@ export function crewStartState(state: StudioState, selfEditing: boolean): { enab
   if (isActive(state.work.run)) return { enabled: false, reason: CREW_START_REFUSALS.active };
   if (selfEditing) return { enabled: false, reason: CREW_START_REFUSALS.closeEdit };
   if (state.scan.status !== 'done' || !state.scan.result) return { enabled: false, reason: CREW_START_REFUSALS.noScan };
+  if (state.scan.result.labelsKey !== labelsKeyOf(state.understanding.corrections)) return { enabled: false, reason: CREW_START_REFUSALS.stale };
   return { enabled: true, reason: null };
 }
 
@@ -78,7 +81,7 @@ export function workerSlots(state: StudioState): Array<{ area: AreaId; name: str
     const idx = crew.steps.findIndex((s) => s.kind === 'area' && s.area === id);
     const nextIdx = crew.steps.findIndex((s, i) => i > idx && s.kind === 'area');
     const end = nextIdx === -1 ? crew.steps.length - 1 : nextIdx;
-    if (crew.position > end && (crew.status === 'finished' || crew.position > end)) return { area: id, name: `${label} crew`, status: `Done: ${Math.min(mine, 12)} findings` };
+    if (crew.position > end && (crew.status === 'finished' || crew.position > end)) return { area: id, name: `${label} crew`, status: mine > 12 ? `Done: 12 of ${mine} narrated` : `Done: ${mine} findings` };
     if (activeArea === id && crew.status === 'awaiting_decision') return { area: id, name: `${label} crew`, status: 'Waiting for your decision' };
     if (activeArea === id && (crew.status === 'paused' || crew.status === 'stopped')) return { area: id, name: `${label} crew`, status: crew.status === 'paused' ? 'Paused' : 'Waiting' };
     if (activeArea === id && lastStep) return { area: id, name: `${label} crew`, status: `Checking ${lastStep.title}` };

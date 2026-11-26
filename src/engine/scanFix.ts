@@ -15,19 +15,19 @@ export function buildTargetBlankFix(content: string, finding: Pick<Finding, 'pat
   if (first < 1 || last > lines.length || last < first) return null;
   const block = lines.slice(first - 1, last).map((l) => l.replace(/\r$/, ''));
   const joined = block.join('\n');
-  const tag = /<a\b[^>]*>/i.exec(joined);
+  const tag = /<a\b(?:=>|[^>])*>/i.exec(joined);
   if (!tag) return null;
   const t = tag[0];
-  const target = /\btarget\s*=\s*(["'])_blank\1/i.exec(t);
+  const target = /(?<![\w:-])target\s*=\s*(["'])_blank\1/i.exec(t);
   if (!target) return null;
   let fixed: string;
-  if (/\brel\s*=\s*\{/i.test(t)) return null;
-  const rel = /\brel\s*=\s*(["'])([^"'\n]*)\1/i.exec(t);
+  if (/(?<![\w:-])rel\s*=\s*\{/i.test(t)) return null;
+  const rel = /(?<![\w:-])rel\s*=\s*(["'])([^"'\n]*)\1/i.exec(t);
   if (rel) {
     const words = rel[2]!.split(/\s+/).filter(Boolean);
     for (const w of ['noopener', 'noreferrer']) if (!words.includes(w)) words.push(w);
     fixed = t.slice(0, rel.index) + `rel=${rel[1]}${words.join(' ')}${rel[1]}` + t.slice(rel.index + rel[0].length);
-  } else if (/\brel\b/i.test(t)) {
+  } else if (/(?<![\w:-])rel\b/i.test(t)) {
     return null;
   } else {
     const end = target.index + target[0].length;
