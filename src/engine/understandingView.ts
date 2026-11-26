@@ -1,6 +1,7 @@
 // @node: F5.6
 // Pure view helpers for the Project understanding section.
 import type { ClassificationConfidence } from '../types/contracts';
+import type { ScanResult } from './scanFindingTypes';
 import type { AnalysisResult, Certainty, Edge, EdgeKind, FileUnderstanding, Label } from './understandTypes';
 
 export const LABEL_NAMES: Record<Label, string> = {
@@ -34,19 +35,19 @@ export interface Summary {
   labels: Array<{ label: Label; name: string; count: number }>;
   areas: Array<{ id: 'frontend' | 'backend' | 'api_data'; name: string; count: number }>;
   helpers: Array<{ id: 'assets' | 'tests' | 'configuration' | 'documentation'; name: string; count: number }>;
-  security: 'pending scan (2D)';
+  security: string;
   needsReview: number;
   ignored: number;
 }
 
-export function summarize(files: readonly FileUnderstanding[]): Summary {
+export function summarize(files: readonly FileUnderstanding[], scan?: ScanResult): Summary {
   const count = (label: Label) => files.filter((f) => !f.ignored && f.labels.includes(label)).length;
   const order: Label[] = ['frontend', 'backend', 'shared', 'api_data', 'assets', 'configuration', 'tests', 'documentation', 'infrastructure', 'unknown'];
   return {
     labels: order.map((label) => ({ label, name: labelName(label), count: count(label) })),
     areas: (['frontend', 'backend', 'api_data'] as const).map((id) => ({ id, name: labelName(id), count: count(id) })),
     helpers: (['assets', 'tests', 'configuration', 'documentation'] as const).map((id) => ({ id, name: labelName(id), count: count(id) })),
-    security: 'pending scan (2D)',
+    security: scan ? `${scan.findings.length} findings${scan.partial ? ' (Partial)' : ''}` : 'pending scan (2D)',
     needsReview: files.filter((f) => f.needsReview).length,
     ignored: files.filter((f) => f.ignored).length,
   };

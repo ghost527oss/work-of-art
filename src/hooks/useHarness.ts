@@ -4,8 +4,9 @@
 // restores the work with the restore gate. No network and no AI request: the only AI
 // interaction is cancelling a pending request through `services.cancelAI`.
 import { useEffect, useMemo, useRef } from 'react';
+import { SCAN_LIMITS } from '../config/scanLimits';
 import { WORK_LIMITS } from '../config/workLimits';
-import { parseCommand, type ActionName, type PanelWord } from '../engine/commands';
+import { parseCommand, type ActionName, type CommandArg } from '../engine/commands';
 import { openPanelById, type LayoutState } from '../store/layoutSlice';
 import { browserStorage, type KeyValueStorage } from '../store/layoutStorage';
 import { layoutStore } from './useLayout';
@@ -14,7 +15,7 @@ import {
   addChatReply, enterSelfEditing, restoreWork, runCommand, tickRun, type Mode, type WorkCtx, type WorkEffect,
 } from '../store/workActions';
 import {
-  buildRecord, clearWorkSlot, loadWork, replacedMessage, saveWork, trimRecord, repoKeyOf, TOO_BIG_MESSAGE, TRIMMED_MESSAGE,
+  buildRecord, clearWorkSlot, historyHasSecret, loadWork, replacedMessage, saveWork, trimRecord, repoKeyOf, SECRET_MESSAGE, TOO_BIG_MESSAGE, TRIMMED_MESSAGE,
   type WorkRecord,
 } from '../store/workStorage';
 
@@ -33,7 +34,7 @@ export interface HarnessActions {
   /** Returns true when the text was a command or a refused command word (nothing goes to the AI). */
   submitText(text: string): boolean;
   /** What the buttons call: the same path as a typed command. */
-  run(name: ActionName, arg?: PanelWord): void;
+  run(name: ActionName, arg?: CommandArg): void;
   stop(): void;
 }
 
@@ -65,6 +66,7 @@ export function createHarnessController(
   let skipSave = false;
   let noteTrim = false;
   let noteTooBig = false;
+  let noteSecret = false;
   let lastEditOpen = layout.getState().openPanel === 'edit';
 
   // ---- queue: dispatches made while another runs wait their turn, in order ----
@@ -119,7 +121,7 @@ export function createHarnessController(
     timerKey = key;
     const id = run.id;
     const position = run.position;
-    timer = services.setTimer(() => onTick(id, position), WORK_LIMITS.tickMs);
+    timer = services.setTimer(() => onTick(id, position), run.kind === 'crew' ? SCAN_LIMITS.crewTickMs : WORK_LIMITS.tickMs);
   }
 
   function onTick(runId: string, position: number): void {
@@ -144,7 +146,7 @@ export function createHarnessController(
     }
   }
 
-  function dispatchCommand(name: ActionName, arg?: PanelWord): void {
+  function dispatchCommand(name: ActionName, arg?: CommandArg): void {
     enqueue(() => {
       let effects: WorkEffect[] = [];
       studio.update((s) => {
@@ -203,6 +205,14 @@ export function createHarnessController(
       addNote(replacedMessage(old));
       return;
     }
+    if (historyHasSecret(s)) {
+      if (!noteSecret) {
+        noteSecret = true;
+        addNote(SECRET_MESSAGE);
+      }
+      return;
+    }
+    noteSecret = false;
     const t = trimRecord(record);
     if (t.tooBig) {
       if (!noteTooBig) {

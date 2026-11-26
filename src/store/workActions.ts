@@ -1,10 +1,16 @@
 // @node: F4.5
+// @node: F6.7 (crew runs: start crew, crew steps, re-check after changes)
 // Whole-state work actions: pure transitions from workSlice plus Log entries and chat replies,
 // as one atomic update. Imports withLog from useStudioStore, as aiActions.ts does.
 // useStudioStore imports only `idleWork` from workSlice, so there is no import cycle.
 // Privacy: Log entries and chat replies hold paths and fixed phrases only. Never instruction
 // text, file content, secrets, or diff bodies.
-import { ACTIONS, HELP_LINES, PANEL_WORDS, type ActionName, type PanelWord } from '../engine/commands';
+import { ACTIONS, HELP_LINES, PANEL_WORDS, type ActionName, type CommandArg } from '../engine/commands';
+import { buildCrewScript, narrate } from '../engine/crewScript';
+import { buildFixProposal } from '../engine/scanFix';
+import { rescanPaths, scanFile } from '../engine/scanProject';
+import { crewStartState } from '../engine/scanView';
+import { refreshScan } from './scanActions';
 import { hashText, applyUnifiedDiff, reverseUnifiedDiff } from '../engine/diffApply';
 import { PRACTICE_COMMENT, buildPracticeDiff, buildPracticeScript, practiceContent } from '../engine/practiceScript';
 import { commentLineFor } from '../engine/unifiedDiff';
@@ -14,7 +20,7 @@ import { repoKeyOf, type WorkRecord } from './workStorage';
 import {
   addChat, decideProposal, decisionRefusal, idleWork, workProblems, pauseRefusal, pauseRun, redoChange, redoRefusal,
   resumeRefusal, resumeRun, runOneStep, setSelfEditingPause, startRefusal, startRun, stepRefusal,
-  stopRefusal, stopRun, undoChange, undoRefusal, type HistoryEntry, type Run, type WorkState,
+  stopRefusal, stopRun, undoChange, undoRefusal, type HistoryEntry, type ProposalBuilder, type Run, type WorkState,
 } from './workSlice';
 
 export type Mode = 'automation' | 'self_editing';
@@ -34,7 +40,7 @@ export interface WorkResult {
 
 export interface CommandInput {
   name: ActionName;
-  arg?: PanelWord;
+  arg?: CommandArg;
 }
 
 type LogEntry = { action: string; status: StudioState['log'][number]['status']; message: string; affectedPaths?: string[] };
@@ -102,10 +108,91 @@ function verifyLine(state: StudioState, path: string): LogEntry {
   return { action: 'run_verify', status: 'info', message: `Nothing to verify for ${path}: no change was applied in this run.`, affectedPaths: [path] };
 }
 
+const CREW_NARRATION = /^crew_(?:frontend|backend|security|api_data)$/;
+
+/** Counts since the latest run start: findings narrated, fixes approved, fixes rejected. */
+function crewSummary(state: StudioState): string {
+  let narrated = 0, approved = 0, rejected = 0;
+  for (let i = state.log.length - 1; i >= 0; i--) {
+    const e = state.log[i]!;
+    if (e.action === 'run_started') break;
+    if (CREW_NARRATION.test(e.action) && e.affectedPaths.length === 1) narrated++;
+    else if (e.action === 'proposal_approved') approved++;
+    else if (e.action === 'proposal_rejected') rejected++;
+  }
+  return `${narrated} findings narrated, ${approved} fixes approved, ${rejected} rejected.`;
+}
+
+function scanInputsOf(state: StudioState) {
+  const snap = state.snapshot;
+  const analysis = state.understanding.result;
+  if (!snap || !analysis) return undefined;
+  return { snapshot: snap, analysis, corrections: state.understanding.corrections, effective: (p: string) => practiceContent(snap, state.work.applied, p) };
+}
+
+/** Re-checks the given paths in the same update, so findings and work never disagree. */
+function refreshFindings(state: StudioState, paths: string[]): StudioState {
+  const inputs = scanInputsOf(state);
+  if (!inputs || state.scan.status !== 'done' || !state.scan.result) return state;
+  return refreshScan(state, rescanPaths(state.scan.result, paths, inputs));
+}
+
+function crewStepAndLog(state: StudioState, ctx: WorkCtx): StudioState {
+  const before = state.work.run;
+  const step = before?.steps[before.position];
+  const inputs = scanInputsOf(state);
+  if (!before || !step || !inputs) return state;
+  const findings = state.scan.result?.findings ?? [];
+  const finding = step.findingId ? findings.find((f) => f.id === step.findingId) : undefined;
+  const build: ProposalBuilder = () => {
+    if (!finding) return null;
+    const content = inputs.effective(finding.path);
+    if (content === undefined) return null;
+    const r = buildFixProposal(finding, content, (p, t) => scanFile(inputs, p, t));
+    return r.ok ? { diff: r.diff, title: r.title, findingId: finding.id, source: 'crew' } : null;
+  };
+  const next = runOneStep(state.work, ctx.newId(), build);
+  if (next === state.work || !next.run) return state;
+  const n = next.run;
+  const area = step.area;
+  const entries: LogEntry[] = [{ action: 'run_step', status: 'info', message: `Step ${n.position} of ${n.steps.length}: ${step.title}`, affectedPaths: step.path ? [step.path] : [] }];
+  if (step.kind === 'info') entries.push({ action: 'crew_info', status: 'info', message: step.title });
+  else if (step.kind === 'area') entries.push({ action: `crew_${area}`, status: 'info', message: step.title });
+  else if (step.kind === 'finding') {
+    entries.push(finding
+      ? { action: `crew_${area}`, status: 'info', message: narrate(finding), affectedPaths: [finding.path] }
+      : { action: `crew_${area}`, status: 'info', message: 'This finding is already gone.' });
+  } else if (step.kind === 'propose') {
+    entries.push(next.proposal
+      ? { action: 'proposal_created', status: 'proposed', message: `Proposal created for ${next.proposal.path}.`, affectedPaths: [next.proposal.path] }
+      : { action: 'crew_fix_unavailable', status: 'info', message: 'A safe automatic fix could not be built here.', affectedPaths: step.path ? [step.path] : [] });
+  } else if (step.kind === 'verify' && step.path) {
+    let applied = false;
+    for (let i = state.log.length - 1; i >= 0; i--) {
+      const e = state.log[i]!;
+      if (e.action === 'run_started') break;
+      if (e.action === 'change_applied' && e.affectedPaths.includes(step.path)) { applied = true; break; }
+    }
+    const text = inputs.effective(step.path);
+    const skillId = finding?.skillId ?? step.skill;
+    const still = applied && skillId && text !== undefined ? scanFile(inputs, step.path, text).some((f) => f.skillId === skillId) : false;
+    entries.push(!applied || !skillId
+      ? { action: 'run_verify', status: 'info', message: `Nothing to verify for ${step.path}: no change was applied.`, affectedPaths: [step.path] }
+      : still
+        ? { action: 'run_verify', status: 'failed', message: `failed: the check still reports this problem in ${step.path}.`, affectedPaths: [step.path] }
+        : { action: 'run_verify', status: 'verified', message: `Verified: the check no longer reports this problem in ${step.path}.`, affectedPaths: [step.path] });
+  }
+  let s: StudioState = { ...state, work: next };
+  if (n.status === 'finished') entries.push({ action: 'run_finished', status: 'info', message: `Skeleton Crew finished: ${crewSummary(s)}` });
+  s = logAll(s, ctx.now, entries);
+  return s;
+}
+
 /** Runs the step at the run's position and logs it. Caller has checked the guard. */
 function runStepAndLog(state: StudioState, ctx: WorkCtx): StudioState {
   const before = state.work.run;
   if (!before) return state;
+  if (before.kind === 'crew') return crewStepAndLog(state, ctx);
   const stepBefore = before.steps[before.position];
   const next = runOneStep(state.work, ctx.newId());
   if (next === state.work || !next.run || !stepBefore) return state;
@@ -166,10 +253,19 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
       return accept(state, label, statusReply(state, ctx));
     case 'open': {
       const word = cmd.arg;
-      if (!word) return refuse(state, label, 'Use: open edit, chat, log, history, or journal.');
-      return accept(state, label, `Opened ${word}.`, [{ type: 'open_panel', panel: PANEL_WORDS[word] }]);
+      if (!word || !(word in PANEL_WORDS)) return refuse(state, label, 'Use: open edit, chat, log, history, or journal.');
+      return accept(state, label, `Opened ${word}.`, [{ type: 'open_panel', panel: PANEL_WORDS[word as keyof typeof PANEL_WORDS] }]);
     }
     case 'start': {
+      if (cmd.arg === 'crew') {
+        const gate = crewStartState(state, selfEditing);
+        if (!gate.enabled) return refuse(state, label, gate.reason!);
+        const crewSteps = buildCrewScript(state.scan.result!);
+        const crewWork = startRun(w, ctx.newId(), crewSteps, selfEditing, 'crew');
+        if (crewWork === w) return refuse(state, label, 'The crew script is too long to start.');
+        const cs = logAll({ ...state, work: crewWork }, ctx.now, [{ action: 'run_started', status: 'info', message: `Skeleton Crew run started with ${crewSteps.length} steps.` }]);
+        return accept(cs, label, 'Skeleton Crew run started.');
+      }
       const refusal = startRefusal(w, selfEditing);
       if (refusal) return refuse(state, label, refusal);
       const steps = buildPracticeScript(snap!);
@@ -212,6 +308,7 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
         }
         entries.push({ action: 'run_stopped', status: 'info', message: 'Run stopped.' });
         s = logAll({ ...state, work: stopRun(w) }, ctx.now, entries);
+        if (w.run?.kind === 'crew') s = logAll(s, ctx.now, [{ action: 'crew_stopped', status: 'info', message: `Skeleton Crew stopped: ${crewSummary(s)}` }]);
       }
       return accept(s, label, refusal ? 'Cancelled the pending AI request.' : 'Stopped.', [{ type: 'cancel_ai' }]);
     }
@@ -229,8 +326,9 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
       const entry: HistoryEntry = {
         id: ctx.newId(), path: proposal.path, title: proposal.title, at: ctx.now, diff: proposal.diff,
         beforeHash: hashText(current), afterHash: hashText(result.text),
+        ...(proposal.source === 'crew' && proposal.findingId ? { area: state.scan.result?.findings.find((f) => f.id === proposal.findingId)?.primary } : {}),
       };
-      const s = logAll({ ...state, work: decideProposal(w, 'approve', entry) }, ctx.now, [
+      const s = logAll(refreshFindings({ ...state, work: decideProposal(w, 'approve', entry) }, [proposal.path]), ctx.now, [
         { action: 'proposal_approved', status: 'approved', message: `Approved the change to ${proposal.path}.`, affectedPaths: [proposal.path] },
         { action: 'change_applied', status: 'applied', message: `Applied to the practice copy of ${proposal.path}.`, affectedPaths: [proposal.path] },
       ]);
@@ -259,7 +357,7 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
         const s = logAll(state, ctx.now, [{ action: `change_${name}_failed`, status: 'failed', message: 'failed: file changed since', affectedPaths: [entry.path] }]);
         return refuse(s, label, 'The file changed since, so this could not be done.');
       }
-      const s = logAll({ ...state, work: name === 'undo' ? undoChange(w) : redoChange(w) }, ctx.now, [
+      const s = logAll(refreshFindings({ ...state, work: name === 'undo' ? undoChange(w) : redoChange(w) }, [entry.path]), ctx.now, [
         name === 'undo'
           ? { action: 'change_undone', status: 'undone', message: `Undid the change to ${entry.path}.`, affectedPaths: [entry.path] }
           : { action: 'change_redone', status: 'applied', message: `Redid the change to ${entry.path}.`, affectedPaths: [entry.path] },
@@ -329,9 +427,9 @@ export function restoreWork(state: StudioState, record: WorkRecord, ctx: WorkCtx
   const candidate: WorkState = {
     ...w,
     run: record.run
-      ? { ...record.run, steps: record.run.steps.map((x) => ({ ...x })), status: record.run.status === 'running' ? 'paused' : record.run.status, autoAdvance: false }
+      ? { ...record.run, kind: 'practice' as const, steps: record.run.steps.map((x) => ({ ...x })), status: record.run.status === 'running' ? 'paused' : record.run.status, autoAdvance: false }
       : null,
-    proposal: record.proposal ? { ...record.proposal } : null,
+    proposal: record.proposal ? { ...record.proposal, source: 'practice' as const } : null,
     applied: record.applied.map((e) => ({ ...e })),
     undone: record.undone.map((e) => ({ ...e })),
     runSeq: record.run ? Math.max(w.runSeq, 1) : w.runSeq,

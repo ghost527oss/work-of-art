@@ -8,13 +8,16 @@ import { redact } from './redact';
 import { isSafeRepoPath } from './repoUrl';
 import { buildInsertDiff, commentLineFor } from './unifiedDiff';
 
-export type StepKind = 'info' | 'plan' | 'propose' | 'verify' | 'finish';
+export type StepKind = 'info' | 'plan' | 'propose' | 'verify' | 'finish' | 'area' | 'finding';
 
 export interface RunStep {
   kind: StepKind;
   title: string;
   skill?: string;
   path?: string;
+  /** Crew runs (2D): the area a step belongs to, and the finding it narrates or fixes. */
+  area?: 'frontend' | 'backend' | 'security' | 'api_data';
+  findingId?: string;
 }
 
 export const PRACTICE_COMMENT = 'PRACTICE: example change from the practice run (no AI)';

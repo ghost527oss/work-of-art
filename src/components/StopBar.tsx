@@ -3,6 +3,8 @@
 import type { RunStatus } from '../store/workSlice';
 
 export interface StopBarRun {
+  /** `crew` shows "Skeleton Crew run". Missing or `practice` shows "Practice run (no AI)". */
+  kind?: 'practice' | 'crew';
   status: RunStatus;
   position: number;
   total: number;
@@ -37,7 +39,7 @@ export function StopBar({ mode, run, waiting, aiPending = false, onStop }: StopB
   return (
     <div className="stop-bar" role="status" aria-live="polite">
       <span className="stop-bar-text">
-        {run === null ? 'No run. Type start in AI Chat.' : `Practice run (no AI): ${STATE_TEXT[run.status]}, step ${run.position} of ${run.total}.`}
+        {run === null ? 'No run. Type start in AI Chat.' : `${run.kind === 'crew' ? 'Skeleton Crew run' : 'Practice run (no AI)'}: ${STATE_TEXT[run.status]}, step ${run.position} of ${run.total}.`}
       </span>{' '}
       <span className="stop-bar-text">Mode: {mode === 'self_editing' ? 'Self-editing' : 'Automation'}.</span>
       {waiting && <span className="stop-bar-text"> Waiting for your decision.</span>}

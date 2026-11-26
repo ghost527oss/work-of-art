@@ -5,7 +5,7 @@
 // Nothing here throws. No React, no network.
 import { z } from 'zod';
 import { WORK_LIMITS } from '../config/workLimits';
-import { redact } from '../engine/redact';
+import { containsSecret, redact } from '../engine/redact';
 import { SessionLogEntrySchema, type RepoSnapshot } from '../types/contracts';
 import type { KeyValueStorage } from './layoutStorage';
 import type { StudioState } from './useStudioStore';
@@ -45,6 +45,7 @@ const HistorySchema = z.strictObject({
   diff: z.string().min(1).max(WORK_LIMITS.maxDiffChars),
   beforeHash: Hash,
   afterHash: Hash,
+  area: z.enum(['frontend', 'backend', 'security', 'api_data']).optional(),
 });
 
 export const WorkRecordSchema = z
@@ -80,6 +81,7 @@ export function replacedMessage(oldKey: string): string {
 }
 
 export const TRIMMED_MESSAGE = 'Saved work was trimmed.';
+export const SECRET_MESSAGE = 'Saved work was not updated: a change contains a likely secret.';
 export const TOO_BIG_MESSAGE = 'Saved work is too large to save, so it was not saved.';
 
 /** Builds the record from the current state, or `null` when no snapshot is loaded. Writes the allowed fields only. */
@@ -87,14 +89,17 @@ export function buildRecord(state: StudioState, now: number): WorkRecord | null 
   const snap = state.snapshot;
   if (!snap) return null;
   const w = state.work;
-  const run = w.run
+  // A crew run and a crew proposal are never saved (2D R6.10); the applied fixes come back through History.
+  const savedRun = w.run && w.run.kind === 'practice' ? w.run : null;
+  const savedProposal = w.proposal && w.proposal.source === 'practice' ? w.proposal : null;
+  const run = savedRun
     ? {
-        id: w.run.id,
-        status: w.run.status === 'running' ? ('paused' as const) : w.run.status,
+        id: savedRun.id,
+        status: savedRun.status === 'running' ? ('paused' as const) : savedRun.status,
         autoAdvance: false,
-        position: w.run.position,
-        steps: w.run.steps.map((s) => ({
-          kind: s.kind,
+        position: savedRun.position,
+        steps: savedRun.steps.map((s) => ({
+          kind: s.kind as 'info' | 'plan' | 'propose' | 'verify' | 'finish',
           title: s.title,
           ...(s.skill !== undefined ? { skill: s.skill } : {}),
           ...(s.path !== undefined ? { path: s.path } : {}),
@@ -103,13 +108,14 @@ export function buildRecord(state: StudioState, now: number): WorkRecord | null 
     : null;
   const entry = (e: StudioState['work']['applied'][number]) => ({
     id: e.id, path: e.path, title: e.title, at: e.at, diff: e.diff, beforeHash: e.beforeHash, afterHash: e.afterHash,
+    ...(e.area ? { area: e.area } : {}),
   });
   return {
     version: 1,
     repoKey: repoKeyOf(snap),
     savedAt: now,
     run,
-    proposal: w.proposal ? { id: w.proposal.id, path: w.proposal.path, title: w.proposal.title, diff: w.proposal.diff } : null,
+    proposal: savedProposal ? { id: savedProposal.id, path: savedProposal.path, title: savedProposal.title, diff: savedProposal.diff } : null,
     applied: w.applied.map(entry),
     undone: w.undone.map(entry),
     log: state.log.slice(-WORK_LIMITS.maxSavedLogEntries).map((e) => ({
@@ -117,6 +123,11 @@ export function buildRecord(state: StudioState, now: number): WorkRecord | null 
       message: redact(e.message).text, redacted: e.redacted,
     })),
   };
+}
+
+/** True when any history diff looks like it contains a secret (the history is then not saved). */
+export function historyHasSecret(state: StudioState): boolean {
+  return [...state.work.applied, ...state.work.undone].some((e) => containsSecret(e.diff));
 }
 
 export function recordBytes(record: WorkRecord): number {

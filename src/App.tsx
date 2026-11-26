@@ -3,6 +3,7 @@
 // @node: F3.5
 // @node: F4.9 (calls useHarness once)
 // @node: F5.11 (calls useUnderstanding once)
+// @node: F6.11 (calls useScan once)
 // Switches between the Start, Loading, and Studio screens from the store's experience
 // stage. One ingestion hook instance and one assistant hook instance serve every screen.
 import { LoadingScene } from './components/LoadingScene';
@@ -12,6 +13,7 @@ import { useIngestion } from './hooks/useIngestion';
 import { useAssistant } from './hooks/useAssistant';
 import { useHarness } from './hooks/useHarness';
 import { useUnderstanding } from './hooks/useUnderstanding';
+import { useScan } from './hooks/useScan';
 import { useLayoutPersistence } from './hooks/useLayout';
 import { useShellReset } from './hooks/useShell';
 import { useStudioStore } from './store/useStudioStore';
@@ -22,6 +24,7 @@ export function App() {
   const assistant = useAssistant();
   const harness = useHarness(assistant);
   const understanding = useUnderstanding();
+  const scan = useScan();
   useLayoutPersistence();
   useShellReset();
 
@@ -46,6 +49,7 @@ export function App() {
           assistant={assistant}
           harness={harness}
           understanding={understanding}
+          scan={scan}
         />
       );
     default:

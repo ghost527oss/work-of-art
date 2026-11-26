@@ -7,7 +7,7 @@ import { emptyScan, type ScanResult } from './scanTypes';
 const MAX_RESULTS = 200;
 
 /** Blank comments and triple-quoted bodies, keeping line breaks. `skeleton` also blanks ordinary string bodies. */
-function maskPy(src: string): { masked: string; skeleton: string } {
+export function maskPy(src: string): { masked: string; skeleton: string } {
   const m: string[] = [];
   const k: string[] = [];
   let i = 0;

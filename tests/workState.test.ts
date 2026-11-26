@@ -151,7 +151,7 @@ describe('refusals return the same object', () => {
   });
   it('second proposal while one waits', () => {
     const w = atProposal();
-    expect(createProposal(w, { id: 'q', path: 'y', title: 't', diff: 'd' })).toBe(w);
+    expect(createProposal(w, { id: 'q', path: 'y', title: 't', diff: 'd', source: 'practice' })).toBe(w);
     expect(runOneStep(w, 'q')).toBe(w);
   });
   it('approve without an entry', () => {

@@ -24,6 +24,7 @@ export interface ProjectInfoProps {
 export function ProjectInfo({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, understanding }: ProjectInfoProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const understandingState = useStudioStore((s) => s.understanding);
+  const scanResult = useStudioStore((s) => s.scan.status === 'done' ? s.scan.result : undefined);
   const ingestion = useStudioStore((s) => s.ingestion);
   const [shown, setShown] = useState(PAGE);
 
@@ -88,6 +89,7 @@ export function ProjectInfo({ onLoadFolders, onCancel, onRetry, onDismissError, 
           onSetLabels={(p, l) => understanding.setLabels(p, l)}
           onRemove={understanding.removeCorrection}
           onClear={understanding.clearCorrections}
+          scan={scanResult}
         />
       )}
 

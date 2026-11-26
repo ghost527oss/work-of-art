@@ -11,7 +11,7 @@ describe('ACTIONS', () => {
   it('has a help line for each and only open takes an argument', () => {
     for (const a of ACTIONS) {
       expect(a.help.length).toBeGreaterThan(0);
-      expect(a.takesArg).toBe(a.name === 'open');
+      expect(a.takesArg).toBe(a.name === 'open' || a.name === 'start');
     }
     expect(HELP_LINES).toHaveLength(13);
   });

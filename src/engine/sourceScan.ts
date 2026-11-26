@@ -3,7 +3,7 @@
 // comments are masked in one pass, then short anchored patterns run on the masked text.
 import { UNDERSTANDING_LIMITS as L } from '../config/understandingLimits';
 import { emptyScan, type ScanResult } from './scanTypes';
-import { scanPython } from './sourceScanPy';
+import { maskPy, scanPython } from './sourceScanPy';
 
 export const JS_EXT = ['js', 'jsx', 'mjs', 'cjs', 'ts', 'tsx'] as const;
 export const HTML_EXT = ['html', 'htm'] as const;
@@ -267,5 +267,19 @@ export function scanSource(path: string, content: string): ScanResult {
     return scanPython(path, safe);
   } catch {
     return emptyScan('none');
+  }
+}
+
+/** Text with comments blanked (line breaks kept). Strings stay. Used by the 2D checks. Never throws. */
+export function maskComments(path: string, text: string): string {
+  try {
+    const lang = languageOf(path);
+    if (lang === 'js') return maskJs(text).masked;
+    if (lang === 'html') return text.replace(/<!--[\s\S]*?-->/g, blank);
+    if (lang === 'css') return text.replace(/\/\*[\s\S]*?\*\//g, blank);
+    if (lang === 'py') return maskPy(text).masked;
+    return text;
+  } catch {
+    return text;
   }
 }

@@ -14,7 +14,7 @@ export interface ActionInfo {
 export const ACTIONS: readonly ActionInfo[] = [
   { name: 'help', help: 'List every command.', takesArg: false },
   { name: 'status', help: 'Show the mode, the run, and the change counts.', takesArg: false },
-  { name: 'start', help: 'Start the practice run (no AI).', takesArg: false },
+  { name: 'start', help: 'Start the practice run (no AI), or type start crew for the Skeleton Crew run.', takesArg: true },
   { name: 'pause', help: 'Keep the run from moving on by itself.', takesArg: false },
   { name: 'resume', help: 'Let the run move on by itself again.', takesArg: false },
   { name: 'step', help: 'Run one step while paused.', takesArg: false },
@@ -37,15 +37,18 @@ export const PANEL_WORDS = {
 } as const;
 
 export type PanelWord = keyof typeof PANEL_WORDS;
+export type StartWord = 'practice' | 'crew';
+export type CommandArg = PanelWord | StartWord;
 
 export const HELP_LINES: readonly string[] = ACTIONS.map((a) => `${a.name}: ${a.help}`);
 
 export type ParsedCommand =
-  | { kind: 'command'; name: ActionName; arg?: PanelWord }
+  | { kind: 'command'; name: ActionName; arg?: CommandArg }
   | { kind: 'refused'; reply: string }
   | { kind: 'none' };
 
 const OPEN_FORM = 'Use: open edit, chat, log, history, or journal.';
+const START_FORM = 'Use: start, start practice, or start crew.';
 
 function findAction(word: string): ActionInfo | undefined {
   return ACTIONS.find((a) => a.name === word);
@@ -67,6 +70,11 @@ export function parseCommand(text: string): ParsedCommand {
     const arg = words[1];
     if (arg !== undefined && isPanelWord(arg)) return { kind: 'command', name: 'open', arg };
     return { kind: 'refused', reply: OPEN_FORM };
+  }
+  if (action.name === 'start' && words.length === 2) {
+    const w = words[1];
+    if (w === 'practice' || w === 'crew') return { kind: 'command', name: 'start', arg: w };
+    return { kind: 'refused', reply: START_FORM };
   }
   if (words.length === 2) {
     return { kind: 'refused', reply: `That command takes no argument. Type just: ${action.name}` };

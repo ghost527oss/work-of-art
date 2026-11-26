@@ -8,7 +8,7 @@ import { idleWork, type WorkState } from '../src/store/workSlice';
 
 const busy: WorkState = {
   ...idleWork(), runSeq: 3,
-  run: { id: 'r', status: 'paused', autoAdvance: false, position: 1, steps: [{ kind: 'info', title: 't' }] },
+  run: { id: 'r', kind: 'practice', status: 'paused', autoAdvance: false, position: 1, steps: [{ kind: 'info', title: 't' }] },
 };
 const target = { owner: 'sample', repo: 'x', source: 'sample' as const, sampleId: 'x' };
 

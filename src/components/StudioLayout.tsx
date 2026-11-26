@@ -10,6 +10,7 @@ import { shellActions, useShellView } from '../hooks/useShell';
 import type { AssistantActions } from '../hooks/useAssistant';
 import type { HarnessActions } from '../hooks/useHarness';
 import type { UnderstandingActions } from '../hooks/useUnderstanding';
+import type { ScanActions } from '../hooks/useScan';
 import { closePanel, setCollapsed, toggleWidth, togglePanel, type PanelId } from '../store/layoutSlice';
 import { useStudioStore } from '../store/useStudioStore';
 import { AIAssistantPanel } from './AIAssistantPanel';
@@ -36,6 +37,8 @@ export interface StudioLayoutProps {
   harness?: HarnessActions;
   /** Sub-phase 2C. When absent the Project understanding section is not shown. */
   understanding?: UnderstandingActions;
+  /** Sub-phase 2D. With `harness` it makes Screens 4 and 5 live. */
+  scan?: ScanActions;
 }
 
 const PANEL_TITLES: Record<PanelId, string> = {
@@ -54,7 +57,7 @@ function HarnessBar({ harness }: { harness: HarnessActions }) {
   return (
     <StopBar
       mode={selfEditing ? 'self_editing' : 'automation'}
-      run={run ? { status: run.status, position: run.position, total: run.steps.length, autoAdvance: run.autoAdvance } : null}
+      run={run ? { kind: run.kind, status: run.status, position: run.position, total: run.steps.length, autoAdvance: run.autoAdvance } : null}
       waiting={waiting}
       aiPending={aiPending}
       onStop={harness.stop}
@@ -62,7 +65,7 @@ function HarnessBar({ harness }: { harness: HarnessActions }) {
   );
 }
 
-export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding }: StudioLayoutProps) {
+export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan }: StudioLayoutProps) {
   const hasSnapshot = useStudioStore((s) => s.snapshot !== undefined);
   if (!hasSnapshot) return null;
   return (
@@ -77,12 +80,13 @@ export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError,
         assistant={assistant}
         harness={harness}
         understanding={understanding}
+        scan={scan}
       />
     </div>
   );
 }
 
-function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding }: StudioLayoutProps) {
+function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan }: StudioLayoutProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const log = useStudioStore((s) => s.log);
   const work = useStudioStore((s) => s.work);
@@ -97,7 +101,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
         <div className="shell-left">
           <SandboxPlaceholder />
         </div>
-        <SkeletonCrewScreen onOpenArea={shellActions.openDomain} onBack={shellActions.backToStudio} />
+        <SkeletonCrewScreen onOpenArea={shellActions.openDomain} onBack={shellActions.backToStudio} live={harness && scan ? { harness, scan, onOpened: shellActions.backToStudio } : undefined} />
       </main>
     );
   }
@@ -108,7 +112,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
         <div className="shell-left">
           <SandboxPlaceholder />
         </div>
-        <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} />
+        <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} live={harness ? { harness, onOpened: shellActions.backToStudio } : undefined} />
       </main>
     );
   }

@@ -18,4 +18,21 @@ export interface SortSkill {
 export interface SkillBook {
   version: number;
   sort: readonly SortSkill[];
+  scan: readonly ScanSkill[];
+}
+
+export type ScanSeverity = 'high' | 'medium' | 'low';
+
+/** A scanning skill (sub-phase 2D). The matching code lives in the engine, keyed by `id`. */
+export interface ScanSkill {
+  id: string;
+  title: string;
+  primary: 'frontend' | 'backend' | 'security' | 'api_data';
+  also: Array<'frontend' | 'backend' | 'security' | 'api_data'>;
+  severity: ScanSeverity;
+  certainty: 'found' | 'possible';
+  fix: 'auto' | 'guided' | 'explanation';
+  explain: string;
+  why: string;
+  how: string[];
 }

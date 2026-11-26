@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { applyCorrections, summarize } from '../engine/understandingView';
 import type { Label } from '../engine/understandTypes';
+import type { ScanResult } from '../engine/scanFindingTypes';
 import type { UnderstandingState } from '../store/understandingSlice';
 import { ConnectionsTable } from './ConnectionsTable';
 import { FileLabelsTable } from './FileLabelsTable';
@@ -16,14 +17,16 @@ export interface UnderstandingSectionProps {
   onSetLabels(path: string, labels: Label[]): string | null;
   onRemove(path: string): void;
   onClear(): void;
+  /** A finished scan (2D). Without it the Security row reads "pending scan (2D)". */
+  scan?: ScanResult;
 }
 
-export function UnderstandingSection({ state, onRun, onCancel, onSetLabels, onRemove, onClear }: UnderstandingSectionProps) {
+export function UnderstandingSection({ state, onRun, onCancel, onSetLabels, onRemove, onClear, scan }: UnderstandingSectionProps) {
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const result = state.result;
   const files = useMemo(() => (result ? applyCorrections(result, state.corrections) : []), [result, state.corrections]);
-  const summary = useMemo(() => summarize(files), [files]);
+  const summary = useMemo(() => summarize(files, scan), [files, scan]);
   const review = files.filter((f) => f.needsReview);
   const notScannedExt = useMemo(() => new Set(Object.keys(result?.coverage.notScanned ?? {})), [result]);
   const correctionCount = Object.keys(state.corrections).length;

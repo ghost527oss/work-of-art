@@ -3,6 +3,7 @@
 // command replies. Every transition returns the SAME object when it refuses, so nothing
 // re-renders and nothing is saved. The `*Refusal` helpers give the plain-English reason.
 // No Log entries are written here (workActions.ts does that). No React, no store, no network.
+import { SCAN_LIMITS } from '../config/scanLimits';
 import { WORK_LIMITS } from '../config/workLimits';
 import { buildPracticeDiff, type RunStep } from '../engine/practiceScript';
 
@@ -12,6 +13,8 @@ export type RunStatus = 'running' | 'paused' | 'awaiting_decision' | 'stopped' |
 
 export interface Run {
   id: string;
+  /** `practice` is the 2B script. `crew` is the Skeleton Crew run (2D). */
+  kind: 'practice' | 'crew';
   status: RunStatus;
   autoAdvance: boolean;
   position: number;
@@ -23,6 +26,8 @@ export interface Proposal {
   path: string;
   title: string;
   diff: string;
+  source: 'practice' | 'crew';
+  findingId?: string;
 }
 
 export interface HistoryEntry {
@@ -33,6 +38,8 @@ export interface HistoryEntry {
   diff: string;
   beforeHash: string;
   afterHash: string;
+  /** Set for Skeleton Crew fixes (2D): the area the finding belongs to. */
+  area?: 'frontend' | 'backend' | 'security' | 'api_data';
 }
 
 export interface ChatLine {
@@ -135,12 +142,13 @@ export function redoRefusal(w: WorkState): string | null {
 // Transitions
 // ---------------------------------------------------------------------------
 
-export function startRun(w: WorkState, runId: string, steps: RunStep[], selfEditing: boolean): WorkState {
+export function startRun(w: WorkState, runId: string, steps: RunStep[], selfEditing: boolean, kind: 'practice' | 'crew' = 'practice'): WorkState {
   if (startRefusal(w, selfEditing) !== null) return w;
-  if (steps.length === 0 || steps.length > WORK_LIMITS.maxSteps) return w;
+  const limit = kind === 'crew' ? SCAN_LIMITS.crewSteps : WORK_LIMITS.maxSteps;
+  if (steps.length === 0 || steps.length > limit) return w;
   return {
     ...w,
-    run: { id: runId, status: 'running', autoAdvance: true, position: 0, steps: steps.map((s) => ({ ...s })) },
+    run: { id: runId, kind, status: 'running', autoAdvance: true, position: 0, steps: steps.map((s) => ({ ...s })) },
     proposal: null,
     runSeq: w.runSeq + 1,
   };
@@ -170,7 +178,14 @@ export function createProposal(w: WorkState, proposal: Proposal): WorkState {
  * Runs the step at `position` (used by ticks and `step`). Allowed while `running` or `paused`
  * with no waiting proposal. A `propose` step creates the proposal; the last step finishes the run.
  */
-export function runOneStep(w: WorkState, proposalId: string): WorkState {
+export type ProposalBuilder = (step: RunStep) => { diff: string; title: string; findingId?: string; source: 'practice' | 'crew' } | null;
+
+/**
+ * Runs the step at `position` (used by ticks and `step`). Allowed while `running` or `paused`
+ * with no waiting proposal. A `propose` step creates the proposal (a practice one by default, or
+ * the one `build` returns; `null` means no proposal is made); the last step finishes the run.
+ */
+export function runOneStep(w: WorkState, proposalId: string, build?: ProposalBuilder): WorkState {
   const run = w.run;
   if (!run || w.proposal !== null) return w;
   if (run.status !== 'running' && run.status !== 'paused') return w;
@@ -178,15 +193,18 @@ export function runOneStep(w: WorkState, proposalId: string): WorkState {
   if (!step) return w;
   const moved: Run = { ...run, position: run.position + 1 };
   if (step.kind === 'propose' && step.path !== undefined) {
-    return createProposal({ ...w, run: moved }, { id: proposalId, path: step.path, title: step.title, diff: buildPracticeDiff(step.path) });
+    const made = build ? build(step) : { diff: buildPracticeDiff(step.path), title: step.title, source: 'practice' as const };
+    if (made) {
+      return createProposal({ ...w, run: moved }, { id: proposalId, path: step.path, title: made.title, diff: made.diff, source: made.source, ...(made.findingId ? { findingId: made.findingId } : {}) });
+    }
   }
   if (moved.position >= moved.steps.length) moved.status = 'finished';
   return { ...w, run: moved };
 }
 
-export function stepRun(w: WorkState, selfEditing: boolean, proposalId: string): WorkState {
+export function stepRun(w: WorkState, selfEditing: boolean, proposalId: string, build?: ProposalBuilder): WorkState {
   if (stepRefusal(w, selfEditing) !== null) return w;
-  return runOneStep(w, proposalId);
+  return runOneStep(w, proposalId, build);
 }
 
 export function stopRun(w: WorkState): WorkState {
@@ -240,7 +258,7 @@ export function workProblems(w: WorkState): string[] {
   if ((w.run?.status === 'awaiting_decision') !== (w.proposal !== null)) p.push('awaiting_decision and proposal disagree');
   if (w.applied.length + w.undone.length > WORK_LIMITS.maxHistoryEntries) p.push('history too long');
   if (w.run && w.run.position > w.run.steps.length) p.push('position past the end');
-  if (w.run && w.run.steps.length > WORK_LIMITS.maxSteps) p.push('too many steps');
+  if (w.run && w.run.steps.length > (w.run.kind === 'crew' ? SCAN_LIMITS.crewSteps : WORK_LIMITS.maxSteps)) p.push('too many steps');
   if (w.chat.length > WORK_LIMITS.maxChatReplies) p.push('too many chat lines');
   if (w.run?.status === 'running' && !w.run.autoAdvance) p.push('running without autoAdvance');
   return p;
