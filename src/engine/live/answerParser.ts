@@ -169,7 +169,7 @@ export function parseAnswer(text: string, request: AIRequest, provider: AIProvid
 
     case 'explanation': {
       if (!a.evidence_paths.every(inSel)) return bad('path_not_selected');
-      const limitations = a.limitations.slice(0, 6).map(clip);
+      const limitations = a.limitations.slice(0, 5).map(clip);
       limitations.push(AI_NOTE(provider));
       if (!a.cards_covered) limitations.push(CARDS_NOTE);
       return { ok: true, response: { type: 'explanation', summary: clip(a.summary), evidencePaths: a.evidence_paths, limitations } };
@@ -180,7 +180,7 @@ export function parseAnswer(text: string, request: AIRequest, provider: AIProvid
         return { ok: true, response: { type: 'clarification', questions: ['Which file should this change apply to? Select a file in the panel and ask again.'] } };
       }
       if (a.affected_paths.length === 0 || !a.affected_paths.every(inSel)) return bad('path_not_selected');
-      const risks = a.risks.slice(0, 7).map(clip);
+      const risks = a.risks.slice(0, 6).map(clip);
       risks.push(DEFAULT_RISK);
       return { ok: true, response: { type: 'plan', summary: clip(a.summary), affectedPaths: a.affected_paths, steps: a.steps.slice(0, 12).map(clip), risks } };
     }
@@ -193,7 +193,7 @@ export function parseAnswer(text: string, request: AIRequest, provider: AIProvid
       if (!built.ok) return bad(`bad_edits: ${built.reason}`);
       const tests = a.tests.slice(0, 8).map(clip);
       if (tests.length === 0) tests.push(DEFAULT_TEST);
-      const risks = a.risks.slice(0, 7).map(clip);
+      const risks = a.risks.slice(0, 6).map(clip);
       risks.push(DEFAULT_RISK);
       return { ok: true, response: { type: 'patch_proposal', summary: clip(a.summary), affectedPaths: [a.path], unifiedDiff: built.diff, tests, risks } };
     }

@@ -40,11 +40,12 @@ afterEach(() => vi.restoreAllMocks());
 // ---------------------------------------------------------------------------
 
 describe('method check', () => {
-  for (const method of ['GET', 'PUT', 'DELETE', 'PATCH']) {
+  // Phase 3A (F11.5): GET now returns the mode status, so it is no longer a 405.
+  for (const method of ['PUT', 'DELETE', 'PATCH']) {
     it(`${method} → 405 with Allow header`, async () => {
       const res = await handleAssistantRequest(new Request('http://localhost/api/assistant', { method }), {});
       expect(res.status).toBe(405);
-      expect(res.headers.get('allow')).toBe('POST');
+      expect(res.headers.get('allow')).toBe('GET, POST');
       const body = await json(res) as { error: { code: string } };
       expect(body.error.code).toBe('invalid_request');
     });
@@ -60,7 +61,7 @@ describe('AI_MODE check', () => {
     ['unset → mock', undefined, 200, 'ok'],
     ['blank → mock', '', 200, 'ok'],
     ['mock → mock', 'mock', 200, 'ok'],
-    ['live → 501 unsupported', 'live', 501, 'unsupported'],
+    ['live with no keys → 503 unsupported', 'live', 503, 'unsupported'],
     ['MOCK (wrong case) → 501', 'MOCK', 501, 'unsupported'],
     ['live2 → 501', 'live2', 501, 'unsupported'],
     ['garbage → 501', 'garbage_xyz', 501, 'unsupported'],
@@ -79,19 +80,21 @@ describe('AI_MODE check', () => {
         expect(body.error.code).toBe('unsupported');
         // Message must not echo the AI_MODE value
         expect(body.error.message).not.toContain(mode);
-        expect(body.error.message).toBe('Live AI is not available in this build.');
+        expect(body.error.message).toBe(mode === 'live'
+          ? 'Live AI is not set up. Add at least one key (GEMINI_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY) to the server settings.'
+          : 'The AI mode is not recognised. Use mock or live.');
       }
     });
   }
 
-  it('a live-mode request with an invalid body still gets 501 (mode check first)', async () => {
+  it('a live-mode request with no providers gets 503 before the body is read (mode check first)', async () => {
     const req = new Request('http://localhost/api/assistant', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: '{not valid json',
     });
     const res = await handleAssistantRequest(req, { AI_MODE: 'live' });
-    expect(res.status).toBe(501);
+    expect(res.status).toBe(503);
   });
 
   it('the handler reads AI_MODE only: an env proxy throws on any other key', async () => {
@@ -294,9 +297,9 @@ describe('zero outbound requests', () => {
       const env = mode !== undefined ? { AI_MODE: mode } : {};
       const [req] = post(baseReq, env);
       const res = await handleAssistantRequest(req, env);
-      // Should not have called fetch; mode=live returns 501 without touching fetch
+      // Should not have called fetch; mode=live with no keys returns 503 without touching fetch
       expect(fetchSpy).not.toHaveBeenCalled();
-      expect([200, 400, 413, 501]).toContain(res.status);
+      expect([200, 400, 413, 501, 503]).toContain(res.status);
     }
   });
 });
@@ -361,8 +364,13 @@ describe('logging hygiene', () => {
 // ---------------------------------------------------------------------------
 
 describe('default export', () => {
-  it('a GET returns 405', async () => {
+  it('a GET returns the mode status (mock by default)', async () => {
     const res = await assistantRoute.fetch(new Request('http://localhost/api/assistant'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ mode: 'mock' });
+  });
+  it('a PUT returns 405', async () => {
+    const res = await assistantRoute.fetch(new Request('http://localhost/api/assistant', { method: 'PUT' }));
     expect(res.status).toBe(405);
   });
 });

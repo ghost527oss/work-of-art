@@ -50,23 +50,31 @@ traceability/        PLAN.md
 
 ## AI Assistant (AI_MODE)
 
-The AI Assistant endpoint is at `POST /api/assistant`. It is controlled by the `AI_MODE` environment variable on the server:
+The AI Assistant endpoint is `/api/assistant` (`POST` asks a question, `GET` reports the mode). It is controlled by the `AI_MODE` environment variable on the server:
 
 | `AI_MODE` | Behaviour |
 |---|---|
 | unset or blank | Same as `mock` |
-| `mock` | Returns instant, canned mock responses. No AI model is called. No data leaves your server. |
-| `live` or any other value | Returns `501 unsupported` immediately, before reading the request body. No key is read; no network call is made. |
+| `mock` (default) | Returns instant, canned mock responses. No AI model is called. No data leaves your server. |
+| `live` | Asks a free outside AI provider (Phase 3A). The order is Gemini, then Groq, then OpenRouter. With no key set at all, it answers **"Live AI is not set up"** and never a mock answer. |
+| any other value | `501 unsupported`, before the body is read. |
 
-**Phase 1 (current):** only `mock` works. Live AI (Phase 3) will add a free-tier provider chain behind this same endpoint. Setting `AI_MODE=live` now returns `unsupported`.
+Live mode settings are server-side only (copy `.env.example` to `.env`; never use a `VITE_` prefix):
+
+| Variable | Meaning |
+|---|---|
+| `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY` | Any one is enough. A provider without a key is skipped. |
+| `*_MODEL_LIGHT`, `*_MODEL_HEAVY` | Optional model names. Empty uses the defaults: Gemini `gemini-3.1-flash-lite` and `gemini-3.6-flash`, Groq `openai/gpt-oss-20b` and `openai/gpt-oss-120b`, OpenRouter `openrouter/free` for both. Free model names change often, so these are easy to override. |
+
+How live mode works: the **Context Engine** (in the browser) picks the smallest useful redacted context and remembers answers for the session. The **Model Router** (on the server) sends light jobs (explanations, safe actions) to the light models and code-change jobs to the heavy models first, falling back to the next provider on a rate limit or error (each attempt at most 7 s, the whole request at most 14 s). Every answer shows which provider answered. The AI can propose a code change, but nothing changes until you press Approve, and only PatchBay's practice copy changes, never your repository.
 
 The endpoint:
-- Reads `AI_MODE` only from environment variables. No other env key is accessed.
-- Makes zero outbound network requests.
-- Logs only the error code and task type, never the instruction, file paths, or file content.
-- Redacts likely secrets from request fields before building any response.
+- In mock mode reads `AI_MODE` only and makes zero outbound requests.
+- In live mode reads `AI_MODE` and the nine names above, and calls only three fixed provider addresses (keys go in headers, never in a URL).
+- Logs only codes and outcome words, never the question, file paths, file content, answers, or keys.
+- Redacts likely secrets from the question and snippets before any provider sees them, and again checks every answer.
 
-
+**Real providers are Unverified** until you run the real-key check in `.kiro/specs/11-live-ai-chat/design.md` section 14; the automated tests use fake providers.
 
 Verified by automated tests and by a headless-browser run. **Not yet verified:** a real Vercel deployment (including request cancellation), branch names containing `/` on the tree endpoint, and a physical phone.
 
