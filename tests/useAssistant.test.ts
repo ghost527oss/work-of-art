@@ -300,3 +300,396 @@ describe('subscription cleanup', () => {
     expect(listenersAfter).toBe(listenersBefore);
   });
 });
+
+// ---------------------------------------------------------------------------
+// @node: F11.8 Phase 3A: live mode, the notice, the held request, and the session cache
+// ---------------------------------------------------------------------------
+
+import { createAnswerCache } from '../src/engine/aiCache';
+import type { AIStatusState } from '../src/engine/aiStatus';
+
+function setupLive(status: AIStatusState = { kind: 'live', ready: true, providers: [] }, opts: { cacheless?: boolean } = {}) {
+  const store: Store<StudioState> = createStore(initialState());
+  const calls: Call[] = [];
+  let clock = 100;
+  let currentStatus = status;
+  const services: AssistantServices = {
+    requestAssistant(request, { signal }) {
+      const result = deferred<AIResult>();
+      calls.push({ request, signal, result });
+      return result.promise;
+    },
+    now: () => ++clock,
+    newId: () => `ai-${calls.length + 1}-${clock}`,
+    fetchStatus: async () => currentStatus,
+    ...(opts.cacheless ? {} : { cache: createAnswerCache() }),
+  };
+  const controller = createAssistantController(store, services);
+  let st = store.getState();
+  st = beginIngestion(st, { owner: 'o', repo: 'r', source: 'github' }, 1);
+  st = completeIngestion(st, st.ingestion.runId, buildSampleSnapshot('static-site', 1), 2);
+  store.setState(st);
+  return {
+    store, calls, controller, actions: controller.actions, ui: controller.actions.ui!,
+    setStatus(s: AIStatusState) { currentStatus = s; },
+  };
+}
+const liveResult = (id: string, over: Partial<AIResult> = {}): AIResult => ({
+  requestId: id, mode: 'live',
+  response: { type: 'explanation', summary: 'ANSWER_SENTINEL', evidencePaths: ['index.html'], limitations: ['AI note'] },
+  meta: { tier: 'light', provider: 'groq', model: 'openai/gpt-oss-20b', lighter: false, attempts: [{ provider: 'gemini', outcome: 'rate_limited' }] },
+  ...over,
+});
+const liveInput = (store: Store<StudioState>, over: Record<string, unknown> = {}) => ({
+  snapshot: store.getState().snapshot!, instruction: 'What does this do?', taskType: 'explain' as const,
+  selectedPaths: ['index.html'], includeContent: false, ...over,
+});
+const settle = async () => { await flush(); await flush(); };
+
+describe('Phase 3A: status', () => {
+  it('starts as checking, then shows the server mode', async () => {
+    const t = setupLive({ kind: 'live', ready: true, providers: [{ id: 'groq', configured: true }] });
+    expect(t.ui.getState().status).toEqual({ kind: 'checking' });
+    await t.actions.refreshStatus!();
+    expect(t.ui.getState().status).toEqual({ kind: 'live', ready: true, providers: [{ id: 'groq', configured: true }] });
+  });
+  it('a controller without a status service is mock and never asks for the notice', () => {
+    const { actions, calls, store } = setup();
+    expect(actions.ui!.getState().status).toEqual({ kind: 'mock' });
+    store.setState({ ...store.getState() });
+    actions.send(baseInput());
+    expect(calls).toHaveLength(1);
+    expect(actions.ui!.getState().noticeOpen).toBe(false);
+  });
+  it('a status answer for an older epoch (StrictMode double effect) is ignored', async () => {
+    const t = setupLive();
+    const first = t.actions.refreshStatus!();
+    t.controller.dispose();
+    t.setStatus({ kind: 'mock' });
+    const second = t.actions.refreshStatus!();
+    await Promise.all([first, second]);
+    expect(t.ui.getState().status).toEqual({ kind: 'mock' });
+  });
+  it('a mode change clears saved answers and a held request', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    expect(t.ui.getState().noticeOpen).toBe(true);
+    t.setStatus({ kind: 'mock' });
+    await t.actions.refreshStatus!();
+    expect(t.ui.getState().noticeOpen).toBe(false);
+    t.actions.acceptNotice!();
+    expect(t.calls).toHaveLength(0);
+  });
+});
+
+describe('Phase 3A: mock mode is exactly Phase 2', () => {
+  it('builds the request with the Phase 2 builder: whole file contents, no skill id, no connections, no window', async () => {
+    const t = setupLive({ kind: 'mock' });
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store, { includeContent: true }));
+    const req = t.calls[0]!.request;
+    expect(req.sourceContext![0]!.startLine).toBeUndefined();
+    expect('skillId' in req).toBe(false);
+    expect('connections' in req).toBe(false);
+    expect(t.ui.getState().noticeOpen).toBe(false);
+  });
+  it('never saves or reuses a mock answer', async () => {
+    const t = setupLive({ kind: 'mock' });
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    t.calls[0]!.result.resolve({ ...liveResult(t.calls[0]!.request.requestId), mode: 'mock' });
+    await settle();
+    t.actions.send(liveInput(t.store));
+    expect(t.calls).toHaveLength(2);
+  });
+});
+
+describe('Phase 3A: the first-request notice', () => {
+  it('the first live request is held, not sent, and the Log has no request line', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    expect(t.actions.send(liveInput(t.store))).toBeNull();
+    expect(t.calls).toHaveLength(0);
+    expect(t.ui.getState().noticeOpen).toBe(true);
+    expect(t.store.getState().ai.status).toBe('idle');
+    expect(t.store.getState().log.some((l) => l.action === 'ai_request')).toBe(false);
+  });
+  it('OK sends exactly the held request, once, and later requests need no notice', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    t.actions.acceptNotice!();
+    expect(t.calls).toHaveLength(1);
+    expect(t.ui.getState().noticeOpen).toBe(false);
+    t.actions.acceptNotice!();
+    t.actions.acceptNotice!();
+    expect(t.calls).toHaveLength(1);
+    t.calls[0]!.result.resolve(liveResult(t.calls[0]!.request.requestId));
+    await settle();
+    t.actions.send(liveInput(t.store, { instruction: 'A different question' }));
+    expect(t.calls).toHaveLength(2);
+    expect(t.ui.getState().noticeOpen).toBe(false);
+  });
+  it('OK with nothing held sends nothing', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.acceptNotice!();
+    expect(t.calls).toHaveLength(0);
+  });
+  it('an unknown mode also needs the notice, because the server may be live', async () => {
+    const t = setupLive({ kind: 'unknown' });
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    expect(t.ui.getState().noticeOpen).toBe(true);
+    expect(t.calls).toHaveLength(0);
+  });
+  it('a request sent before the status answer arrives also waits for the notice', () => {
+    const t = setupLive();
+    t.actions.send(liveInput(t.store));
+    expect(t.ui.getState().noticeOpen).toBe(true);
+    expect(t.calls).toHaveLength(0);
+  });
+});
+
+describe('Phase 3A: a held request never fires late', () => {
+  const held = async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    expect(t.ui.getState().noticeOpen).toBe(true);
+    return t;
+  };
+  const neverSends = async (t: Awaited<ReturnType<typeof held>>) => {
+    expect(t.ui.getState().noticeOpen).toBe(false);
+    t.actions.acceptNotice!();
+    await settle();
+    expect(t.calls).toHaveLength(0);
+    expect(t.store.getState().ai.status).not.toBe('pending');
+  };
+  it('Cancel', async () => { const t = await held(); t.actions.cancel(); await neverSends(t); });
+  it('Clear', async () => { const t = await held(); t.actions.clear(); await neverSends(t); });
+  it('Stop / reset commands (cancel and reset)', async () => {
+    const a = await held(); a.actions.reset!(); await neverSends(a);
+    const b = await held(); b.actions.cancel(); await neverSends(b);
+  });
+  it('dispose', async () => { const t = await held(); t.controller.dispose(); await neverSends(t); });
+  it('the panel unmounting (discardHeld)', async () => { const t = await held(); t.actions.discardHeld!(); await neverSends(t); });
+  it('a snapshot change: Back to Start, a new load, or reset', async () => {
+    const a = await held();
+    a.store.update((s) => reset(s));
+    await neverSends(a);
+    const b = await held();
+    b.store.update((s) => beginIngestion(s, { owner: 'o', repo: 'r2', source: 'github' }, 10));
+    await neverSends(b);
+  });
+  it('a replaced snapshot after the request was held (load finishing)', async () => {
+    const t = await held();
+    let st = t.store.getState();
+    st = beginIngestion(st, { owner: 'o', repo: 'r', source: 'github' }, 5, { background: true } as never);
+    t.store.setState(st);
+    st = completeIngestion(st, st.ingestion.runId, buildSampleSnapshot('react-frontend', 9), 6);
+    t.store.setState(st);
+    await neverSends(t);
+  });
+  it('a newer send replaces the held one, so OK sends only the newest', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store, { instruction: 'FIRST question' }));
+    t.actions.send(liveInput(t.store, { instruction: 'SECOND question' }));
+    t.actions.acceptNotice!();
+    expect(t.calls).toHaveLength(1);
+    expect(t.calls[0]!.request.instruction).toBe('SECOND question');
+  });
+  it('even with timers advanced, a discarded request is never sent', async () => {
+    const t = await held();
+    t.actions.cancel();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(t.calls).toHaveLength(0);
+    t.actions.acceptNotice!();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(t.calls).toHaveLength(0);
+  });
+  it('after a discard the user has not accepted, so the next live request asks again', async () => {
+    const t = await held();
+    t.actions.cancel();
+    t.actions.send(liveInput(t.store));
+    expect(t.ui.getState().noticeOpen).toBe(true);
+  });
+  it('a request that is already running is not affected by OK', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    t.actions.acceptNotice!();
+    expect(t.store.getState().ai.status).toBe('pending');
+    t.actions.send(liveInput(t.store, { instruction: 'Another' }));
+    t.actions.acceptNotice!();
+    expect(t.calls).toHaveLength(1);
+  });
+});
+
+describe('Phase 3A: the session cache', () => {
+  const accepted = async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    t.actions.acceptNotice!();
+    t.calls[0]!.result.resolve(liveResult(t.calls[0]!.request.requestId));
+    await settle();
+    return t;
+  };
+  it('the same question again reuses the answer: no request, a Log line, fromCache, and the new request id', async () => {
+    const t = await accepted();
+    t.actions.send(liveInput(t.store, { requestId: 'again-1' }));
+    expect(t.calls).toHaveLength(1);
+    const ai = t.store.getState().ai;
+    expect(ai.status).toBe('done');
+    expect(ai.fromCache).toBe(true);
+    expect(ai.requestId).toBe('again-1');
+    expect(ai.result!.requestId).toBe('again-1');
+    const line = t.store.getState().log.find((l) => l.action === 'ai_reused')!;
+    expect(line.message).toBe('AI answer reused from this session (explain, 1 file selected). No request was sent.');
+  });
+  it('spacing and case do not matter; a different question, file, or task misses', async () => {
+    const t = await accepted();
+    t.actions.send(liveInput(t.store, { instruction: '  WHAT does   this do?  ' }));
+    expect(t.calls).toHaveLength(1);
+    t.actions.send(liveInput(t.store, { instruction: 'Something else' }));
+    expect(t.calls).toHaveLength(2);
+  });
+  it('Ask again skips the saved answer and replaces it', async () => {
+    const t = await accepted();
+    t.actions.send(liveInput(t.store, { bypassCache: true }));
+    expect(t.calls).toHaveLength(2);
+    t.calls[1]!.result.resolve({ ...liveResult(t.calls[1]!.request.requestId), response: { type: 'explanation', summary: 'NEW', evidencePaths: [], limitations: ['x'] } });
+    await settle();
+    t.actions.send(liveInput(t.store));
+    expect(t.calls).toHaveLength(2);
+    expect((t.store.getState().ai.result!.response as { summary: string }).summary).toBe('NEW');
+  });
+  it('a failure is never saved', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    t.actions.acceptNotice!();
+    t.calls[0]!.result.reject(new Error('boom'));
+    await settle();
+    t.actions.send(liveInput(t.store));
+    expect(t.calls).toHaveLength(2);
+  });
+  it('an action answer is never saved', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store, { taskType: 'act', selectedPaths: [], instruction: 'start the crew' }));
+    t.actions.acceptNotice!();
+    t.calls[0]!.result.resolve({ requestId: t.calls[0]!.request.requestId, mode: 'live', response: { type: 'action', action: 'help', summary: 's' } });
+    await settle();
+    t.actions.send(liveInput(t.store, { taskType: 'act', selectedPaths: [], instruction: 'start the crew' }));
+    expect(t.calls).toHaveLength(2);
+  });
+  it('a changed snippet misses; a new repository clears everything; reset clears', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store, { includeContent: true }));
+    t.actions.acceptNotice!();
+    t.calls[0]!.result.resolve(liveResult(t.calls[0]!.request.requestId));
+    await settle();
+    t.actions.send(liveInput(t.store, { includeContent: true }));
+    expect(t.calls).toHaveLength(1);
+    // Same repository, but the file text differs (an edit): the key changes by itself.
+    const snap = t.store.getState().snapshot!;
+    const edited = { ...snap, files: snap.files.map((f) => (f.path === 'index.html' ? { ...f, content: (f.content ?? '') + '\n<!-- edited -->' } : f)) };
+    t.actions.send({ ...liveInput(t.store, { includeContent: true }), snapshot: edited });
+    expect(t.calls).toHaveLength(2);
+    t.calls[1]!.result.resolve(liveResult(t.calls[1]!.request.requestId));
+    await settle();
+    t.actions.reset!();
+    t.actions.send(liveInput(t.store, { includeContent: true }));
+    expect(t.calls).toHaveLength(3);
+    t.calls[2]!.result.resolve(liveResult(t.calls[2]!.request.requestId));
+    await settle();
+    t.store.update((s) => reset(s));
+    let st = t.store.getState();
+    st = beginIngestion(st, { owner: 'o', repo: 'r', source: 'github' }, 20);
+    st = completeIngestion(st, st.ingestion.runId, buildSampleSnapshot('static-site', 20), 21);
+    t.store.setState(st);
+    t.actions.send(liveInput(t.store, { includeContent: true }));
+    expect(t.calls).toHaveLength(4);
+  });
+  it('a saved answer needs no notice', async () => {
+    const t = await accepted();
+    t.actions.discardHeld!();
+    t.actions.send(liveInput(t.store));
+    expect(t.ui.getState().noticeOpen).toBe(false);
+  });
+  it('nothing is saved or shown before a request was sent', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    expect(t.calls).toHaveLength(0);
+    expect(t.store.getState().ai.status).toBe('idle');
+  });
+});
+
+describe('Phase 3A: Context Engine in live requests', () => {
+  it('sends no snippet with the box off, and a window with its first line when on', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store, { finding: { path: 'index.html', skillId: 'scan.frontend.img-alt', firstLine: 1 } }));
+    t.actions.acceptNotice!();
+    const req = t.calls[0]!.request;
+    expect(req.sourceContext).toBeUndefined();
+    expect(req.skillId).toBe('scan.frontend.img-alt');
+  });
+  it('a request that fails the Phase 2 checks returns the message and holds nothing', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    expect(t.actions.send(liveInput(t.store, { instruction: '   ' }))).toBe('The instruction is empty.');
+    expect(t.ui.getState().noticeOpen).toBe(false);
+    expect(t.actions.send(liveInput(t.store, { selectedPaths: ['nope.js'] }))).toBe('"nope.js" is not in the loaded snapshot.');
+  });
+});
+
+describe('Phase 3A: the result hand-off and the Log', () => {
+  it('calls the handler with the result, the request, and whether it was saved; the finding id is passed through', async () => {
+    const t = setupLive();
+    const seen: Array<{ type: string; fromCache: boolean; findingId?: string }> = [];
+    t.actions.setResultHandler!((r, _req, info) => seen.push({ type: r.response.type, fromCache: info.fromCache, ...(info.findingId ? { findingId: info.findingId } : {}) }));
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store, { findingId: 'f-1' }));
+    t.actions.acceptNotice!();
+    t.calls[0]!.result.resolve(liveResult(t.calls[0]!.request.requestId));
+    await settle();
+    t.actions.send(liveInput(t.store, { findingId: 'f-1' }));
+    expect(seen).toEqual([{ type: 'explanation', fromCache: false, findingId: 'f-1' }, { type: 'explanation', fromCache: true, findingId: 'f-1' }]);
+  });
+  it('removing the handler stops the calls; a throwing handler is logged and does not break the controller', async () => {
+    const t = setupLive();
+    const off = t.actions.setResultHandler!(() => { throw new Error('handler boom'); });
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store));
+    t.actions.acceptNotice!();
+    t.calls[0]!.result.resolve(liveResult(t.calls[0]!.request.requestId));
+    await settle();
+    expect(t.store.getState().ai.status).toBe('done');
+    expect(t.store.getState().log.find((l) => l.action === 'ai_handoff_failed')!.message).toBe('The AI answer could not be handed on (Error).');
+    off();
+    t.actions.send(liveInput(t.store, { instruction: 'next' }));
+    expect(t.calls).toHaveLength(2);
+  });
+  it('Log lines hold the provider, tier, and counts, and never the question, snippet, or answer text', async () => {
+    const t = setupLive();
+    await t.actions.refreshStatus!();
+    t.actions.send(liveInput(t.store, { instruction: 'QUESTION_SENTINEL_77 about this', includeContent: true }));
+    t.actions.acceptNotice!();
+    t.calls[0]!.result.resolve(liveResult(t.calls[0]!.request.requestId, { meta: { tier: 'light', provider: 'groq', model: 'openai/gpt-oss-20b', lighter: true, attempts: [{ provider: 'gemini', outcome: 'rate_limited' }] } }));
+    await settle();
+    const log = t.store.getState().log;
+    const resp = log.find((l) => l.action === 'ai_response')!;
+    expect(resp.message).toBe('AI response: explanation (live, Groq, light, lighter model, 1 earlier attempt failed).');
+    const text = JSON.stringify(log) + JSON.stringify({ ...t.store.getState().ai, result: undefined, summary: t.store.getState().ai.summary });
+    expect(text).not.toContain('QUESTION_SENTINEL_77');
+    expect(text).not.toContain('ANSWER_SENTINEL');
+    expect(text).not.toContain('openai/gpt-oss-20b');
+  });
+});
