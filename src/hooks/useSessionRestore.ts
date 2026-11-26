@@ -37,6 +37,8 @@ export interface SessionDeps {
 export interface SessionActions {
   startup(): void;
   resume(): void;
+  /** Retry from the failure panel: the same restore again (no automatic retry). */
+  retry(): void;
   backToStart(): void;
   resetSession(): void;
 }
@@ -155,6 +157,12 @@ export function createSessionController(deps: SessionDeps): SessionController {
       const s = session.getState();
       if (!s.record || s.status === 'pending' || s.status === 'applying') return;
       if (studio.getState().experience !== 'start') return;
+      start(s.record);
+    },
+    retry() {
+      const s = session.getState();
+      if (s.status !== 'failed' || !s.record) return;
+      if (studio.getState().ingestion.status !== 'failed') return;
       start(s.record);
     },
     backToStart() {

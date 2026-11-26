@@ -1,17 +1,32 @@
 // @node: F1.7
+// @node: F10.7 (Resume banner, reset notice, Saved in this browser)
 // Start screen (Phase 1 wireframe): one repository field, one primary action, and a
 // visually secondary sample picker. No logo, no color, no animation.
 import { useState, type FormEvent } from 'react';
 import { SAMPLES } from '../data/sampleRepos';
 import { useStudioStore } from '../store/useStudioStore';
+import type { SavedRow, SessionRecord } from '../store/sessionRecord';
+import { ResumeBanner } from './ResumeBanner';
+import { SavedDataPanel } from './SavedDataPanel';
+
+export interface StartSessionProps {
+  record?: SessionRecord;
+  restoring: boolean;
+  notice?: string;
+  savedRows: readonly SavedRow[];
+  onResume(): void;
+  onReset(): void;
+}
 
 export interface StartScreenProps {
   /** Returns an error message, or null when a run started. */
   onSubmit(text: string): string | null;
   onSample(id: string): void;
+  /** Sub-phase 2G. When absent the Start screen looks as before. */
+  session?: StartSessionProps;
 }
 
-export function StartScreen({ onSubmit, onSample }: StartScreenProps) {
+export function StartScreen({ onSubmit, onSample, session }: StartScreenProps) {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [sampleId, setSampleId] = useState<string>(SAMPLES[0]?.id ?? '');
@@ -27,6 +42,8 @@ export function StartScreen({ onSubmit, onSample }: StartScreenProps) {
 
   return (
     <main className="screen start">
+      {session?.notice && <p role="status">{session.notice}</p>}
+      {session && <ResumeBanner record={session.record} restoring={session.restoring} onResume={session.onResume} onReset={session.onReset} />}
       <form onSubmit={handleSubmit} noValidate>
         <label htmlFor="repo-input">GitHub repository URL</label>
         <input
@@ -66,6 +83,7 @@ export function StartScreen({ onSubmit, onSample }: StartScreenProps) {
           Use sample
         </button>
       </section>
+      {session && <SavedDataPanel rows={session.savedRows} onReset={session.savedRows.some((r) => r.bytes !== null) ? session.onReset : undefined} />}
     </main>
   );
 }

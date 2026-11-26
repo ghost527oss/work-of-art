@@ -1,5 +1,6 @@
 // @node: F3.5
 // @node: F5.11 (renders the Project understanding section between coverage and inventory)
+// @node: F10.7 (Reset session next to Back to Start; Saved in this browser)
 // The repository header, the scoped-reload status and error blocks, the coverage panel, and
 // the inventory table. Moved out of the old Studio stub with its markup and text unchanged.
 import { useState } from 'react';
@@ -8,6 +9,9 @@ import { formatResetTime } from './LoadingScene';
 import { CoveragePanel } from './CoveragePanel';
 import { UnderstandingSection } from './UnderstandingSection';
 import type { UnderstandingActions } from '../hooks/useUnderstanding';
+import type { SavedRow } from '../store/sessionRecord';
+import { ResetSessionButton } from './ResetSessionButton';
+import { SavedDataPanel } from './SavedDataPanel';
 
 const PAGE = 500;
 
@@ -19,9 +23,11 @@ export interface ProjectInfoProps {
   onBack(): void;
   /** Sub-phase 2C. When absent the section is not shown (2A and 2B look). */
   understanding?: UnderstandingActions;
+  /** Sub-phase 2G. */
+  session?: { onReset(): void; savedRows(): readonly SavedRow[] };
 }
 
-export function ProjectInfo({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, understanding }: ProjectInfoProps) {
+export function ProjectInfo({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, understanding, session }: ProjectInfoProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const understandingState = useStudioStore((s) => s.understanding);
   const scanResult = useStudioStore((s) => s.scan.status === 'done' ? s.scan.result : undefined);
@@ -47,8 +53,10 @@ export function ProjectInfo({ onLoadFolders, onCancel, onRetry, onDismissError, 
           <button type="button" onClick={onBack}>
             Back to Start
           </button>{' '}
+          {session && <><ResetSessionButton onReset={session.onReset} />{' '}</>}
           <span className="note">Clears this session&apos;s loaded data. The original repository is never changed.</span>
         </p>
+        {session && <SavedDataPanel rows={session.savedRows()} />}
       </header>
 
       {reloading && (

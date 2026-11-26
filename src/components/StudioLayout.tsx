@@ -1,6 +1,7 @@
 // @node: F3.5
 // @node: F4.9 (Stop bar, History and Edit panels, optional harness prop)
 // @node: F9.10 (Journal panel, Export changes, log downloads, Learn more)
+// @node: F10.7 (Reset session and Saved in this browser in Project info)
 // The Studio shell (sub-phase 2A). Screen 3 has a left area (Sandbox placeholder and Project
 // info), one right-hand panel, and the vertical toolbar on the far right edge. Screens 4 and 5
 // are empty pages without the toolbar. The screen comes from the screen store and the layout
@@ -52,6 +53,8 @@ export interface StudioLayoutProps {
   editPad?: EditActions;
   /** Sub-phase 2F. When absent the Journal panel shows only a short note. */
   journal?: { actions: JournalActions; exports: ExportActions };
+  /** Sub-phase 2G. */
+  session?: { onReset(): void; savedRows(): readonly import('../store/sessionRecord').SavedRow[] };
 }
 
 const PANEL_TITLES: Record<PanelId, string> = {
@@ -78,7 +81,7 @@ function HarnessBar({ harness }: { harness: HarnessActions }) {
   );
 }
 
-export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad, journal }: StudioLayoutProps) {
+export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad, journal, session }: StudioLayoutProps) {
   const hasSnapshot = useStudioStore((s) => s.snapshot !== undefined);
   if (!hasSnapshot) return null;
   return (
@@ -97,12 +100,13 @@ export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError,
         preview={preview}
         editPad={editPad}
         journal={journal}
+        session={session}
       />
     </div>
   );
 }
 
-function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad, journal }: StudioLayoutProps) {
+function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad, journal, session }: StudioLayoutProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const log = useStudioStore((s) => s.log);
   const work = useStudioStore((s) => s.work);
@@ -139,7 +143,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
     <main className="shell">
       <div className={covered ? 'shell-left covered' : 'shell-left'}>
         {preview ? <SandboxPanel preview={preview} pad={editPad} /> : <SandboxPlaceholder />}
-        <ProjectInfo onLoadFolders={onLoadFolders} onCancel={onCancel} onRetry={onRetry} onDismissError={onDismissError} onBack={onBack} understanding={understanding} />
+        <ProjectInfo onLoadFolders={onLoadFolders} onCancel={onCancel} onRetry={onRetry} onDismissError={onDismissError} onBack={onBack} understanding={understanding} session={session} />
       </div>
       <PanelFrame
         title={PANEL_TITLES[open ?? 'ai']}

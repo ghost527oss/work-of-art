@@ -1,5 +1,6 @@
 // @node: F1.7
 // @node: F5.8 (Classify files is listed after Load source files and shows its own progress)
+// @node: F10.7 (restore heading, Reset session, kept-session sentence)
 // Loading screen (Phase 1 wireframe). Every status shown here comes from real pipeline
 // events held in the store. Counts appear only when both numbers are known, and there is
 // no percentage anywhere.
@@ -7,6 +8,9 @@ import { useState } from 'react';
 import { SAMPLES } from '../data/sampleRepos';
 import { describeTarget, useStudioStore, type StageStatus } from '../store/useStudioStore';
 import type { IngestStage } from '../types/contracts';
+import type { SessionRecord } from '../store/sessionRecord';
+import { KEPT_LINE, RestoreHeading } from './RestoreNotice';
+import { ResetSessionButton } from './ResetSessionButton';
 
 const STAGES: ReadonlyArray<{ id: IngestStage; label: string }> = [
   { id: 'resolving_ref', label: 'Resolve branch' },
@@ -36,9 +40,11 @@ export interface LoadingSceneProps {
   onRetry(): void;
   onSample(id: string): void;
   onBack(): void;
+  /** Sub-phase 2G: set while a session restore is pending or has failed. */
+  restore?: { record: SessionRecord; onReset(): void };
 }
 
-export function LoadingScene({ onCancel, onRetry, onSample, onBack }: LoadingSceneProps) {
+export function LoadingScene({ onCancel, onRetry, onSample, onBack, restore }: LoadingSceneProps) {
   const ingestion = useStudioStore((s) => s.ingestion);
   const [sampleId, setSampleId] = useState<string>(SAMPLES[0]?.id ?? '');
   const target = ingestion.target;
@@ -48,8 +54,8 @@ export function LoadingScene({ onCancel, onRetry, onSample, onBack }: LoadingSce
 
   return (
     <main className="screen loading">
-      <h1>Loading repository</h1>
-      {target && (
+      {restore ? <RestoreHeading record={restore.record} /> : <h1>Loading repository</h1>}
+      {!restore && target && (
         <p>
           {describeTarget(target)}
           {target.source === 'sample' ? ' (sample)' : ''}
@@ -86,9 +92,12 @@ export function LoadingScene({ onCancel, onRetry, onSample, onBack }: LoadingSce
       )}
 
       {running && (
-        <button type="button" onClick={onCancel}>
-          Cancel
-        </button>
+        <p>
+          <button type="button" onClick={onCancel}>
+            Cancel
+          </button>
+          {restore && <> <ResetSessionButton onReset={restore.onReset} /></>}
+        </p>
       )}
 
       {failed && ingestion.error && (
@@ -98,10 +107,12 @@ export function LoadingScene({ onCancel, onRetry, onSample, onBack }: LoadingSce
             <strong>{ingestion.error.code}</strong>: {ingestion.error.message}
           </p>
           {resetTime && <p>The rate limit resets at {resetTime}.</p>}
+          {restore && <p>{KEPT_LINE}</p>}
           <p>
             <button type="button" onClick={onRetry}>
               Retry
             </button>{' '}
+            {restore && <><ResetSessionButton onReset={restore.onReset} />{' '}</>}
             <button type="button" onClick={onBack}>
               Back to Start
             </button>

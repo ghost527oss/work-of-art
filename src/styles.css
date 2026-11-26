@@ -665,3 +665,38 @@ textarea {
   width: 24px;
   height: 24px;
 }
+
+/* @node: F10.6 Session restore parts (black and white only) */
+.resume-banner,
+.saved-data {
+  border: 1px solid #000;
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+  background: #fff;
+  color: #000;
+}
+
+.saved-data summary {
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.resume-banner button,
+.saved-data button,
+.reset-confirm button,
+.reset-session {
+  min-height: 44px;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+}
+
+.reset-confirm {
+  display: inline-block;
+  border: 2px solid #000;
+  padding: 0.25rem 0.5rem;
+}
+
+.saved-data code {
+  overflow-wrap: anywhere;
+}

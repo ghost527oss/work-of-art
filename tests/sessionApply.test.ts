@@ -97,9 +97,11 @@ describe('startup and apply', () => {
     expect(net.requests).toHaveLength(1);
     net.fail = undefined;
     net.repos.set('octo/shop', githubFixture('octo', 'shop', 'main', { 'index.html': '<p>x</p>\n' }));
-    p.ingestion.actions.retry();
+    p.sessionCtl.actions.retry();
     await p.settle(); p.mountSandbox(); await p.settle();
     expect(p.studio.getState().experience).toBe('studio');
+    expect(p.session.getState().status).toBe('done');
+    expect(p.studio.getState().log.some((e) => e.message === 'Session restored: octo/shop, screen 3.')).toBe(true);
     expect(net.requests.at(-1)).toMatchObject({ owner: 'octo', repo: 'shop', ref: 'main' });
     p.dispose();
   });

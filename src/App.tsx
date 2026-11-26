@@ -7,6 +7,7 @@
 // @node: F7.10 (calls usePreview once)
 // @node: F8.8 (calls useEditPad once)
 // @node: F9.10 (calls useJournal and useExports once)
+// @node: F10.7 (calls useSessionRestore once; composes Back to Start and Reset session)
 // Switches between the Start, Loading, and Studio screens from the store's experience
 // stage. One ingestion hook instance and one assistant hook instance serve every screen.
 import { LoadingScene } from './components/LoadingScene';
@@ -21,6 +22,9 @@ import { usePreview } from './hooks/usePreview';
 import { useEditPad } from './hooks/useEditPad';
 import { useExports, useJournal } from './hooks/useJournal';
 import { useMemo } from 'react';
+import { useSessionRestore, useSessionView } from './hooks/useSessionRestore';
+import { describeSavedData } from './store/sessionRecord';
+import { browserStorage } from './store/layoutStorage';
 import { useLayoutPersistence } from './hooks/useLayout';
 import { useShellReset } from './hooks/useShell';
 import { useStudioStore } from './store/useStudioStore';
@@ -37,17 +41,25 @@ export function App() {
   const journalActions = useJournal();
   const exports = useExports();
   const journal = useMemo(() => ({ actions: journalActions, exports }), [journalActions, exports]);
+  const session = useSessionRestore(ingestion, preview);
+  const sessionView = useSessionView();
+  const ingestionRunId = useStudioStore((s) => s.ingestion.runId);
+  const studioSession = useMemo(() => ({ onReset: session.resetSession, savedRows: () => describeSavedData(browserStorage()) }), [session]);
   useLayoutPersistence();
   useShellReset();
+
+  // The Loading screen is in restore mode while the restore load runs, and in its failure panel.
+  const restoring = sessionView.status === 'pending' || (sessionView.status === 'failed' && sessionView.pendingRunId === ingestionRunId);
 
   switch (experience) {
     case 'loading':
       return (
         <LoadingScene
           onCancel={ingestion.cancel}
-          onRetry={ingestion.retry}
+          onRetry={restoring ? session.retry : ingestion.retry}
           onSample={ingestion.startSample}
-          onBack={ingestion.backToStart}
+          onBack={session.backToStart}
+          restore={restoring && sessionView.record ? { record: sessionView.record, onReset: session.resetSession } : undefined}
         />
       );
     case 'studio':
@@ -57,7 +69,7 @@ export function App() {
           onCancel={ingestion.cancel}
           onRetry={ingestion.retry}
           onDismissError={ingestion.dismissError}
-          onBack={ingestion.backToStart}
+          onBack={session.backToStart}
           assistant={assistant}
           harness={harness}
           understanding={understanding}
@@ -65,9 +77,16 @@ export function App() {
           preview={preview}
           editPad={editPad}
           journal={journal}
+          session={studioSession}
         />
       );
     default:
-      return <StartScreen onSubmit={ingestion.submitInput} onSample={ingestion.startSample} />;
+      return (
+        <StartScreen
+          onSubmit={ingestion.submitInput}
+          onSample={ingestion.startSample}
+          session={{ record: sessionView.record, restoring: sessionView.status === 'pending' || sessionView.status === 'applying', notice: sessionView.notice, savedRows: describeSavedData(browserStorage()), onResume: session.resume, onReset: session.resetSession }}
+        />
+      );
   }
 }
