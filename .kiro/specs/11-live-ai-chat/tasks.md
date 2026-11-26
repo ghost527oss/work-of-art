@@ -48,14 +48,15 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
 ## L1. Contracts, validators, limits, provider table, mock `act` branch
 - **plan_id:** P3A-LIVE-CHAT  **node_id:** F11.1
 - **scope:** `src/types/contracts.ts`, `src/engine/aiValidate.ts`, `src/engine/mockAssistant.ts`, `src/config/aiLive.ts`, `src/config/aiProviders.ts`, `src/config/budgets-proxy.ts`, `tests/aiContracts.test.ts`, `tests/aiValidate.test.ts`, `tests/mockAssistant.test.ts`, `tests/aiLiveConfig.test.ts`, `tests/aiProviderConfig.test.ts`
-- **goal:** Build design sections 6 and 7: the fourth task type, `skillId`, `connections`, `startLine`, the `action` response, `meta`, the new validation rules, `AI_LIVE`, and the provider table. Re-check each default model name against the provider's current free list (web check) and report any change before using it.
+- **goal:** Build design sections 6 and 7: the fourth task type, `skillId`, `connections`, `startLine`, the `action` response, `meta`, the new validation rules, `AI_LIVE`, and the provider table. Re-check each default model name against the provider's current official page (web check) and report any change.
 - **acceptance:**
   - Valid requests with and without the new fields pass; extra fields, a bad `skillId`, an unknown skill, a `startLine` outside a `sourceContext` item, and a secret in `connections` are rejected.
   - An `action` result is valid only for `act` with no `sourceContext`; `arg` rules per action; `approve`, `reject`, and `reset` do not parse.
   - A mock `act` request returns a deterministic explanation that carries the mock notice and runs nothing. Every existing mock output is byte-identical (the existing fixtures prove it).
   - `meta` is optional, strict, and bounded; a result without `meta` still parses.
   - `AI_LIVE` values equal design 7.3 and are marked provisional; the browser-safe subset is re-exported by `budgets-proxy.ts`.
-  - Provider table: fixed endpoints, no key values, model-name validation rejects `../x`, spaces, 81 characters, and `/` or `:` for Gemini.
+  - Provider table: fixed endpoints, no key values, model-name validation rejects `../x`, spaces, 81 characters, and `/` or `:` for Gemini. Defaults are Gemini `gemini-3.1-flash-lite` and `gemini-3.6-flash`, Groq `openai/gpt-oss-20b` and `openai/gpt-oss-120b`, OpenRouter `openrouter/free` for both tiers; an empty variable uses the default and a set variable overrides it; duplicate model names (OpenRouter light and heavy) are dropped from a plan.
+  - `AI_LIVE.attemptTimeoutMs` is 7,000 and `totalBudgetMs` is 14,000.
 - **verify:** `npm run typecheck && npx vitest run tests/aiContracts.test.ts tests/aiValidate.test.ts tests/mockAssistant.test.ts tests/aiLiveConfig.test.ts tests/aiProviderConfig.test.ts`
 
 ## L2. Card picker and prompt builder
@@ -76,7 +77,7 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
 - **goal:** Build design sections 7.1, 9.2, and 9.3: `parseAnswer`, the edits-to-diff builder, and `callProvider` for Gemini, Groq, and OpenRouter.
 - **acceptance:**
   - **Parser:** JSON is found inside a code fence or surrounding text; each kind maps to a valid `AIResponse`; every rule in 9.2 gives `bad_answer` when broken (extra field, path not selected, `patch` with the wrong path count or no snippet, `plan` with fewer than 2 paths becomes a `clarification`, `action` with snippets, secret in any string); the two added limitations appear.
-  - **Diff builder:** one hunk with 3 context lines; correct hunk header counts; at most 3 edits, no overlap, each inside the snippet, at most 40 new lines; a no-change edit, an over-2,000-character diff, and a snippet with `\r` or a redaction marker are rejected; the diff applies to the snippet with the independent test applier `tests/helpers/applyHunks.ts` and with `applyUnifiedDiff`, and reverses exactly (a seeded random edit test runs at least 200 cases).
+  - **Diff builder:** one hunk with 3 context lines; correct hunk header counts; at most 3 edits, no overlap, each inside the snippet, at most 40 new lines; a no-change edit, an over-2,000-character diff, and a snippet with a redaction marker are rejected (a snippet line with a trailing `\r` is not accepted by the builder either: the browser removes it first); the diff applies to the snippet with the independent test applier `tests/helpers/applyHunks.ts` and with `applyUnifiedDiff`, and reverses exactly (a seeded random edit test runs at least 200 cases).
   - **Adapters:** the key is only in a header; the URL is the fixed endpoint (Gemini's model name validated); `redirect: 'error'`; output-token cap set; response read capped at 64 KB; status mapping (429, 401, 403, 5xx, other 4xx, timeout, network failure, abort); a provider error body never appears in any result or message (sentinel test).
   - The fake-provider helper supports scripted statuses, delays (fake timers), bodies, and aborts, and makes no network call.
 - **verify:** `npm run typecheck && npx vitest run tests/answerParser.test.ts tests/liveProviders.test.ts`
@@ -87,7 +88,7 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
 - **goal:** Build design section 8 and the `answerLive` orchestration.
 - **acceptance:**
   - **Plan:** tier by task; light and heavy orders exactly as design 8.1; skip rules; duplicate model names dropped; no usable entry gives an explicit "not set up" result.
-  - **Run:** 429 marks the provider busy and skips its other entries; timeout, 5xx, and network failure go to the next entry; 401 and 403 skip the provider; a bad answer goes on; no same-model retry; each attempt at most 5 s and the whole run at most 12 s (fake clock); below 1.5 s remaining no new attempt starts and `out_of_time` is recorded; an aborted request stops at once.
+  - **Run:** 429 marks the provider busy and skips its other entries; timeout, 5xx, and network failure go to the next entry; 401 and 403 skip the provider; a bad answer goes on; no same-model retry; each attempt at most 7 s and the whole run at most 14 s (fake clock; the third attempt gets only the time that remains); below 1.5 s remaining no new attempt starts and `out_of_time` is recorded; an aborted request stops at once.
   - **Result:** the winner's provider, model, tier, `lighter`, and failed `attempts` appear in `meta`; heavy falls to light only after every heavy entry fails and then `lighter` is true; all-429 gives `rate_limited`, anything else `upstream_failure`; the message names providers and outcomes only.
   - **`answerLive`:** picks cards, builds the prompt, runs the router, parses, validates with `validateAIResult`, and rejects a result that contains a secret as a bad answer. A fixed seeded sequence of 500 random provider behaviours never ends with an invalid result, a missing `meta`, or more than one attempt per model.
 - **verify:** `npm run typecheck && npx vitest run tests/modelRouter.test.ts tests/liveAssistant.test.ts`
@@ -115,7 +116,7 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
   - Whole file when at most 2 KB; otherwise a 15-before-and-after window around the finding's first line, at most 80 lines and 6 KB, with the right `startLine`; with no finding, the first 60 lines.
   - Truncated, not-loaded, and unknown paths are refused with a plain note. At most 10 paths. Totals above the Phase 2 request limits give a note, never a silent cut.
   - Connection facts: only edges touching the selected paths, confirmed first, at most 3, one line each, built from paths, kinds, certainty, and lines (a test proves no source text can enter, using a sentinel in file content).
-  - Snippets and facts are redacted. Pure and deterministic.
+  - Snippets and facts are redacted. The trailing `\r` is removed from every snippet line (CRLF text gives the same snippet as LF text). Pure and deterministic.
 - **verify:** `npm run typecheck && npx vitest run tests/contextEngine.test.ts`
 
 ## L7. Session cache
@@ -137,6 +138,7 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
 - **acceptance:**
   - `fetchAIStatus` validates the response with a schema and never throws; a bad or failed check gives an explicit "unknown" status.
   - In live mode `send()` shows "needs notice" until accepted; OK releases the held request; the flag is memory-only. Mock mode never asks.
+  - **Held request:** after `send()` returns needs-notice, each of these makes **OK** send nothing and make no network call: `cancel`, `clear`, `dispose`, `stop`, `reset`, a snapshot change, Back to Start, a mode change, the panel unmounting, and a newer `send()` (which replaces the held one). **OK** sends the held request once only. A held request never fires after being discarded, even with fake timers advanced.
   - A cache hit makes no network call, writes the "reused" Log line, and marks the slice `fromCache`. A miss sends and, on a live success, stores. **Ask again** bypasses the lookup and replaces the entry.
   - One request at a time, stale ids ignored, Cancel and `dispose` abort, snapshot change clears the slice, the cache, and attempt counts (existing behaviour kept).
   - Log lines hold task type, counts, mode, provider, tier, `lighter`, failed-attempt count, and `reused`. A sentinel question, snippet, and answer never appear in the Log or the slice summary.
@@ -150,7 +152,7 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
 - **goal:** Build design section 13.
 - **acceptance:**
   - **Actions:** only the ten allowed actions; never `approve`, `reject`, or `reset`; refused for any task type but `act`; refused when snippets were sent; `toCommand` equals what `parseCommand` gives for the same words; the harness's own refusals are passed through unchanged; the AI cannot change a proposal's state.
-  - **Queue:** each condition of 13.2 has a test with its plain reason (mock result, two paths, run active, proposal waiting, file truncated, diff does not apply, secret, history full, attempts used). When all hold, exactly one waiting proposal (`source: 'ai'`) exists and nothing is applied.
+  - **Queue:** each condition of 13.2 has a test with its plain reason (mock result, two paths, run active, proposal waiting, file truncated, diff does not apply, mixed line endings or no final newline fails the apply-then-reverse round trip, secret, history full, attempts used). A CRLF file and an LF file both queue and round-trip; a mixed file stays display-only. When all hold, exactly one waiting proposal (`source: 'ai'`) exists and nothing is applied.
   - **Approve:** the diff is applied to the practice copy only; reversing it returns the exact original (hash); a failure records nothing; a re-scan Log line says "still found" or "no longer found" and a finding is never called fixed otherwise.
   - **Undo, Redo, Reject, Stop** work on AI changes; **Stop** rejects a waiting AI proposal.
   - **Attempt cap:** the 4th AI proposal for one finding is refused with the exact message; the count resets with a new snapshot; each of the 3 still needs Approve; nothing loops.

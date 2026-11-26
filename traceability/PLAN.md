@@ -905,7 +905,7 @@ Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (
 ### F11.4 — Model Router and live assistant
 - Inputs: a request, the providers' settings, a clock, a signal
 - Outputs: an `AIResult` with `meta`, or a coded failure
-- Invariants: fixed order; 429 skips the provider for the request; no same-model retry; 5 s per attempt and 12 s total; heavy falls to light only after all heavy fail and sets `lighter`
+- Invariants: fixed order; 429 skips the provider for the request; no same-model retry; 7 s per attempt and 14 s total; heavy falls to light only after all heavy fail and sets `lighter`
 - Files: `src/engine/live/modelRouter.ts`, `src/engine/live/liveAssistant.ts`, `tests/modelRouter.test.ts`, `tests/liveAssistant.test.ts`
 - Depends on: F11.1, F11.2, F11.3
 - verify: `npm run typecheck && npx vitest run tests/modelRouter.test.ts tests/liveAssistant.test.ts`

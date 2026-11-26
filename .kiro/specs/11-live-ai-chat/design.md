@@ -113,7 +113,7 @@ AIAssistantPanel
           redact again
           answerLive():
             pickCards -> buildPrompt -> Model Router:
-               attempt 1 ... attempt n (fixed order, 5 s each, 12 s total)
+               attempt 1 ... attempt n (fixed order, 7 s each, 14 s total)
                parseAnswer -> validateAIResult -> secret check
                first good answer wins; each failure is recorded
           200 { requestId, mode:'live', response, meta }
@@ -177,12 +177,16 @@ meta: z.strictObject({
 | Provider | Endpoint (fixed) | Key header | Light default | Heavy default |
 |---|---|---|---|---|
 | `gemini` | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | `x-goog-api-key` | `gemini-3.1-flash-lite` | `gemini-3.6-flash` |
-| `groq` | `https://api.groq.com/openai/v1/chat/completions` | `Authorization: Bearer` | `llama-3.1-8b-instant` | `openai/gpt-oss-120b` |
-| `openrouter` | `https://openrouter.ai/api/v1/chat/completions` | `Authorization: Bearer` | none: set `OPENROUTER_MODEL_LIGHT` | none: set `OPENROUTER_MODEL_HEAVY` |
+| `groq` | `https://api.groq.com/openai/v1/chat/completions` | `Authorization: Bearer` | `openai/gpt-oss-20b` | `openai/gpt-oss-120b` |
+| `openrouter` | `https://openrouter.ai/api/v1/chat/completions` | `Authorization: Bearer` | `openrouter/free` | `openrouter/free` |
 
 A model name from the environment must match `^[A-Za-z0-9._:/-]{1,80}$` (and, for Gemini, contain no `/` or `:`), because it is placed in a URL path or a body. A bad name makes that entry unusable, with no error text that echoes it.
 
-**Unverified.** These defaults come from search results, not from your keys. Free model names and quotas change often. For example, a search result says Groq took `llama-3.3-70b-versatile` off its free plan in August 2026, so it is not a default. I will check each name again in task L1 and you confirm them with the real-key check (section 14).
+**Verified on 2026-11-26** (task L1 re-checks them again before they are used):
+- Gemini ids `gemini-3.1-flash-lite` and `gemini-3.6-flash` are listed in Google's current model list ([aistudio.google.com/docs/models](https://aistudio.google.com/docs/models)). Google's page does not state which models the free tier includes; secondary sources say the 3.x Flash and Flash-Lite models are free, so free access is **Unverified** until your key runs.
+- Groq `openai/gpt-oss-20b` and `openai/gpt-oss-120b` are in the rate-limit table for the plan with no card (30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 a day) ([console.groq.com/docs/rate-limits](https://console.groq.com/docs/rate-limits)). `llama-3.1-8b-instant` is not in that table, so it is not a default. With 8,000 tokens a minute, a large request (about 3,000 prompt tokens) leaves room for about two a minute.
+- OpenRouter `openrouter/free` is the Free Models Router. It picks a free model at random for each request and filters for the features the request needs ([OpenRouter documentation](https://openrouter.ai/docs/guides/routing/routers/free-router)). Because the model is random, quality varies between requests, and the answer's `model` field shows which one ran. Light and heavy use the same id by default, so a heavy request on OpenRouter is not "stronger". Pin a model with the `OPENROUTER_MODEL_*` variables if you want one.
+- Content was rephrased for compliance with licensing restrictions.
 
 ### 7.2 What the quotas mean for the design
 
@@ -198,8 +202,8 @@ Consequences: a few heavy requests can use a day's Gemini allowance, so the ligh
 ```ts
 export const AI_LIVE = {
   provisional: true,
-  attemptTimeoutMs: 5000,        // per attempt
-  totalBudgetMs: 12000,          // whole request, inside the 15 s browser timeout
+  attemptTimeoutMs: 7000,        // per attempt (raised from 5000 at your request)
+  totalBudgetMs: 14000,          // whole request, inside the 15 s browser timeout (about 1 s to spare)
   minAttemptMs: 1500,            // stop starting attempts below this
   maxPromptChars: 12000,
   maxOutputTokensLight: 700,
@@ -304,7 +308,7 @@ Known limit: a hunk that reaches the last line of a file with no final newline c
 `buildContext({ snapshot, paths, finding, includeContent, analysis })` returns `{ selectedPaths, sourceContext?, skillId?, connections?, notes[] }`.
 
 - **Paths:** the chosen files (and the finding's file when one is chosen), at most 10.
-- **Snippets** (only when `includeContent` is true): for each `loaded`, not `truncated` file, whole file if at most 2 KB; else a window of 15 lines either side of the finding's first line (at most 80 lines and 6 KB, with `startLine`); with no finding, the first 60 lines. Redacted. Over-limit totals are reported in `notes`, never silently dropped.
+- **Snippets** (only when `includeContent` is true): for each `loaded`, not `truncated` file, with the trailing `\r` removed from every line, whole file if at most 2 KB; else a window of 15 lines either side of the finding's first line (at most 80 lines and 6 KB, with `startLine`); with no finding, the first 60 lines. Redacted. Over-limit totals are reported in `notes`, never silently dropped.
 - **Connection facts:** from `analysis.edges`, edges where `from` or `targetPath` is a selected path, confirmed first, at most 3, each one line such as `src/app.js calls /api/profile (confirmed, line 12)`. Built from paths, targets, kind, certainty, and line only. Never source text.
 - **skillId:** the finding's skill id when a finding is chosen.
 - **Cards** are not chosen here. The server picks them (R3.6), so the browser cannot influence the card text.
@@ -326,7 +330,7 @@ Note on correctness: because the key includes the snippet fingerprint, an approv
 
 `createAssistantController` (existing) gains these private parts. No new store beyond the AI slice fields.
 - **status:** `fetchAIStatus()` on first use of the panel (and again after a failure). The result drives the banner. A failed status check shows "Could not check the AI mode." and leaves Send enabled, because the server still decides.
-- **consent:** a boolean in the controller. `send()` returns `{ needsNotice: true }` when live and not yet accepted. The panel shows the notice. **OK** sets the flag and re-sends the held form values (the form values are held in panel state, not in the store).
+- **consent and the held request:** a boolean `accepted` and one `held` slot in the controller (memory only). `send()` returns `{ needsNotice: true }` when live and not yet accepted, and stores the validated request, the snapshot id, and a new `heldId` in `held`. The panel shows the notice. `acceptNotice()` sets `accepted`, and sends `held` only if `held` is still set and its snapshot id equals the current one; it then clears `held` before sending, so it can never fire twice. `discardHeld()` sets `held = null`. It is called by `cancel`, `clear`, `dispose`, the Stop and `reset` effects, a snapshot change or Back to Start (the existing store subscription), a mode change from the status check, a new `send()` (replaces the held one), and by the panel's unmount cleanup (switching or closing the panel). A test sets each of these between the notice and **OK** and proves that no request is made.
 - **cache:** `createAnswerCache()`; checked before the network call, filled after a live success.
 - **attempts:** `Record<findingId, number>` in the AI slice (cleared with the slice on a new snapshot).
 - **hand-off:** after a result, the controller calls a `onResult(result, request)` hook given by `StudioLayout`, which runs `checkAIAction` and `checkAIProposal` and calls the harness (`run`) or the proposal action. This keeps the controller free of harness details, as 2B did for `cancelAI`.
@@ -348,7 +352,7 @@ State changes still go through pure actions. A stale `requestId` is ignored. One
 2. Exactly one affected path, equal to the one selected file.
 3. No active run and no waiting proposal (`isActive`, `w.proposal`).
 4. The file is `loaded`, not `truncated`; the practice copy exists (`practiceContent`).
-5. `applyUnifiedDiff(current, diff)` is ok.
+5. `applyUnifiedDiff(current, diff)` is ok, and applying the reversed diff (`reverseUnifiedDiff`) to the result returns text with the same `hashText` as `current`. If the apply works but the round trip fails, the reason is the mixed-line-ending message from R9.1.
 6. No likely secret in the diff or the result text.
 7. History has room (`decisionRefusal` rule).
 8. If tied to a finding: attempts for that finding are below 3.
@@ -362,7 +366,7 @@ When ok, `queueAIProposal` sets `work.proposal = { id, path, title: 'AI-proposed
 ## 14. The real-key check (for you, after the build)
 
 1. Copy `.env.example` to `.env` (it is already ignored by git). Fill in at least `GEMINI_API_KEY`; add `GROQ_API_KEY` and OpenRouter values to test the fallback.
-2. Set `AI_MODE=live`. For OpenRouter, set both `OPENROUTER_MODEL_*` names to a current `:free` model.
+2. Set `AI_MODE=live`. OpenRouter works with its default `openrouter/free`; set `OPENROUTER_MODEL_LIGHT` and `OPENROUTER_MODEL_HEAVY` only to pin a specific model.
 3. Start the dev server and load a sample. The banner should say live. Click OK on the notice.
 4. Ask an explanation. Check the provider line. Ask the same thing again: it should show "Saved answer" and make no request.
 5. Remove `GEMINI_API_KEY`, restart: the next answer should come from Groq with no error.
@@ -423,7 +427,7 @@ Mutation checks (L12), each must be killed by a test: remove the 429 skip; allow
 
 1. **Free models change and quotas are small.** Defaults may be wrong on the day you test. Mitigation: environment overrides, one config file, plain errors.
 2. **Model answers vary.** The parser rejects bad shapes, but a valid-looking wrong answer is possible. Every code change needs your Approve, and the diff comes from real lines.
-3. **Patch limits.** One file, one hunk, 2,000 characters, no CRLF, nothing at an unterminated last line. Larger changes become a plan.
+3. **Patch limits.** One file, one hunk, 2,000 characters. Files with mixed line endings, or a change at a last line with no final newline, stay display-only because they cannot be reversed exactly. Larger changes become a plan.
 4. **The cache can show an old answer** if a file is edited outside PatchBay's tracked state. The key includes the snippet text, so edits PatchBay knows about change the key. "Ask again" is always available.
 5. **Prompt injection.** Cannot be fully excluded for an AI. The defences are structural: fixed system text, a closed answer schema, path and action allowlists, no action when file text was sent, and an Approve gate on every change.
 6. **Providers see redacted text.** Redaction uses a fixed pattern list and can miss an unusual secret. The notice says so. File contents stay off by default.
