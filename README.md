@@ -141,3 +141,13 @@ The **Journal** toolbar button opens the Learning Journal. It explains how the l
 - The **Log** panel downloads the log as Markdown or JSON (redacted, no file contents). The Journal downloads as Markdown at the current level.
 - Downloads are made in the browser only. Nothing is uploaded.
 
+## Saving and resetting a session (Phase 2, sub-phase 2G)
+
+A browser refresh is harmless. PatchBay remembers **where you were**, not what the files contain: a small record (`patchbay.session.v1`) holds the repository address (owner, name, ref, chosen folders, or the sample), the screen, and the Sandbox width, mode, and page. After a refresh the Loading screen says "Restoring your session", loads the same repository again, and puts back the screen, the Sandbox settings, the panel layout, your History and edits, the Log, a paused practice run, your label corrections, and the reading level.
+
+- Not restored, on purpose: Preview Only changes, the selection, scripts turned on, a Skeleton Crew run in progress, AI Chat text, and the scan (it runs again). The Log says so when it matters.
+- If the repository cannot be loaded again (offline, rate limited, private), the failure panel keeps everything and offers Retry, Reset session, and Back to Start. Cancel during a restore goes to Start with **Resume last session**.
+- **Back to Start** forgets the session record but keeps your History and corrections for that repository. **Reset session** (it asks first) deletes the session, History, Log, and corrections in this browser and keeps your layout and reading level. Your repository is never changed.
+- **Saved in this browser** (Start screen and Project info) lists the five saved parts with their sizes. PatchBay never saves file contents, secrets, or what you type to the AI.
+- Known limits: every refresh downloads the repository again (GitHub limits apply; samples cost nothing); a branch that moved since drops your saved changes to files that changed; two tabs overwrite each other (last write wins).
+

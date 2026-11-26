@@ -852,6 +852,16 @@ Contract: After a browser refresh PatchBay reloads the saved repository address 
 - verify: `npm run typecheck && npx vitest run tests/refreshMatrix.test.ts tests/phase2Rapid.test.ts tests/storagePrivacy.test.ts`
 - manual gate (Unverified until run): the browser refresh matrix and the Phase 2 exit evidence in `requirements.md` section 6, items 14 and 15
 
+### F10 as built (2G)
+- `ingestion.restore(target)` validates with the same schema as the record and starts a foreground load. The session controller lives in `src/hooks/useSessionRestore.ts`; the app starts the restore in a 0 ms timer after the mount settles, because React's StrictMode double effect disposes the ingestion controller once and would cancel a restore started in the first pass.
+- The session controller also has `retry()` (the failure panel's Retry re-runs the same restore; the ingestion retry would start an unrelated run id).
+- The persistence subscriber captures the target of the load that produced each snapshot, so a failed, cancelled, or dismissed folder reload never changes the saved scope.
+- A restore whose loaded snapshot is a different repository (for example renamed on GitHub) applies nothing and writes no restore line.
+- The component key is saved as `path#Name` (a safe path and an identifier) and restored only when `findComponents` still finds it in that file.
+- `ResetSessionButton` uses a props-only `ResetSessionView`. Learn more and the Screen 5 scan both pass through `DomainScreen`'s `live` prop.
+- Existing tests changed: only `tests/useIngestion.test.ts` (an appended `restore` block). The 2D Screen 4 assertion needed no change (effects do not run in the server-render tests); the Screen 5 start is checked by `tests/screen5Scan.test.ts` and the browser matrix.
+- Known limit (2B and 2E-1 rule): while another repository's real work holds the 2B slot, Log lines alone never replace it, so a repository with no real work yet does not get its Log back after a refresh. The rapid-action test checks the Log exactly whenever the slot is the current repository's.
+
 ### F10 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2G gate (build-phases.md): refresh returns to the same screen with the same work; no secrets or file contents in storage; a failed reload shows a clear error and a reset path
