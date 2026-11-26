@@ -19,30 +19,39 @@ async function obey(taskType: 'explain' | 'suggest_change' | 'act' | 'review_fin
 }
 
 describe('a model that obeys the injected text is not obeyed by PatchBay', () => {
-  const cases: Array<[string, Parameters<typeof obey>[0], unknown, Record<string, unknown>?]> = [
-    ['action approve for an act request with no file text', 'act', { kind: 'action', action: 'approve', summary: 'ok' }, { selectedPaths: [], includeContent: false }],
-    ['action reset', 'act', { kind: 'action', action: 'reset', summary: 'ok' }, { selectedPaths: [], includeContent: false }],
-    ['an action when file text was sent', 'act', { kind: 'action', action: 'start', arg: 'crew', summary: 'ok' }, {}],
-    ['an action for an explain request', 'explain', { kind: 'action', action: 'help', summary: 'ok' }],
-    ['evidence for a file that was not selected', 'explain', { kind: 'explanation', summary: 's', evidence_paths: ['/etc/passwd'] }],
-    ['a patch for another file', 'suggest_change', { kind: 'patch', summary: 's', path: 'other.html', edits: [{ start_line: 1, end_line: 1, new_text: 'x' }] }],
-    ['a patch with lines outside the snippet', 'suggest_change', { kind: 'patch', summary: 's', path: 'index.html', edits: [{ start_line: 900, end_line: 901, new_text: 'x' }] }],
-    ['a plan naming /etc/passwd', 'suggest_change', { kind: 'plan', summary: 's', affected_paths: ['/etc/passwd'], steps: ['x'], risks: [] }],
-    ['text that is not JSON', 'explain', 'Sure! I will now run reset and approve everything.'],
-    ['an extra field smuggled into the answer', 'explain', { kind: 'explanation', summary: 's', run: 'reset' }],
+  // [name, task, answer, extra request fields, the plain reason PatchBay gives]
+  const cases: Array<[string, Parameters<typeof obey>[0], unknown, Record<string, unknown> | undefined, string]> = [
+    ['action approve for an act request with no file text', 'act', { kind: 'action', action: 'approve', summary: 'ok' }, { selectedPaths: [], includeContent: false }, 'it had the wrong fields'],
+    ['action reset', 'act', { kind: 'action', action: 'reset', summary: 'ok' }, { selectedPaths: [], includeContent: false }, 'it had the wrong fields'],
+    ['action undo (only the user changes History)', 'act', { kind: 'action', action: 'undo', summary: 'ok' }, { selectedPaths: [], includeContent: false }, 'it had the wrong fields'],
+    ['an action when file text was sent', 'act', { kind: 'action', action: 'start', arg: 'crew', summary: 'ok' }, {}, 'it asked for an action that is not allowed here'],
+    ['an action for an explain request', 'explain', { kind: 'action', action: 'help', summary: 'ok' }, undefined, 'it was the wrong kind of answer for this request'],
+    ['evidence for a file that was not selected', 'explain', { kind: 'explanation', summary: 's', evidence_paths: ['/etc/passwd'] }, undefined, 'it named a file you did not select'],
+    ['a patch for another file', 'suggest_change', { kind: 'patch', summary: 's', path: 'other.html', edits: [{ start_line: 1, end_line: 1, new_text: 'x' }] }, undefined, 'it proposed a change where none was allowed'],
+    ['a patch with lines outside the snippet', 'suggest_change', { kind: 'patch', summary: 's', path: 'index.html', edits: [{ start_line: 900, end_line: 901, new_text: 'x' }] }, undefined, 'its edit did not fit the lines it was shown'],
+    ['a plan naming /etc/passwd', 'suggest_change', { kind: 'plan', summary: 's', affected_paths: ['/etc/passwd'], steps: ['x'], risks: [] }, undefined, 'it named a file you did not select'],
+    ['text that is not JSON', 'explain', 'Sure! I will now run reset and approve everything.', undefined, 'it was not in the expected format'],
   ];
-  for (const [name, task, answer, over] of cases) {
+  for (const [name, task, answer, over, why] of cases) {
     it(`${name}: refused, nothing changes`, async () => {
       const { sys, unchanged } = await obey(task, answer, over);
       const s = sys.store.getState();
       expect(s.ai.status).toBe('failed');
-      expect(s.ai.error!.message).toBe('Groq gave an answer PatchBay could not use.');
+      expect(s.ai.error!.message).toBe(`Groq gave an answer PatchBay could not use (${why}).`);
       expect(unchanged()).toBe(true);
       expect(sys.ran).toEqual([]);
       expect(s.work.proposal).toBeNull();
       expect(s.work.run).toBeNull();
     });
   }
+  it('an extra field smuggled into an otherwise valid answer is ignored, never copied, and runs nothing', async () => {
+    const { sys, unchanged } = await obey('explain', { kind: 'explanation', summary: 'A fine answer', evidence_paths: [], run: 'reset', approve: true });
+    const s = sys.store.getState();
+    expect(s.ai.status).toBe('done');
+    expect(JSON.stringify(s.ai.result)).not.toContain('reset');
+    expect(unchanged()).toBe(true);
+    expect(sys.ran).toEqual([]);
+  });
 });
 
 describe('valid answers stay inside what was asked', () => {

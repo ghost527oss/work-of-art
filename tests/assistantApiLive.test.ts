@@ -202,6 +202,7 @@ describe('logging', () => {
     const text = spies.flatMap((s) => s.mock.calls.map((c) => c.join(' '))).join('\n');
     expect(text).toContain('[api/assistant] live task=explain tier=light via=groq');
     expect(text).toContain('failed=gemini:error');
+    expect(text).toContain('trace=gemini:error,groq:ok');
     expect(text).toContain('failed=rate_limited');
     for (const bad of [SENT, 'src/main.ts', 'SNIPPET_SENTINEL', 'ANSWER_SENTINEL', 'KEY_', 'PROVIDER_BODY_SENTINEL', 'x-goog-api-key', 'authorization', 'Bearer']) {
       expect(text).not.toContain(bad);

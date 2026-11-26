@@ -142,3 +142,18 @@ describe('no provider text or key ever appears in a result', () => {
     }
   });
 });
+
+describe('a cut-off answer is reported as truncated', () => {
+  it('Gemini finishReason MAX_TOKENS', async () => {
+    const f = makeFakeFetch(() => ({ json: { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '{"kind":"expl' }] } }] } }));
+    expect(await callProvider(args({ provider: 'gemini', model: 'gemini-3.6-flash' }, f).a)).toEqual({ ok: true, text: '{"kind":"expl', truncated: true });
+  });
+  it('OpenAI-style finish_reason length', async () => {
+    const f = makeFakeFetch(() => ({ json: { choices: [{ finish_reason: 'length', message: { content: '{"kind"' } }] } }));
+    expect(await callProvider(args({}, f).a)).toEqual({ ok: true, text: '{"kind"', truncated: true });
+  });
+  it('a finished answer is not marked truncated', async () => {
+    const f = makeFakeFetch(() => ({ json: { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'ok' }] } }] } }));
+    expect(await callProvider(args({ provider: 'gemini', model: 'gemini-3.6-flash' }, f).a)).toEqual({ ok: true, text: 'ok' });
+  });
+});

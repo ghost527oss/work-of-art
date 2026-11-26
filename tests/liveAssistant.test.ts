@@ -28,6 +28,7 @@ describe('answerLive: success', () => {
     const f = makeFakeFetch((c) => reply(c));
     await answerLive(explain(), ALL, { fetchImpl: f.fetch });
     expect(f.calls[0]!.body.generationConfig.maxOutputTokens).toBe(AI_LIVE.maxOutputTokensLight);
+    expect(AI_LIVE.maxOutputTokensLight).toBe(1500);
     const f2 = makeFakeFetch((c) => reply(c, JSON.stringify({ kind: 'clarification', questions: ['Which file?'] })));
     await answerLive(explain({ taskType: 'suggest_change', selectedPaths: [] }), ALL, { fetchImpl: f2.fetch });
     expect(f2.calls[0]!.body.generationConfig.maxOutputTokens).toBe(AI_LIVE.maxOutputTokensHeavy);
@@ -92,14 +93,14 @@ describe('answerLive: fallback', () => {
 describe('answerLive: failure', () => {
   it('no keys: unsupported 503 with the exact message and no call', async () => {
     const f = makeFakeFetch((c) => reply(c));
-    expect(await answerLive(explain(), {}, { fetchImpl: f.fetch })).toEqual({ ok: false, status: 503, code: 'unsupported', message: NOT_SET_UP_MESSAGE });
+    expect(await answerLive(explain(), {}, { fetchImpl: f.fetch })).toEqual({ ok: false, status: 503, code: 'unsupported', message: NOT_SET_UP_MESSAGE, trace: 'none' });
     expect(f.calls).toHaveLength(0);
     expect(NOT_SET_UP_MESSAGE).toBe('Live AI is not set up. Add at least one key (GEMINI_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY) to the server settings.');
   });
   it('all rate limited: 429 rate_limited naming the providers', async () => {
     const f = makeFakeFetch(() => ({ status: 429 }));
     const out = await answerLive(explain(), ALL, { fetchImpl: f.fetch });
-    expect(out).toEqual({ ok: false, status: 429, code: 'rate_limited', message: 'Gemini, Groq and OpenRouter are at their free limit right now. Try again in a minute.' });
+    expect(out).toEqual({ ok: false, status: 429, code: 'rate_limited', message: 'Gemini, Groq and OpenRouter are at their free limit right now. Try again in a minute.', trace: 'gemini:rate_limited,groq:rate_limited,openrouter:rate_limited' });
   });
   it('one provider rate limited: singular wording', async () => {
     const f = makeFakeFetch(() => ({ status: 429 }));
@@ -109,7 +110,7 @@ describe('answerLive: failure', () => {
   it('mixed failures: 502 upstream_failure with plain outcome words only', async () => {
     const f = makeFakeFetch((c) => (c.provider === 'gemini' ? { status: 500 } : c.provider === 'groq' ? { throws: 'network' } : { text: '{"nope":1}' }));
     const out = await answerLive(explain(), ALL, { fetchImpl: f.fetch });
-    expect(out).toEqual({ ok: false, status: 502, code: 'upstream_failure', message: 'Gemini had a problem. Groq had a problem. OpenRouter had a problem.' });
+    expect(out).toEqual({ ok: false, status: 502, code: 'upstream_failure', message: 'Gemini had a problem. Groq had a problem. OpenRouter had a problem.', trace: 'gemini:error,groq:error,openrouter:error' });
   });
   it('a rejected key is named plainly and never echoes the key or the provider body', async () => {
     const f = makeFakeFetch(() => ({ status: 401, text: 'KEY_G_sentinel PROVIDER_BODY' }));
@@ -195,5 +196,32 @@ describe('answerLive: 500 seeded random provider behaviours', () => {
         if (Object.keys(keys).length === 0) expect(out.code).toBe('unsupported');
       } else throw new Error('unexpected abort');
     }
+  });
+});
+
+describe('answerLive: the reason a bad answer was refused', () => {
+  const only = { GEMINI_API_KEY: 'g' };
+  const cut = { json: { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '{"kind":"explanation","summ' }] } }] } };
+  it('a cut-off answer says so, and the trace names the code word', async () => {
+    const out = await answerLive(explain(), only, { fetchImpl: makeFakeFetch(() => cut).fetch });
+    expect(out).toMatchObject({ ok: false, code: 'upstream_failure', message: 'Gemini gave an answer PatchBay could not use (the answer was cut off).', trace: 'gemini:bad_answer(truncated)' });
+  });
+  it('each code word has plain words, and the heavy then light attempts both appear in the trace', async () => {
+    const f = makeFakeFetch((c) => ({ json: okBody(c.provider, '{"kind":"explanation","summary":"s"}') }));
+    const out = await answerLive(explain({ taskType: 'suggest_change', selectedPaths: [] }), only, { fetchImpl: f.fetch });
+    expect(out).toMatchObject({ ok: false, trace: 'gemini:bad_answer(kind_not_allowed),gemini:bad_answer(kind_not_allowed)', message: 'Gemini gave an answer PatchBay could not use (it was the wrong kind of answer for this request).' });
+  });
+  it('the detail code words never reach the browser result (meta.attempts has only provider and outcome)', async () => {
+    const f = makeFakeFetch((c, i) => reply(c, i === 0 ? 'not json at all' : good));
+    const out = await answerLive(explain(), ALL, { fetchImpl: f.fetch });
+    if (!out.ok || out.aborted) throw new Error('expected ok');
+    expect(out.result.meta!.attempts).toEqual([{ provider: 'gemini', outcome: 'bad_answer' }]);
+    expect(out.trace).toBe('gemini:bad_answer(not_json),groq:ok');
+    expect(AIResultSchema.safeParse(out.result).success).toBe(true);
+  });
+  it('the message and the trace hold only fixed words: nothing from the answer text', async () => {
+    const f = makeFakeFetch((c) => reply(c, 'ANSWER_TEXT_SENTINEL_42 is not json'));
+    const out = await answerLive(explain(), only, { fetchImpl: f.fetch });
+    expect(JSON.stringify(out)).not.toContain('ANSWER_TEXT_SENTINEL_42');
   });
 });

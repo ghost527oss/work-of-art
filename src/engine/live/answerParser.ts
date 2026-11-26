@@ -15,20 +15,21 @@ const bad = (reason: string): ParseOutcome => ({ ok: false, reason });
 const clip = (s: string): string => (s.length > MAX_STR ? s.slice(0, MAX_STR) : s);
 const str = z.string().min(1);
 
-const ExplanationSchema = z.strictObject({
+const ExplanationSchema = z.object({
   kind: z.literal('explanation'),
   summary: str,
   evidence_paths: z.array(z.string().min(1).max(250)).max(10).default([]),
   limitations: z.array(str).max(12).default([]),
   cards_covered: z.boolean().default(true),
 });
-const ClarificationSchema = z.strictObject({ kind: z.literal('clarification'), questions: z.array(str).min(1).max(12) });
-const EditSchema = z.strictObject({
+const ClarificationSchema = z.object({ kind: z.literal('clarification'), questions: z.array(str).min(1).max(12) });
+// Unknown extra fields are ignored (never copied into the result); a missing or null `new_text` means "delete these lines".
+const EditSchema = z.object({
   start_line: z.number().int().min(1),
   end_line: z.number().int().min(1),
-  new_text: z.string().max(4000),
+  new_text: z.string().max(4000).nullish().transform((v) => v ?? ''),
 });
-const PatchSchema = z.strictObject({
+const PatchSchema = z.object({
   kind: z.literal('patch'),
   summary: str,
   path: z.string().min(1).max(250),
@@ -36,14 +37,14 @@ const PatchSchema = z.strictObject({
   tests: z.array(str).max(12).default([]),
   risks: z.array(str).max(12).default([]),
 });
-const PlanSchema = z.strictObject({
+const PlanSchema = z.object({
   kind: z.literal('plan'),
   summary: str,
   affected_paths: z.array(z.string().min(1).max(250)).max(10),
   steps: z.array(str).min(1).max(24),
   risks: z.array(str).max(12).default([]),
 });
-const ActionSchema = z.strictObject({
+const ActionSchema = z.object({
   kind: z.literal('action'),
   action: z.enum(AI_ACTION_NAMES),
   arg: z.enum(AI_ACTION_ARGS).optional(),
@@ -186,16 +187,19 @@ export function parseAnswer(text: string, request: AIRequest, provider: AIProvid
     }
 
     case 'patch': {
-      if (request.selectedPaths.length !== 1 || a.path !== request.selectedPaths[0]) return bad('patch_not_allowed');
-      const ctx = request.sourceContext?.find((c) => c.filePath === a.path);
+      // Models often write "./index.html" or "a/index.html" for the one file they were given: accept those spellings only.
+      const named = a.path.replace(/^(?:\.\/|\/|[ab]\/)+/, '');
+      if (request.selectedPaths.length !== 1 || named !== request.selectedPaths[0]) return bad('patch_not_allowed');
+      const path = request.selectedPaths[0]!;
+      const ctx = request.sourceContext?.find((c) => c.filePath === path);
       if (!ctx) return bad('patch_not_allowed');
-      const built = buildEditDiff(a.path, ctx.startLine ?? 1, ctx.content, a.edits);
+      const built = buildEditDiff(path, ctx.startLine ?? 1, ctx.content, a.edits);
       if (!built.ok) return bad(`bad_edits: ${built.reason}`);
       const tests = a.tests.slice(0, 8).map(clip);
       if (tests.length === 0) tests.push(DEFAULT_TEST);
       const risks = a.risks.slice(0, 6).map(clip);
       risks.push(DEFAULT_RISK);
-      return { ok: true, response: { type: 'patch_proposal', summary: clip(a.summary), affectedPaths: [a.path], unifiedDiff: built.diff, tests, risks } };
+      return { ok: true, response: { type: 'patch_proposal', summary: clip(a.summary), affectedPaths: [path], unifiedDiff: built.diff, tests, risks } };
     }
 
     case 'action': {

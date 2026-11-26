@@ -154,7 +154,7 @@ export async function handleAssistantRequest(
     }
     if (outcome.aborted) return new Response(null, { status: 499 });
     if (!outcome.ok) {
-      liveLog(req.taskType, `failed=${outcome.code}`);
+      liveLog(req.taskType, `failed=${outcome.code} trace=${outcome.trace}`);
       return jsonError(outcome.status, outcome.code, outcome.message);
     }
     const final = noteRedaction(outcome.result, live.count);
@@ -163,7 +163,7 @@ export async function handleAssistantRequest(
       return jsonError(502, 'upstream_failure', 'The AI answer could not be checked.');
     }
     const meta = final.meta;
-    liveLog(req.taskType, `via=${meta?.provider} lighter=${meta?.lighter} failed=${(meta?.attempts ?? []).map((a) => `${a.provider}:${a.outcome}`).join(',') || 'none'}`);
+    liveLog(req.taskType, `via=${meta?.provider} lighter=${meta?.lighter} failed=${(meta?.attempts ?? []).map((a) => `${a.provider}:${a.outcome}`).join(',') || 'none'} trace=${outcome.trace}`);
     return new Response(JSON.stringify(final), { status: 200, headers: JSON_CT });
   }
 

@@ -83,7 +83,7 @@ Existing tests changed on purpose (design 4.3): `assistantApi` (GET now returns 
 - `openrouter/free` picks a random free model each time, so answer quality varies, and its "heavy" request is not stronger than its "light" one unless you set `OPENROUTER_MODEL_*`.
 - A busy provider is retried on the next request, because the server remembers nothing (no shared cool-down).
 - AI patches are limited to one file, one block of lines, at most 2,000 characters, and files whose line endings can be undone exactly. Bigger changes become a plan.
-- The model's JSON answer is checked strictly. A sloppy free model that adds an unknown field is treated as a bad answer, and the next model is tried. This is easy to loosen later if it causes too many fallbacks.
+- The model's JSON answer is checked strictly for the kind, the required fields, the files, and the edit lines. After the first real-key run (a Gemini answer was refused), unknown extra fields are now ignored and the output caps were raised (see the follow-up note below).
 - `undo` and `redo` were removed from the AI's action list after review (your decision): only you can change History.
 - `GET /api/assistant` tells anyone who can reach it whether each provider has a key (never the key or the model). Fine for a personal deployment; revisit before a public one.
 - The Edit pad's changes also end the saved answers (they change the practice copy).
@@ -110,3 +110,12 @@ Existing tests changed on purpose (design 4.3): `assistantApi` (GET now returns 
 2. Loosen the strict answer check if free models produce too many fallbacks?
 3. Open a pull request for `feat/live-ai-chat` into `main`? (The spec said to open one after L12. I have not, because you did not ask for it yet.)
 4. After your real-key check, decide whether 3A is accepted and whether to start 3B. I recommend nothing beyond: **3A built, 3B not started.**
+
+## 8. Follow-up after your first real-key run
+
+Step 10 gave "Gemini gave an answer PatchBay could not use." That means Gemini answered, but PatchBay could not read the answer. I could not see why (by design the server never logs answer text), so I made the reason visible and fixed the likely causes:
+
+- The error now says why in plain words, for example "(the answer was cut off)", "(it had the wrong fields)", or "(its edit did not fit the lines it was shown)". The terminal running `npm run dev` also prints `trace=gemini:bad_answer(<code word>)`. These are fixed words only, never text from the answer.
+- Most likely cause: the Gemini 3 models "think" before they answer and the thinking counts against the output cap, so the JSON was cut off. Caps raised from 700 / 1,200 to 1,500 / 3,000 tokens, and a cut-off answer is now reported as cut off.
+- Models often add extra fields or write the file as `./index.html`. Extra fields are now ignored (never copied) and `./x`, `/x`, `a/x` are accepted for the one selected file. A missing or null `new_text` deletes the lines.
+- Still refused: a wrong kind of answer, a file you did not select, edits outside the lines shown, anything that looks like a secret, and any action not on the list.

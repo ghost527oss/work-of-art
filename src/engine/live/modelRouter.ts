@@ -14,7 +14,8 @@ export interface Entry {
   lighterPart: boolean;
 }
 
-export interface Attempt { provider: AIProviderId; outcome: AIAttemptOutcome }
+/** `detail` is a fixed code word (for example `wrong_shape`), never text from an answer. It is for the server log and the error message only. */
+export interface Attempt { provider: AIProviderId; outcome: AIAttemptOutcome; detail?: string }
 
 /** Light jobs: explanations, finding reviews, safe actions. Heavy jobs: code-change proposals. */
 export function tierOf(taskType: AITaskType): Tier {
@@ -50,7 +51,7 @@ export function buildAttemptPlan(tier: Tier, env: LiveEnv): Entry[] {
 
 export type StepResult<T> =
   | { kind: 'ok'; value: T }
-  | { kind: 'fail'; outcome: AIAttemptOutcome }
+  | { kind: 'fail'; outcome: AIAttemptOutcome; detail?: string }
   | { kind: 'aborted' };
 
 export interface Clock { now(): number }
@@ -87,7 +88,7 @@ export async function runAttempts<T>(
     const r = await step(entry, Math.min(AI_LIVE.attemptTimeoutMs, remaining));
     if (signal?.aborted || r.kind === 'aborted') return { kind: 'aborted' };
     if (r.kind === 'ok') return { kind: 'ok', entry, value: r.value, attempts };
-    attempts.push({ provider: entry.provider, outcome: r.outcome });
+    attempts.push({ provider: entry.provider, outcome: r.outcome, ...(r.detail !== undefined ? { detail: r.detail } : {}) });
     if (r.outcome === 'rate_limited' || r.outcome === 'key_rejected') skipped.add(entry.provider);
   }
   const allBusy = attempts.length > 0 && attempts.every((a) => a.outcome === 'rate_limited');

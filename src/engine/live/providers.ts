@@ -5,7 +5,7 @@ import { AI_LIVE } from '../../config/aiLive';
 import { PROVIDERS, isValidModelName, type AIProviderId } from '../../config/aiProviders';
 
 export type CallFailure = 'rate_limited' | 'timeout' | 'error' | 'key_rejected' | 'aborted';
-export type CallResult = { ok: true; text: string } | { ok: false; outcome: CallFailure };
+export type CallResult = { ok: true; text: string; truncated?: boolean } | { ok: false; outcome: CallFailure };
 
 export interface CallArgs {
   provider: AIProviderId;
@@ -77,7 +77,7 @@ function buildRequest(args: CallArgs): { url: string; headers: Record<string, st
   };
 }
 
-function extractText(provider: AIProviderId, json: unknown): string | undefined {
+function extractText(provider: AIProviderId, json: unknown): { text: string; truncated: boolean } | undefined {
   const j = json as Record<string, unknown> | null;
   if (!j || typeof j !== 'object') return undefined;
   if (provider === 'gemini') {
@@ -86,12 +86,14 @@ function extractText(provider: AIProviderId, json: unknown): string | undefined 
     const parts = (cands[0] as { content?: { parts?: unknown } } | undefined)?.content?.parts;
     if (!Array.isArray(parts)) return undefined;
     const text = parts.map((p) => (p && typeof (p as { text?: unknown }).text === 'string' ? (p as { text: string }).text : '')).join('');
-    return text === '' ? undefined : text;
+    const finish = (cands[0] as { finishReason?: unknown }).finishReason;
+    return text === '' ? undefined : { text, truncated: finish === 'MAX_TOKENS' };
   }
   const choices = j.choices;
   if (!Array.isArray(choices) || choices.length === 0) return undefined;
   const content = (choices[0] as { message?: { content?: unknown } } | undefined)?.message?.content;
-  return typeof content === 'string' && content !== '' ? content : undefined;
+  const finish = (choices[0] as { finish_reason?: unknown } | undefined)?.finish_reason;
+  return typeof content === 'string' && content !== '' ? { text: content, truncated: finish === 'length' } : undefined;
 }
 
 export async function callProvider(args: CallArgs): Promise<CallResult> {
@@ -120,8 +122,8 @@ export async function callProvider(args: CallArgs): Promise<CallResult> {
     if (bodyText === undefined) return { ok: false, outcome: 'error' };
     let json: unknown;
     try { json = JSON.parse(bodyText); } catch { return { ok: false, outcome: 'error' }; }
-    const text = extractText(args.provider, json);
-    return text === undefined ? { ok: false, outcome: 'error' } : { ok: true, text };
+    const got = extractText(args.provider, json);
+    return got === undefined ? { ok: false, outcome: 'error' } : { ok: true, text: got.text, ...(got.truncated ? { truncated: true } : {}) };
   } catch {
     if (args.signal?.aborted) return { ok: false, outcome: 'aborted' };
     if (timedOut) return { ok: false, outcome: 'timeout' };

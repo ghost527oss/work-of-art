@@ -23,7 +23,7 @@ describe('AI_LIVE limits', () => {
   });
   it('matches design 7.3', () => {
     expect(AI_LIVE).toMatchObject({
-      maxPromptChars: 12000, maxOutputTokensLight: 700, maxOutputTokensHeavy: 1200, maxProviderBodyBytes: 65536,
+      maxPromptChars: 12000, maxOutputTokensLight: 1500, maxOutputTokensHeavy: 3000, maxProviderBodyBytes: 65536,
       maxCards: 2, maxCardChars: 700, wholeFileMaxBytes: 2048, windowLinesBefore: 15, windowLinesAfter: 15,
       windowMaxLines: 80, windowMaxBytes: 6144, headLines: 60, maxConnections: 3, maxEdits: 3, maxEditNewLines: 40,
       cacheMaxEntries: 30, cacheMaxBytes: 262144, maxAttemptsPerFinding: 3, maxFindingsListed: 50,

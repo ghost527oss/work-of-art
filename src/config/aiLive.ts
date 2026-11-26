@@ -10,8 +10,9 @@ export const AI_LIVE = {
   /** No new attempt starts when less than this remains. */
   minAttemptMs: 1500,
   maxPromptChars: 12000,
-  maxOutputTokensLight: 700,
-  maxOutputTokensHeavy: 1200,
+  // Reasoning models spend part of this on thinking before the JSON answer, so the caps are generous.
+  maxOutputTokensLight: 1500,
+  maxOutputTokensHeavy: 3000,
   maxProviderBodyBytes: 64 * 1024,
   maxCards: 2,
   maxCardChars: 700,

@@ -61,8 +61,7 @@ describe('parseAnswer: explanation and clarification', () => {
 describe('parseAnswer: bad answers', () => {
   const reason = (text: string, request = req()) => { const r = parseAnswer(text, request, 'groq'); return r.ok ? 'ok' : r.reason; };
   it('not JSON', () => expect(reason('I cannot do that')).toBe('not_json'));
-  it('wrong shape: extra field, missing field, wrong type, unknown kind, empty summary', () => {
-    expect(reason(json({ kind: 'explanation', summary: 'S', surprise: 1 }))).toBe('wrong_shape');
+  it('wrong shape: missing field, wrong type, unknown kind, empty summary', () => {
     expect(reason(json({ kind: 'explanation' }))).toBe('wrong_shape');
     expect(reason(json({ kind: 'explanation', summary: 5 }))).toBe('wrong_shape');
     expect(reason(json({ kind: 'novel', summary: 'S' }))).toBe('wrong_shape');
@@ -279,5 +278,37 @@ describe('parseAnswer: patch', () => {
     expect(one({ start_line: 1.5, end_line: 2, new_text: 'x' })).toEqual({ ok: false, reason: 'wrong_shape' });
     const four = Array.from({ length: 4 }, (_, i) => ({ start_line: 2 * i + 1, end_line: 2 * i + 1, new_text: 'z' }));
     expect(parseAnswer(patch(four), withSnippet(), 'groq')).toEqual({ ok: false, reason: 'wrong_shape' });
+  });
+});
+
+describe('parseAnswer: tolerant where it is safe (found with real models)', () => {
+  const one = (edits: unknown, path = 'src/a.ts') => parseAnswer(JSON.stringify({ kind: 'patch', summary: 'fix', path, edits, extra: 'ignored' }), withSnippet(), 'gemini');
+  it('unknown extra fields are ignored and never copied into the result', () => {
+    const r = parseAnswer(JSON.stringify({ kind: 'explanation', summary: 'S', surprise: 'SMUGGLED', cards_covered: true }), req(), 'gemini');
+    expect(r.ok).toBe(true);
+    expect(JSON.stringify(r)).not.toContain('SMUGGLED');
+    const p = one([{ start_line: 3, end_line: 3, new_text: 'x', note: 'SMUGGLED' }]);
+    expect(p.ok).toBe(true);
+    expect(JSON.stringify(p)).not.toContain('SMUGGLED');
+  });
+  it('the one selected file may be written ./index.ts, /index.ts, or a/index.ts, but no other file', () => {
+    const e = [{ start_line: 3, end_line: 3, new_text: 'changed' }];
+    for (const p of ['src/a.ts', './src/a.ts', '/src/a.ts', 'a/src/a.ts', 'b/src/a.ts']) {
+      const r = one(e, p);
+      expect(r.ok, p).toBe(true);
+      expect(r.ok && r.response.type === 'patch_proposal' && r.response.affectedPaths).toEqual(['src/a.ts']);
+    }
+    for (const p of ['src/b.ts', '../src/a.ts', 'x/src/a.ts', '']) expect(one(e, p).ok, p).toBe(false);
+  });
+  it('a missing or null new_text deletes the lines', () => {
+    for (const edit of [{ start_line: 3, end_line: 3, new_text: null }, { start_line: 3, end_line: 3 }]) {
+      const r = one([edit]);
+      expect(r.ok).toBe(true);
+      expect(r.ok && r.response.type === 'patch_proposal' && r.response.unifiedDiff).toContain('-line 3');
+    }
+  });
+  it('the unknown kind and a missing summary are still refused', () => {
+    expect(parseAnswer(JSON.stringify({ kind: 'novel', summary: 's' }), req(), 'groq')).toEqual({ ok: false, reason: 'wrong_shape' });
+    expect(parseAnswer(JSON.stringify({ kind: 'explanation' }), req(), 'groq')).toEqual({ ok: false, reason: 'wrong_shape' });
   });
 });

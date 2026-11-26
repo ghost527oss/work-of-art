@@ -206,8 +206,8 @@ export const AI_LIVE = {
   totalBudgetMs: 14000,          // whole request, inside the 15 s browser timeout (about 1 s to spare)
   minAttemptMs: 1500,            // stop starting attempts below this
   maxPromptChars: 12000,
-  maxOutputTokensLight: 700,
-  maxOutputTokensHeavy: 1200,
+  maxOutputTokensLight: 1500,   // raised from 700 after the first real-key run: reasoning models spend part of the cap thinking
+  maxOutputTokensHeavy: 3000,   // raised from 1200
   maxProviderBodyBytes: 64 * 1024,
   maxCards: 2,
   maxCardChars: 700,
