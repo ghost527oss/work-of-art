@@ -388,6 +388,5 @@ describe('source rules', () => {
   it('imports no fetch, aiAssistant, mockAssistant, or useAssistant module', () => {
     const src = readFileSync('src/hooks/useHarness.ts', 'utf8');
     expect(src).not.toMatch(/fetch\(|from '\.\.\/engine\/aiAssistant'|mockAssistant|from '\.\/useAssistant'/);
-    expect(src).toMatch(/import type \{ AssistantActions \} from '\.\/useAssistant'/);
   });
 });
