@@ -1,4 +1,6 @@
 // @node: F1.7
+// @node: F5.8 (the classifying stage runs inside the loading run)
+// @node: F10.4 (restore: start a saved target as a foreground load)
 // Owns the AbortController for the current ingestion run, calls the ingestion service,
 // and dispatches the results to the store. Components call these actions; they never
 // touch the network or the controller themselves.
@@ -13,7 +15,11 @@ import { parseRepoInput } from '../engine/repoUrl';
 import { isSampleId, type SampleId } from '../data/sampleRepos';
 import {
   applyEvent,
+  beginClassifying,
   beginIngestion,
+  classifyProgressed,
+  finishClassifying,
+  withLog,
   cancelIngestion,
   completeIngestion,
   dismissError,
@@ -25,6 +31,13 @@ import {
   type StudioState,
 } from '../store/useStudioStore';
 import type { ApiError, IngestEvent, RepoRequest, RepoSnapshot } from '../types/contracts';
+import { AnalysisAbortError, analyzeProject, type AnalyzeOptions } from '../engine/analyzeProject';
+import type { AnalysisResult, Label } from '../engine/understandTypes';
+import { browserStorage } from '../store/layoutStorage';
+import { loadCorrectionsFor } from '../store/correctionsStorage';
+import { understandingDone, understandingFailed } from '../store/understandingSlice';
+import { doneMessage } from '../store/understandingActions';
+import { toIngestTarget, validateTarget, type SessionTarget } from '../store/sessionRecord';
 
 export interface IngestionActions {
   /** Parses and validates the text, then starts a run. Returns an error message, or null when a run started. */
@@ -36,15 +49,27 @@ export interface IngestionActions {
   cancel(): void;
   dismissError(): void;
   backToStart(): void;
+  /** 2G. Validates a saved session target like the Start screen does and starts it as a foreground load. Returns an error message, or null when a run started. */
+  restore(target: SessionTarget): string | null;
 }
 
 export interface IngestionServices {
   ingestRepository(request: RepoRequest, options: { signal: AbortSignal; onEvent: (e: IngestEvent) => void }): Promise<RepoSnapshot>;
   ingestSample(id: SampleId, options: { signal: AbortSignal; onEvent: (e: IngestEvent) => void }): Promise<RepoSnapshot>;
   now(): number;
+  /** Optional. When missing, the classifying stage is skipped and loading behaves as before. */
+  analyze?(snapshot: RepoSnapshot, options: AnalyzeOptions): Promise<AnalysisResult>;
+  /** Optional. Never throws. */
+  loadCorrections?(snapshot: RepoSnapshot): Record<string, Label[]>;
 }
 
-const defaultServices: IngestionServices = { ingestRepository, ingestSample, now: () => Date.now() };
+const defaultServices: IngestionServices = {
+  ingestRepository,
+  ingestSample,
+  now: () => Date.now(),
+  analyze: analyzeProject,
+  loadCorrections: (snapshot) => loadCorrectionsFor(browserStorage(), snapshot),
+};
 
 export interface IngestionController {
   actions: IngestionActions;
@@ -93,7 +118,7 @@ export function createIngestionController(
           };
           snapshot = await services.ingestRepository(request, { signal: controller.signal, onEvent });
         }
-        store.update((s) => completeIngestion(s, runId, snapshot, services.now()));
+        await classifyAndComplete(snapshot, runId, controller.signal);
       } catch (error) {
         if (isAbortError(error)) return; // a cancel or dispose action already updated the state
         store.update((s) => failIngestion(s, runId, toApiError(error), services.now()));
@@ -101,6 +126,43 @@ export function createIngestionController(
         if (current === controller) current = null;
       }
     })();
+  }
+
+  /** The classifying stage, then ONE completion update carrying the snapshot, the result, and the corrections. */
+  async function classifyAndComplete(snapshot: RepoSnapshot, runId: number, signal: AbortSignal): Promise<void> {
+    if (!services.analyze) {
+      store.update((s) => finishClassifying(s, runId, 'skipped'));
+      store.update((s) => completeIngestion(s, runId, snapshot, services.now()));
+      return;
+    }
+    store.update((s) => beginClassifying(s, runId));
+    let corrections: Record<string, Label[]> = {};
+    try {
+      corrections = services.loadCorrections?.(snapshot) ?? {};
+    } catch {
+      corrections = {};
+    }
+    try {
+      const result = await services.analyze(snapshot, {
+        signal,
+        onProgress: (p) => store.update((s) => classifyProgressed(s, runId, p.done, p.total)),
+      });
+      if (signal.aborted) throw new AnalysisAbortError();
+      store.update((s) => finishClassifying(s, runId, 'done'));
+      const now = services.now();
+      store.update((s) => {
+        const next = completeIngestion(s, runId, snapshot, now, understandingDone(result, corrections));
+        return next === s ? s : { ...next, ...withLog(next, now, { action: 'understanding_done', status: 'info', message: doneMessage(result, corrections) }) };
+      });
+    } catch (error) {
+      if (isAbortError(error) || signal.aborted) throw error;
+      store.update((s) => finishClassifying(s, runId, 'failed'));
+      const now = services.now();
+      store.update((s) => {
+        const next = completeIngestion(s, runId, snapshot, now, understandingFailed('The analysis could not finish.', corrections));
+        return next === s ? s : { ...next, ...withLog(next, now, { action: 'understanding_failed', status: 'failed', message: 'Analysis failed.' }) };
+      });
+    }
   }
 
   const actions: IngestionActions = {
@@ -134,6 +196,12 @@ export function createIngestionController(
     backToStart() {
       current?.abort();
       store.update((s) => reset(s));
+    },
+    restore(target) {
+      const problem = validateTarget(target);
+      if (problem) return problem;
+      run(toIngestTarget(target), false);
+      return null;
     },
   };
 

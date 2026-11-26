@@ -1,0 +1,87 @@
+// @node: F3.4
+// @node: F6.11 (live Screen 5 when `live` is given; otherwise the 2A empty page)
+// @node: F9.10 (Learn more passed to the finding detail)
+// @node: F10.5 (the scan also starts when Screen 5 opens, so a restore straight to Screen 5 has findings)
+// Screen 5 (Domain Debugging): one area. No toolbar here.
+import { useEffect, useState } from 'react';
+import { areaCounts, findingsForArea, mergedFindings } from '../engine/scanView';
+import { isScanStale } from '../hooks/useScan';
+import type { HarnessActions } from '../hooks/useHarness';
+import type { ScanActions } from '../hooks/useScan';
+import { areaLabel, type AreaId } from '../store/shellView';
+import { useStudioStore } from '../store/useStudioStore';
+import { ChangesMade } from './ChangesMade';
+import { CommandBar } from './CommandBar';
+import { CrewNarration } from './CrewNarration';
+import { FindingDetail } from './FindingDetail';
+import { FindingsTable } from './FindingsTable';
+import { ProposalCard } from './ProposalCard';
+import { RequestTrace } from './RequestTrace';
+
+export interface LiveDomain {
+  harness: HarnessActions;
+  onOpened(): void;
+  /** 2F: opens the finding's lesson in the Journal on Screen 3. */
+  onLearnMore?(lessonId: string): void;
+  /** 2G: when given, Screen 5 starts the scan like Screen 4 does. */
+  scan?: ScanActions;
+}
+
+export interface DomainScreenProps {
+  area: AreaId;
+  onBackToSkeleton(): void;
+  onBackToStudio(): void;
+  live?: LiveDomain;
+}
+
+function LiveScreen5({ area, live }: { area: AreaId; live: LiveDomain }) {
+  const state = useStudioStore((s) => s);
+  const [selected, setSelected] = useState<string | undefined>();
+  const analysisStatus = state.understanding.status;
+  const snapshotId = state.snapshot?.id;
+  useEffect(() => {
+    live.scan?.ensure();
+  }, [live.scan, analysisStatus, snapshotId]);
+  const result = state.scan.result;
+  const merged = mergedFindings(state);
+  const findings = findingsForArea(merged, area);
+  const counts = areaCounts(merged).byArea[area];
+  const selectedFinding = findings.find((f) => f.id === selected);
+  const lines = state.log.filter((e) => e.action === `crew_${area}`);
+  const proposal = state.work.proposal;
+  const proposalArea = proposal?.findingId ? merged.find((f) => f.id === proposal.findingId)?.primary : undefined;
+  return (
+    <>
+      <CommandBar onSubmit={live.harness.submitText} replies={state.work.chat} onOpened={live.onOpened} />
+      <p>{state.scan.status === 'done' ? `High ${counts.high}, Medium ${counts.medium}, Low ${counts.low}.` : 'No scan result yet.'}</p>
+      {result && isScanStale(state) && <p className="partial">Out of date: labels changed. Open Skeleton Crew and press Scan again.</p>}
+      {result?.partial && <p className="partial">Partial result: {result.partialReasons.join(' ')}</p>}
+      <FindingsTable area={area} findings={findings} selectedId={selected} onDetails={setSelected} />
+      {selectedFinding && <FindingDetail finding={selectedFinding} onLearnMore={live.onLearnMore} />}
+      <CrewNarration entries={lines} limit={30} />
+      {proposal && proposalArea === area && (
+        <ProposalCard proposal={proposal} onApprove={() => live.harness.run('approve')} onReject={() => live.harness.run('reject')} />
+      )}
+      <ChangesMade entries={state.work.applied.filter((e) => e.area === area)} />
+      {area === 'api_data' && state.understanding.result && <RequestTrace edges={state.understanding.result.edges} />}
+    </>
+  );
+}
+
+export function DomainScreen({ area, onBackToSkeleton, onBackToStudio, live }: DomainScreenProps) {
+  return (
+    <section className="screen-right" aria-labelledby="domain-heading">
+      <h1 id="domain-heading">{areaLabel(area)}</h1>
+      {!live && <p>Findings and live debugging arrive in sub-phase 2D.</p>}
+      <p>
+        <button type="button" onClick={onBackToSkeleton}>
+          Back to Skeleton Crew
+        </button>{' '}
+        <button type="button" onClick={onBackToStudio}>
+          Back to Studio
+        </button>
+      </p>
+      {live && <LiveScreen5 area={area} live={live} />}
+    </section>
+  );
+}

@@ -69,3 +69,85 @@ The endpoint:
 
 
 Verified by automated tests and by a headless-browser run. **Not yet verified:** a real Vercel deployment (including request cancellation), branch names containing `/` on the tree endpoint, and a physical phone.
+
+## Studio shell (Phase 2, sub-phase 2A)
+
+After a repository or sample loads, the Studio has a left area (a Sandbox placeholder and Project info) and a vertical toolbar on the far right edge with six buttons: Edit, AI Chat, Log, History, Journal, and Skeleton Crew. The first five open a panel on the right (one at a time). A panel can collapse to a thin strip, switch between a narrow and a wide width, and close. Skeleton Crew opens an empty Screen 4, whose four area buttons open an empty Screen 5. The toolbar is hidden on both. The panel layout is saved in browser storage under `patchbay.studio-layout.v1` (four fields, no repository data). After a refresh the app returns to the Start screen; the saved layout is used the next time a repository loads.
+
+## Action harness (Phase 2, sub-phase 2B)
+
+AI Chat now understands a short list of command words. Typing exactly one of them runs it instead of sending a request to the AI. Three or more words always go to the AI.
+
+| Command | What it does |
+|---|---|
+| `help`, `status` | List the commands, or show the mode, the run, and the change counts. |
+| `start` | Start the **practice run (no AI)**: a fixed script of up to 8 steps that reads the loaded repository and proposes one practice comment line per file. |
+| `pause`, `resume`, `step` | Stop the run moving on by itself, let it move again, or run one step while paused. |
+| `stop` | End the run, reject a waiting proposal, and cancel a pending AI request. A Stop button is always visible at the top. |
+| `approve`, `reject` | Decide the waiting proposal (also buttons on the proposal card). Approving changes only an in-memory practice copy, never your repository. |
+| `undo`, `redo` | Take back or re-apply the last practice change (only while paused or idle). |
+| `open edit`, `open chat`, `open log`, `open history`, `open journal` | Open a panel. Opening Edit pauses the run; closing it does not resume. |
+| `reset` | Clear the run, History, Log, and the saved work. |
+
+The work (run, waiting proposal, History, last 200 Log lines) is saved for one repository under `patchbay.work.v1`: diffs of the practice line and short fingerprints only, never file contents, AI text, chat replies, or secrets. After a refresh, loading the same repository restores it (a running run comes back paused). If a file changed, the saved changes are discarded and the Log says so. Loading a different repository leaves the saved work alone until the next change, which replaces it.
+
+## Project understanding (Phase 2, sub-phase 2C)
+
+When a repository finishes loading, the app now runs an offline analysis (no AI, no network) as the real "Classify files" loading stage. The result appears in Project info as **Project understanding**:
+
+- Every file gets one or more labels (Frontend, Backend, Shared, APIs & Data, Images and fonts, Settings, Tests, Docs, Infrastructure), a confidence, and plain reasons that name the skill-book rule that fired. Files with no clue go to **Needs Review** instead of being guessed.
+- A connection map lists imports, page loads, routes, API calls, outside calls, and setting reads, each marked **Confirmed**, **Inferred**, or **Broken** in words. JavaScript, TypeScript, HTML, CSS, and basic Python are read; other languages are listed as not scanned.
+- Limits (2,000 files, 200 connections per file, 5,000 in total, 8 seconds) mark the result **Partial** with a reason.
+- You can set the labels of any file. Corrections are saved per repository under `patchbay.corrections.v1` (paths and label names only) and restored when the same repository loads again. **Clear my label corrections** removes them. The Security row reads "pending scan (2D)" until the scanner exists.
+
+## Scanner and Skeleton Crew (Phase 2, sub-phase 2D)
+
+Skeleton Crew (Screen 4) scans the loaded files offline with 16 checks (no AI, no network) and groups findings into four areas: Frontend, Backend, Security, and APIs & Data. Every finding shows the file, the lines, a redacted snippet, a plain explanation, why it matters, and whether it was **Found** or only **Possible**. There are no scores. A clean scan never says the project is secure: the page lists what was and was not checked.
+
+- **Screen 4:** a map of the four areas with real counts and links, four worker boxes (workers take turns), a **Start Crew** button, a command box, and a "What was and was not checked" list.
+- **Screen 5:** one area with its findings table, a Details view, the crew narration, the pending proposal card, the changes made, and (for APIs & Data) the request trace.
+- **`start crew`** (or the button) runs the crew through the findings with the same controls as the practice run (`pause`, `resume`, `step`, `stop`, Edit auto-pause). Only one fix exists, **Auto-supported**: adding `rel="noopener noreferrer"` to a link. It is offered only when it applies exactly, the check no longer fires, nothing new appears, and the change holds no secret. You approve or reject it; it changes only the in-memory practice copy.
+- Approving, undoing, or redoing re-checks the affected file in the same update. The crew run and its proposal are never saved; applied fixes come back through History.
+
+## Sandbox preview (Phase 2, sub-phase 2E-1)
+
+The left area of the Studio (and of Screens 4 and 5) now shows a **Sandbox** panel with a preview of the project, in one of three modes that PatchBay chooses and explains ("Mode: ... Why: ..."):
+
+- **Live Static Preview**: a plain HTML project is shown as the browser would see it, with scripts off. Widths 375, 768, 1024, and Fit are available.
+- **Component Workbench**: for React, Vue, and Svelte projects, an approximate picture is read from the source (nothing is run, expressions show as dashed `{...}` boxes).
+- **Source Inspection**: files grouped by label with a redacted, numbered viewer.
+
+The preview is a locked iframe built from `srcdoc` by an allowlist re-serializer: it writes a new document with only allowed tags and attributes, every value escaped, outside addresses blocked, and images shown as placeholders. The sandbox is exactly `allow-same-origin` (look-only, no script can run) or exactly `allow-scripts` (an opaque origin with no access to PatchBay's page or storage), never both, with a content policy that blocks every request the browser lets a policy block. **Run scripts** needs a confirmation and is only offered for static pages. A script that sends its own frame to another address is detected and the preview is reset (the browser may already have made that one request); a script can also freeze the tab with an endless loop.
+
+**Check layout** measures the look-only preview and adds measured findings ("Text that does not fit its box") next to the 2D findings, with the measured numbers and widths. The Skeleton Crew narrates them under Frontend. Nothing from the preview is saved.
+
+## Edit pad (Phase 2, sub-phase 2E-2)
+
+The **Edit** panel (Screen 3) is now an edit pad for the page in the Sandbox. Opening it pauses the practice run as before and turns preview scripts off. A clear overlay covers the preview so no page code ever gets your clicks.
+
+- **Select** (click, Shift-click to add), **Lasso** (drag a box), **Background** (the page's top-level elements), or **Pick from list** (no pointer needed). One selected element shows three drag handles to resize it.
+- The property form covers size, corners, spacing, border, shadow, text, and background (colours and a gradient). Every value is built from checked numbers, units, and colours; there is no free-form CSS anywhere.
+- On a plain HTML page, a change to an element whose start tag can be rewritten safely is **written to the practice copy at once** as a `style` change and recorded in History (no Approve step). A burst of changes to the same elements merges into one entry; one Undo reverses the burst. Everything else (component pictures, complex styles, SVG, a page that changed) is **Preview Only**, listed with the reason, and never saved.
+- After each change the layout is checked again; **Try a fix** proposes one of three fixed suggestions you can Keep or Discard. Undo and Redo buttons do exactly what the typed commands do.
+
+## Journal and exports (Phase 2, sub-phase 2F)
+
+The **Journal** toolbar button opens the Learning Journal. It explains how the loaded project works and what PatchBay found, at three reading levels (**Simple**, **Practical**, **Deeper**; the choice is saved). The Log still shows what PatchBay did.
+
+- **Application overview**, **How things flow** (page, request, route, and setting traces that stop with a plain reason when PatchBay cannot see further), **Lessons from your project** (one lesson per check that found something, with the files and lines), and **Concepts** (12 short explanations). **Open in viewer** shows a file in the Sandbox's Source viewer with the line marked. **Learn more** on a finding (Screen 5) jumps to its lesson.
+- All teaching text lives in one structured file, `src/skillbook/playbook.ts` (cards with tags, keywords, and three levels, checked by tests). Lookups (`cardById`, `cardsForSkill`, `cardsByTag`, `searchCards`) are ready for the Phase 3 AI. No AI is used now.
+- Nothing in the Journal or the downloads comes from file contents: only paths, names, counts, and fixed text. Every fact goes through the secret redaction first.
+- **Export changes** (History panel) downloads a `.patch` of your applied changes, one combined diff per file, made against the files as PatchBay loaded them. Apply it in your own project with `git apply <file>`. Files with practice-run changes are unchecked by default; files that were only partly read, have unusual path characters, contain a likely secret, or cannot be verified are left out with the reason. Preview Only changes are never exported.
+- The **Log** panel downloads the log as Markdown or JSON (redacted, no file contents). The Journal downloads as Markdown at the current level.
+- Downloads are made in the browser only. Nothing is uploaded.
+
+## Saving and resetting a session (Phase 2, sub-phase 2G)
+
+A browser refresh is harmless. PatchBay remembers **where you were**, not what the files contain: a small record (`patchbay.session.v1`) holds the repository address (owner, name, ref, chosen folders, or the sample), the screen, and the Sandbox width, mode, and page. After a refresh the Loading screen says "Restoring your session", loads the same repository again, and puts back the screen, the Sandbox settings, the panel layout, your History and edits, the Log, a paused practice run, your label corrections, and the reading level.
+
+- Not restored, on purpose: Preview Only changes, the selection, scripts turned on, a Skeleton Crew run in progress, AI Chat text, and the scan (it runs again). The Log says so when it matters.
+- If the repository cannot be loaded again (offline, rate limited, private), the failure panel keeps everything and offers Retry, Reset session, and Back to Start. Cancel during a restore goes to Start with **Resume last session**.
+- **Back to Start** forgets the session record but keeps your History and corrections for that repository. **Reset session** (it asks first) deletes the session, History, Log, and corrections in this browser and keeps your layout and reading level. Your repository is never changed.
+- **Saved in this browser** (Start screen and Project info) lists the five saved parts with their sizes. PatchBay never saves file contents, secrets, or what you type to the AI.
+- Known limits: every refresh downloads the repository again (GitHub limits apply; samples cost nothing); a branch that moved since drops your saved changes to files that changed; two tabs overwrite each other (last write wins).
+

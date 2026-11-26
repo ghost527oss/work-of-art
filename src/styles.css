@@ -210,3 +210,493 @@ textarea {
   font: inherit;
   resize: vertical;
 }
+
+/* @node: F3.3 — Studio shell (sub-phase 2A). Black and white only, no transition, no animation. */
+.shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.shell-left {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.shell-panel {
+  flex: 0 0 auto;
+  overflow: auto;
+  border-left: 2px solid #000;
+  padding: 0.5rem 1rem;
+}
+
+.shell-panel[hidden],
+.panel-body[hidden] {
+  display: none;
+}
+
+.panel-narrow {
+  width: 22rem;
+}
+
+.panel-wide {
+  width: 40rem;
+}
+
+.panel-collapsed {
+  width: 3.5rem;
+  padding: 0.5rem 0.25rem;
+}
+
+.panel-header h2 {
+  display: block;
+  margin: 0 0 0.5rem;
+}
+
+.toolbar {
+  flex: 0 0 5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-left: 2px solid #000;
+  padding: 0.25rem;
+  overflow: auto;
+}
+
+.toolbar button {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.25rem;
+  font-size: 0.8rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+[aria-pressed='true'] {
+  border-width: 4px;
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.panel-header button {
+  min-height: 44px;
+}
+
+@media (max-width: 40rem) {
+  .shell-panel.panel-narrow,
+  .shell-panel.panel-wide {
+    width: auto;
+    flex: 1;
+  }
+  .shell-panel.panel-collapsed {
+    flex: 0 0 auto;
+    width: 3.5rem;
+  }
+  .shell-left.covered {
+    display: none;
+  }
+}
+
+/* @node: F3.4 — Sandbox placeholder and Screens 4 and 5 (sub-phase 2A). Black and white only. */
+.sandbox-placeholder {
+  border: 2px dashed #000;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.screen-right {
+  flex: 0 0 auto;
+  width: 40rem;
+  max-width: 100%;
+  overflow: auto;
+  border-left: 2px solid #000;
+  padding: 1rem;
+}
+
+@media (max-width: 40rem) {
+  .screen-right {
+    width: auto;
+    flex: 1;
+  }
+}
+
+/* @node: F4.8 — Action harness (sub-phase 2B): stop bar, proposal card, history, replies. Black and white only. */
+.stop-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  border-bottom: 2px solid #000;
+  background: #fff;
+  color: #000;
+  padding: 0.5rem 1rem;
+  overflow-wrap: anywhere;
+}
+
+.stop-bar .stop-button {
+  min-height: 44px;
+  min-width: 44px;
+  border: 3px solid #000;
+  font-weight: bold;
+}
+
+.proposal-card {
+  border: 2px solid #000;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.proposal-card .button-row button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.diff-block {
+  border: 1px solid #000;
+  padding: 0.5rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.history-list {
+  padding-left: 1.25rem;
+}
+
+.chat-replies {
+  padding-left: 1.25rem;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.chat-replies .refused {
+  font-style: italic;
+}
+
+.studio-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.studio-root > .shell {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+/* @node: F5.10 — Project understanding (sub-phase 2C). Black and white only. */
+.understanding details {
+  border: 1px solid #000;
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.5rem;
+}
+
+.understanding details > div,
+.understanding .table-scroll {
+  max-height: 24rem;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.understanding table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.understanding th,
+.understanding td {
+  border: 1px solid #000;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.understanding .filters label {
+  display: inline-block;
+  margin-right: 0.5rem;
+}
+
+.understanding .partial {
+  border: 2px solid #000;
+  padding: 0.5rem;
+}
+
+.understanding button,
+.understanding select,
+.understanding input[type='text'] {
+  min-height: 44px;
+}
+
+.label-editor fieldset {
+  border: 2px solid #000;
+}
+
+/* @node: F6.10 — Skeleton Crew screens (sub-phase 2D). Black and white only. */
+.area-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.area-box {
+  border: 2px solid #000;
+  padding: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.screen-right .table-scroll {
+  max-height: 24rem;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.screen-right table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.screen-right th,
+.screen-right td {
+  border: 1px solid #000;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.screen-right button,
+.screen-right input[type='text'] {
+  min-height: 44px;
+}
+
+.finding-detail {
+  border: 2px solid #000;
+  padding: 0.5rem;
+}
+
+.command-bar {
+  border: 1px solid #000;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* @node: F7.9 — Sandbox panel (sub-phase 2E-1). Its own controls are black and white; the project's page inside the frame shows its own styles. */
+.sandbox {
+  border: 2px solid #000;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  max-height: 28rem;
+  overflow: auto;
+}
+
+.sandbox button,
+.sandbox select,
+.sandbox input[type='text'] {
+  min-height: 44px;
+}
+
+.preview-frame-box {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid #000;
+}
+
+.preview-frame-box iframe {
+  display: block;
+  height: 20rem;
+  border: 0;
+  background: #fff;
+}
+
+.preview-toolbar {
+  margin-bottom: 0.5rem;
+}
+
+/* @node: F7.9 — Sandbox panel (sub-phase 2E-1). Its own controls are black and white; the project's page inside the frame shows its own styles. */
+.sandbox {
+  border: 2px solid #000;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  max-height: 28rem;
+  overflow: auto;
+}
+
+.sandbox button,
+.sandbox select,
+.sandbox input[type='text'] {
+  min-height: 44px;
+}
+
+.preview-frame-box {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid #000;
+}
+
+.preview-frame-box iframe {
+  display: block;
+  height: 20rem;
+  border: 0;
+  background: #fff;
+}
+
+.preview-toolbar {
+  margin-bottom: 0.5rem;
+}
+
+/* @node: F8.7 — Edit pad and overlay (sub-phase 2E-2). Black, white, and dashes only. */
+.edit-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.edit-outline,
+.edit-lasso {
+  position: absolute;
+  border: 2px dashed #000;
+  box-shadow: 0 0 0 1px #fff;
+  pointer-events: none;
+}
+
+.edit-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid #000;
+}
+
+.edit-tools button,
+.property-form button,
+.property-form input,
+.property-form select {
+  min-height: 44px;
+}
+
+.property-form details {
+  border: 1px solid #000;
+  margin: 0.25rem 0;
+  padding: 0.25rem 0.5rem;
+}
+
+.link-button {
+  border: 0;
+  background: #fff;
+  text-decoration: underline;
+}
+
+.property-form input,
+.property-form select,
+.edit-tools select {
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+}
+
+/* @node: F9.9 Journal and export UI (black and white only) */
+.journal-panel details {
+  border: 1px solid #000;
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.5rem;
+}
+
+.journal-panel summary,
+.export-changes summary {
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.fold-title {
+  display: inline;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.level-picker button,
+.journal-panel button,
+.export-changes button,
+.log-export button {
+  min-height: 44px;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+}
+
+.level-picker button[aria-pressed='true'] {
+  background: #000;
+  color: #fff;
+}
+
+.journal-flows select {
+  max-width: 100%;
+  min-height: 44px;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+}
+
+.journal-panel code,
+.export-changes code {
+  overflow-wrap: anywhere;
+}
+
+.export-changes table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.export-changes th,
+.export-changes td {
+  border: 1px solid #000;
+  padding: 0.25rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.export-changes input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+}
+
+/* @node: F10.6 Session restore parts (black and white only) */
+.resume-banner,
+.saved-data {
+  border: 1px solid #000;
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+  background: #fff;
+  color: #000;
+}
+
+.saved-data summary {
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.resume-banner button,
+.saved-data button,
+.reset-confirm button,
+.reset-session {
+  min-height: 44px;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+}
+
+.reset-confirm {
+  display: inline-block;
+  border: 2px solid #000;
+  padding: 0.25rem 0.5rem;
+}
+
+.saved-data code {
+  overflow-wrap: anywhere;
+}

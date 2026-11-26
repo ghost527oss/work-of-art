@@ -376,3 +376,24 @@ describe('backToStart', () => {
     expect(store.getState().snapshot).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 2G (@node: F10.4): restore(target)
+// ---------------------------------------------------------------------------
+describe('restore (2G)', () => {
+  it('a valid GitHub or sample target starts a foreground load; an invalid one starts nothing', async () => {
+    const { store, calls, actions } = setup();
+    expect(actions.restore({ source: 'github', owner: 'octo', repo: 'demo', ref: 'main', scope: ['src'] })).toBeNull();
+    expect(store.getState().ingestion).toMatchObject({ status: 'running', background: false, target: { owner: 'octo', repo: 'demo', ref: 'main', scope: ['src'], source: 'github' } });
+    await flush();
+    expect(calls.length).toBeGreaterThan(0);
+    const { store: s2, actions: a2 } = setup();
+    expect(a2.restore({ source: 'sample', owner: 'sample', repo: 'static-site', sampleId: 'static-site' })).toBeNull();
+    expect(s2.getState().ingestion.target).toMatchObject({ source: 'sample', sampleId: 'static-site' });
+    for (const bad of [{ source: 'github', owner: 'bad owner', repo: 'x' }, { source: 'github', owner: 'o', repo: 'r', scope: ['a/../b'] }, { source: 'sample', owner: 'sample', repo: 'nope', sampleId: 'nope' }]) {
+      const { store: s3, actions: a3 } = setup();
+      expect(a3.restore(bad as never)).toBe('The saved repository address is not valid.');
+      expect(s3.getState().ingestion.status).toBe('idle');
+    }
+  });
+});

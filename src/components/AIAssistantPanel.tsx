@@ -1,14 +1,18 @@
 // @node: F2.7
+// @node: F4.9 (optional harness prop: commands, proposal card, replies)
 // Wireframe AI Assistant panel. Lives in the Studio stub.
 // All text rendered as React text, never as HTML.
-// No Apply, Approve, or Reject controls.
+// No Apply, Approve, or Reject controls on AI patch cards (display only). The practice proposal card (2B) is separate.
 // Black and white only, no animation, keyboard and touch accessible.
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { AI_LIMITS } from '../config/budgets-proxy';
+import { parseCommand } from '../engine/commands';
 import type { AssistantActions } from '../hooks/useAssistant';
+import type { HarnessActions } from '../hooks/useHarness';
 import { useStudioStore } from '../store/useStudioStore';
 import type { AITaskType, RepoSnapshot } from '../types/contracts';
 import { AIResponseView } from './AIResponseView';
+import { ProposalCard } from './ProposalCard';
 
 const TASK_TYPES: Array<{ value: AITaskType; label: string }> = [
   { value: 'explain', label: 'Explain' },
@@ -19,10 +23,14 @@ const TASK_TYPES: Array<{ value: AITaskType; label: string }> = [
 interface Props {
   snapshot: RepoSnapshot;
   assistant: AssistantActions;
+  /** Sub-phase 2B. When absent the panel behaves exactly as in sub-phase 2A. */
+  harness?: HarnessActions;
 }
 
-export function AIAssistantPanel({ snapshot, assistant }: Props) {
+export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
   const ai = useStudioStore((s) => s.ai);
+  const proposal = useStudioStore((s) => s.work.proposal);
+  const chat = useStudioStore((s) => s.work.chat);
   const [instruction, setInstruction] = useState('');
   const [taskType, setTaskType] = useState<AITaskType>('explain');
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
@@ -47,6 +55,13 @@ export function AIAssistantPanel({ snapshot, assistant }: Props) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // Commands first: typed command words never reach the AI.
+    if (harness && harness.submitText(instruction)) {
+      // A refused command word keeps its text so it can be corrected; a command clears the box.
+      if (parseCommand(instruction).kind === 'command') setInstruction('');
+      setInlineError('');
+      return;
+    }
     if (ai.status === 'pending') return;
     const msg = assistant.send({ snapshot, instruction, taskType, selectedPaths, includeContent });
     setInlineError(msg ?? '');
@@ -59,6 +74,24 @@ export function AIAssistantPanel({ snapshot, assistant }: Props) {
         Mock mode: responses are canned examples. No AI model is used and nothing is sent to an AI
         provider.
       </p>
+
+      {harness && proposal && (
+        <ProposalCard proposal={proposal} onApprove={() => harness.run('approve')} onReject={() => harness.run('reject')} />
+      )}
+      {harness && (
+        <>
+          <p className="note">Type help for commands.</p>
+          {chat.length > 0 && (
+            <ol className="chat-replies" aria-live="polite" aria-label="Command replies">
+              {chat.map((line) => (
+                <li key={line.id} className={line.ok ? undefined : 'refused'}>
+                  <strong>{line.command}</strong>: {line.reply}
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
+      )}
 
       <form onSubmit={handleSubmit} noValidate aria-label="AI assistant request">
         <label htmlFor="ai-instruction">
