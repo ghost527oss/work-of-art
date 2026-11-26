@@ -489,7 +489,7 @@ Contract: The left Sandbox shows a safe preview of the loaded project in one of 
 ### F7.1 — Limits and the 17th skill
 - Inputs: none
 - Outputs: `PREVIEW_LIMITS`; `scan.frontend.layout-overflow` (measured); merged findings and counts; updated "what was checked" text
-- Invariants: the text scan never runs a measured skill; the crew script ignores measured findings; the 2D sample expectations are unchanged; only the named 2D test assertions change
+- Invariants: the text scan never runs a measured skill; the crew script is built from merged findings in F7.10; the 2D sample expectations are unchanged; only the named 2D test assertions change
 - Files: `src/config/previewLimits.ts`, `src/skillbook/types.ts`, `src/skillbook/scanSkills.ts`, `src/engine/scanProject.ts`, `src/engine/scanView.ts`, `tests/previewLimits.test.ts`, `tests/scanSkills.test.ts`, `tests/scanView.test.ts`
 - Depends on: F6.1, F6.5
 - verify: `npm run typecheck && npx vitest run tests/previewLimits.test.ts tests/scanSkills.test.ts tests/scanView.test.ts tests/scanProject.test.ts tests/scanSamples.test.ts tests/crewScript.test.ts`
@@ -561,9 +561,9 @@ Contract: The left Sandbox shows a safe preview of the loaded project in one of 
 ### F7.10 — Wiring into the Studio and the 2D views
 - Inputs: the panel, the findings
 - Outputs: the panel on Screens 3, 4, and 5; measured findings in the 2D views; Open in viewer
-- Invariants: only the named placeholder and check-count assertions in 2A and 2D tests change; screens remount the panel and scripts turn off; the crew script is unchanged
-- Files: `src/components/StudioLayout.tsx`, `src/components/SkeletonCrewScreen.tsx`, `src/components/DomainScreen.tsx`, `src/components/ScanSummary.tsx`, `src/components/FindingsTable.tsx`, `src/components/FindingDetail.tsx`, `src/components/WhatWasChecked.tsx`, `src/App.tsx`, `src/styles.css`, `tests/sandboxUi.test.tsx`
-- Depends on: F7.9, F3.5, F6.11
+- Invariants: only the named placeholder and check-count assertions in 2A and 2D tests change; screens remount the panel and scripts turn off; the Skeleton Crew narrates measured findings under Frontend from already-measured data, never measures itself, and says when nothing was measured; a state without measured findings gives the 2D crew script unchanged
+- Files: `src/components/StudioLayout.tsx`, `src/components/SkeletonCrewScreen.tsx`, `src/components/DomainScreen.tsx`, `src/components/ScanSummary.tsx`, `src/components/FindingsTable.tsx`, `src/components/FindingDetail.tsx`, `src/components/WhatWasChecked.tsx`, `src/engine/crewScript.ts`, `src/store/workActions.ts`, `src/App.tsx`, `src/styles.css`, `tests/sandboxUi.test.tsx`, `tests/crewScript.test.ts`, `tests/crewRun.test.ts`
+- Depends on: F7.9, F3.5, F6.7, F6.11
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): the isolation browser test and the browser run in `requirements.md` section 6, items 13 and 14
 

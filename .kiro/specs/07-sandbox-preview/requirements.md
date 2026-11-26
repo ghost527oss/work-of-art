@@ -129,7 +129,7 @@ In simple words: PatchBay shows you what the imported website looks like inside 
    Elements whose overflow is `auto` or `scroll` SHALL NOT be reported.
 4. EACH finding SHALL have: the file and the start-tag line range from the element table, the snippet (the tag's lines, redacted, bounded as in 2D R3.4), the measured numbers and the width in `extra` ("content 312 px in a box 240 px wide, measured at a 375 px wide preview"), an explanation, why it matters, and plan steps, in plain English.
 5. THE same element and the same kind measured at several widths SHALL be one finding that lists the widths. At most 100 measured findings are kept, and a limit sets the Partial line "Layout check limit (100) reached: later findings are missing."
-6. MEASURED findings SHALL be merged into the 2D counts, tables, and Screen 5 views next to the text findings, and SHALL be shown with the word "Measured" and the width. They SHALL NOT be narrated or fixed by the Skeleton Crew (the crew works on the saved scan only), and Screen 4 SHALL say so.
+6. MEASURED findings SHALL be merged into the 2D counts, tables, and Screen 5 views next to the text findings, and SHALL be shown with the word "Measured" and the width. THE **Skeleton Crew SHALL narrate measured findings under Frontend** like any other finding, reading the findings that were already measured (the crew SHALL NOT measure anything itself and does not need the preview to be open). A measured finding is Guided, so the crew never proposes a change for it. The crew script is built when `start crew` is accepted, from the merged text and measured findings at that moment. WHEN no layout check has been run, THE Frontend area step SHALL say "Layout was not measured. Use Check layout in the Sandbox to include layout findings." and Screen 4 SHALL show the same sentence.
 7. THE results SHALL be discarded when the effective content of the entry page or its files changes, when the snapshot changes, and when the preview is rebuilt for another mode. They SHALL NOT be saved.
 8. THE 2D "what was and was not checked" block SHALL list this check as "Layout overflow: measured in the preview (look-only mode, static pages only)" and SHALL no longer say it is "sub-phase 2E". The count of checks SHALL read 17.
 9. THE check SHALL finish in under 3 seconds for 5,000 elements. WHEN it takes longer, it SHALL stop and say "The layout check took too long and was stopped."
@@ -165,6 +165,7 @@ In simple words: PatchBay shows you what the imported website looks like inside 
 | Bridge message invalid | Dropped, counted: "N invalid messages ignored." |
 | Preview tries to navigate | Reset to look-only with the notice in R2.8. |
 | Layout check while scripts are on | Button disabled with the reason. |
+| Crew started before any layout check | The Frontend area step says "Layout was not measured. Use Check layout in the Sandbox to include layout findings." |
 | Layout check too slow | Stopped with the message. |
 | Component cannot be read | That component shows "could not be read". Others work. |
 | Workbench picture | Always labelled "Approximate: read from the source, not run." |
@@ -191,8 +192,10 @@ The spec is satisfied when all of the following hold:
 
 ## 7. Open questions for approval
 
+**Status: all seven approved by the user. Question 2 was approved with a change: the crew narrates measured findings under Frontend.**
+
 1. **The Edit pad and the layout check work in look-only mode only (R4.10).** With scripts on you can interact with the page, but cannot edit or measure it, because script-built pages cannot be mapped to the source and their numbers cannot be trusted. Approve?
-2. **The Skeleton Crew does not go through measured layout findings (R8.6).** They appear in counts and tables but the crew works from the saved text scan, because they need a live preview. Approve?
+2. **The Skeleton Crew narrates measured layout findings under Frontend (R8.6).** Approved with this change: the crew reads the findings already measured, never measures by itself, and says so when nothing was measured.
 3. **The preview is on Screens 3, 4, and 5, and scripts turn off when you change screens (R7.7).** Safer and simpler than keeping a running page alive. Approve?
 4. **Component Workbench covers React, plus basic Vue and Svelte templates (R5).** Angular and others show Source Inspection. Approve?
 5. **Placeholders for images that were not loaded (R3.3).** Because ingestion does not download images and the preview may not use the internet. Only SVG images that were loaded are drawn. Approve?
