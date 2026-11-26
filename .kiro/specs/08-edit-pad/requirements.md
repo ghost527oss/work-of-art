@@ -180,6 +180,8 @@ The spec is satisfied when all of the following hold:
 
 ## 7. Open questions for approval
 
+**Status: all nine approved by the user (including the small test and type updates to 2A, 2B, 2D, and 2E-1 named in the tasks).**
+
 1. **Undo and Redo buttons in the Edit panel (R7.3).** They run the same commands as typing `undo` and `redo`, and show the same replies. A paint-style pad feels wrong without them. Approve, or keep it typed only?
 2. **Workbench elements can be selected and changed as Preview Only (R5.6, R9.4).** This changes the 2E-1 builder so the workbench annotates elements as not mappable. Approve?
 3. **Merging a burst of edits into one History entry (R4.7).** Many small changes to the same element become one entry, so the 50-entry limit is not used up by dragging. Approve?
