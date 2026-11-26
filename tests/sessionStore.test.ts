@@ -52,7 +52,7 @@ describe('restore state machine', () => {
 describe('resetSessionState and the Log lines', () => {
   it('equals the initial state except the run counter; input not mutated', () => {
     const s0 = initialState();
-    const full: StudioState = deepFreeze({ ...s0, experience: 'studio', snapshot: buildSampleSnapshot('static-site', 1), ingestion: { ...s0.ingestion, runId: 7, status: 'done' }, log: [{ id: 'log-1', timestamp: 1, action: 'x', status: 'info', message: 'm', affectedPaths: [] }], logSeq: 1 });
+    const full: StudioState = deepFreeze({ ...s0, experience: 'studio', snapshot: buildSampleSnapshot('static-site', 1), ingestion: { ...s0.ingestion, runId: 7, status: 'done' }, log: [{ id: 'log-1', timestamp: 1, action: 'x', status: 'info' as const, message: 'm', affectedPaths: [] }], logSeq: 1 } as StudioState);
     const r = resetSessionState(full);
     expect(r).toEqual({ ...initialState(), ingestion: { ...initialState().ingestion, runId: 7 } });
     expect(r.log).toEqual([]);
