@@ -11,6 +11,8 @@ import type { AssistantActions } from '../hooks/useAssistant';
 import type { HarnessActions } from '../hooks/useHarness';
 import type { UnderstandingActions } from '../hooks/useUnderstanding';
 import type { ScanActions } from '../hooks/useScan';
+import type { PreviewActions } from '../hooks/usePreview';
+import { SandboxPanel } from './SandboxPanel';
 import { closePanel, setCollapsed, toggleWidth, togglePanel, type PanelId } from '../store/layoutSlice';
 import { useStudioStore } from '../store/useStudioStore';
 import { AIAssistantPanel } from './AIAssistantPanel';
@@ -39,6 +41,8 @@ export interface StudioLayoutProps {
   understanding?: UnderstandingActions;
   /** Sub-phase 2D. With `harness` it makes Screens 4 and 5 live. */
   scan?: ScanActions;
+  /** Sub-phase 2E-1. When given, the Sandbox panel replaces the placeholder. */
+  preview?: PreviewActions;
 }
 
 const PANEL_TITLES: Record<PanelId, string> = {
@@ -65,7 +69,7 @@ function HarnessBar({ harness }: { harness: HarnessActions }) {
   );
 }
 
-export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan }: StudioLayoutProps) {
+export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview }: StudioLayoutProps) {
   const hasSnapshot = useStudioStore((s) => s.snapshot !== undefined);
   if (!hasSnapshot) return null;
   return (
@@ -81,12 +85,13 @@ export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError,
         harness={harness}
         understanding={understanding}
         scan={scan}
+        preview={preview}
       />
     </div>
   );
 }
 
-function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan }: StudioLayoutProps) {
+function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview }: StudioLayoutProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const log = useStudioStore((s) => s.log);
   const work = useStudioStore((s) => s.work);
@@ -99,7 +104,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
     return (
       <main className="shell">
         <div className="shell-left">
-          <SandboxPlaceholder />
+          {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
         </div>
         <SkeletonCrewScreen onOpenArea={shellActions.openDomain} onBack={shellActions.backToStudio} live={harness && scan ? { harness, scan, onOpened: shellActions.backToStudio } : undefined} />
       </main>
@@ -110,7 +115,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
     return (
       <main className="shell">
         <div className="shell-left">
-          <SandboxPlaceholder />
+          {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
         </div>
         <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} live={harness ? { harness, onOpened: shellActions.backToStudio } : undefined} />
       </main>
@@ -122,7 +127,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
   return (
     <main className="shell">
       <div className={covered ? 'shell-left covered' : 'shell-left'}>
-        <SandboxPlaceholder />
+        {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
         <ProjectInfo onLoadFolders={onLoadFolders} onCancel={onCancel} onRetry={onRetry} onDismissError={onDismissError} onBack={onBack} understanding={understanding} />
       </div>
       <PanelFrame

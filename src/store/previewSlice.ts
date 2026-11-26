@@ -42,6 +42,10 @@ export function pvMode(s: PreviewState, mode: PreviewMode, reason: string): Prev
   return { ...s, mode, chosenBy: 'user', reason, scripts: false, status: 'idle', error: undefined, console: [], invalidMessages: 0, layout: freshLayout() };
 }
 
+export function pvComponent(s: PreviewState, key: string): PreviewState {
+  return s.component === key ? s : { ...s, component: key, status: 'idle', layout: freshLayout() };
+}
+
 export function pvWidth(s: PreviewState, width: PreviewWidth): PreviewState {
   return s.width === width ? s : { ...s, width };
 }
