@@ -54,7 +54,7 @@ describe('controller', () => {
     c.dispose();
   });
   it('the bridge only adds console lines, ready, and counts invalid messages; it stops with scripts', () => {
-    const { store, c, send, hasListener, removed } = setup();
+    const { store, c, send, hasListener, removed, advance } = setup();
     c.actions.init(); c.actions.setScripts(true);
     const win = {};
     c.actions.startBridge(win, NONCE);
@@ -66,6 +66,10 @@ describe('controller', () => {
     expect(store.getState().preview.status).toBe('ready');
     const before = JSON.stringify({ ...store.getState().preview, console: undefined, invalidMessages: undefined });
     for (const bad of [{ source: {}, origin: 'null', data: { v: 1, type: 'ready', nonce: NONCE } }, { source: win, origin: 'https://x.test', data: { v: 1, type: 'ready', nonce: NONCE } }, { source: win, origin: 'null', data: { v: 1, type: 'navigate', to: 'https://evil.test', nonce: NONCE } }]) send(bad);
+    // The wrong source is ignored outright. The other two are counted, flushed at most once a second.
+    expect(store.getState().preview.invalidMessages).toBe(1);
+    advance(1000);
+    send({ source: win, origin: 'null', data: 'junk' });
     expect(store.getState().preview.invalidMessages).toBe(3);
     expect(JSON.stringify({ ...store.getState().preview, console: undefined, invalidMessages: undefined })).toBe(before);
     c.actions.setScripts(false);
@@ -73,14 +77,17 @@ describe('controller', () => {
     expect(removed()).toBeGreaterThan(0);
     c.dispose();
   });
-  it('a flood is rate limited and the console keeps the last 50 lines', () => {
-    const { store, c, send } = setup();
+  it('a flood is rate limited, the console is bounded, and invalid counts are flushed once a second', () => {
+    const { store, c, send, advance } = setup();
     c.actions.init(); c.actions.setScripts(true);
     const win = {};
     c.actions.startBridge(win, NONCE);
     for (let i = 0; i < 100; i++) send({ source: win, origin: 'null', data: { v: 1, type: 'console', nonce: NONCE, level: 'log', text: `m${i}` } });
     expect(store.getState().preview.console).toHaveLength(20);
-    expect(store.getState().preview.invalidMessages).toBe(80);
+    expect(store.getState().preview.invalidMessages).toBe(1);
+    advance(1000);
+    send({ source: win, origin: 'null', data: { v: 1, type: 'console', nonce: NONCE, level: 'log', text: 'later' } });
+    expect(store.getState().preview.console.at(-1)!.text).toBe('later');
     c.dispose();
   });
   it('a second document in the frame resets scripts to look-only with the notice', () => {

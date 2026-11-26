@@ -582,6 +582,12 @@ Contract: The left Sandbox shows a safe preview of the loaded project in one of 
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): the isolation browser test and the browser run in `requirements.md` section 6, items 13 and 14
 
+### F7 as built (2E-1)
+- `sanitizeCss` removes `<` and CSS backslash escapes first and filters until the text stops changing. Template extractors are capped at 100 KB and use the linear tokenizer.
+- The bridge listener ignores messages from other windows, rate-limits before validating, and flushes the invalid counter at most once a second. A layout result is dropped when the content key changed while measuring.
+- Not built: the "Open in viewer" button on a finding (the viewer exists in Source Inspection mode).
+- Existing tests edited: 2D tests that counted 16 checks (now 17) and one crew-script test (the Frontend step carries the "not measured" sentence when no layout check ran).
+
 ### F7 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2E-1 gate (build-phases.md): imported code cannot read PatchBay data, cookies, or secrets, or load external scripts or any other external content; messages from the preview are validated and shown only as plain text

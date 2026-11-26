@@ -200,6 +200,9 @@ export function createHarnessController(
     const fp = fingerprint(record);
     if (fp === lastSaved) return;
     if (pendingReplacedKey !== null) {
+      // Another repository's saved work is replaced only by real work here, not by Log lines that loading writes (2E-1 preview lines).
+      const w = s.work;
+      if (w.run === null && w.proposal === null && w.applied.length === 0 && w.undone.length === 0) return;
       const old = pendingReplacedKey;
       pendingReplacedKey = null;
       addNote(replacedMessage(old));

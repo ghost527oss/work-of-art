@@ -390,3 +390,21 @@ describe('source rules', () => {
     expect(src).not.toMatch(/fetch\(|from '\.\.\/engine\/aiAssistant'|mockAssistant|from '\.\/useAssistant'/);
   });
 });
+
+describe('another repository slot and Log-only changes (2E-1)', () => {
+  it('Log lines written while loading do not replace another repository slot; real work does', () => {
+    vi.useFakeTimers();
+    const first = rig();
+    load(first, snap('static-site', 5));
+    first.c.actions.submitText('start');
+    first.c.dispose();
+    const saved = first.data.get(WORK_KEY)!;
+    const r = rig({ data: new Map([[WORK_KEY, saved]]) });
+    load(r, snap('fullstack-api', 6));
+    r.studio.update((s) => ({ ...s, log: [...s.log, { id: 'x1', timestamp: 1, action: 'preview_mode', status: 'info', affectedPaths: [], message: 'Preview mode: Live Static Preview.', redacted: false }], logSeq: s.logSeq + 1 }));
+    expect(r.data.get(WORK_KEY)).toBe(saved);
+    r.c.actions.submitText('start');
+    expect(JSON.parse(r.data.get(WORK_KEY)!).repoKey).toBe('sample:sample/fullstack-api@sample');
+    r.c.dispose();
+  });
+});

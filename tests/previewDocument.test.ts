@@ -104,4 +104,11 @@ describe('css sanitizer', () => {
     expect(out).not.toMatch(/@import|evil\.test|expression\(|moz-binding|behavior|</);
     expect(out).toContain('data:image/png;base64,AAA');
   });
+  it('cannot be rebuilt into a keyword by stripping characters or by CSS escapes (review finding)', () => {
+    for (const css of ['a{background:ur<l(http://evil/x)}', '@im<port "http://evil/x.css";a{}', 'a{background:u\\72l(http://evil/x)}', 'a{background:\\75rl(http://evil/x)}', '@\\69mport url(x);']) {
+      const out = sanitizeCss(css);
+      expect(out, css).not.toMatch(/@import|url\(|\\/i);
+    }
+    expect(sanitizeCss('a{b:url(data:image/png;base64,AAA)}')).toContain('data:image/png;base64,AAA');
+  });
 });

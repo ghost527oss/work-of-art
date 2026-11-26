@@ -109,3 +109,15 @@ Skeleton Crew (Screen 4) scans the loaded files offline with 16 checks (no AI, n
 - **`start crew`** (or the button) runs the crew through the findings with the same controls as the practice run (`pause`, `resume`, `step`, `stop`, Edit auto-pause). Only one fix exists, **Auto-supported**: adding `rel="noopener noreferrer"` to a link. It is offered only when it applies exactly, the check no longer fires, nothing new appears, and the change holds no secret. You approve or reject it; it changes only the in-memory practice copy.
 - Approving, undoing, or redoing re-checks the affected file in the same update. The crew run and its proposal are never saved; applied fixes come back through History.
 
+## Sandbox preview (Phase 2, sub-phase 2E-1)
+
+The left area of the Studio (and of Screens 4 and 5) now shows a **Sandbox** panel with a preview of the project, in one of three modes that PatchBay chooses and explains ("Mode: ... Why: ..."):
+
+- **Live Static Preview**: a plain HTML project is shown as the browser would see it, with scripts off. Widths 375, 768, 1024, and Fit are available.
+- **Component Workbench**: for React, Vue, and Svelte projects, an approximate picture is read from the source (nothing is run, expressions show as dashed `{...}` boxes).
+- **Source Inspection**: files grouped by label with a redacted, numbered viewer.
+
+The preview is a locked iframe built from `srcdoc` by an allowlist re-serializer: it writes a new document with only allowed tags and attributes, every value escaped, outside addresses blocked, and images shown as placeholders. The sandbox is exactly `allow-same-origin` (look-only, no script can run) or exactly `allow-scripts` (an opaque origin with no access to PatchBay's page or storage), never both, with a content policy that blocks every request the browser lets a policy block. **Run scripts** needs a confirmation and is only offered for static pages. A script that sends its own frame to another address is detected and the preview is reset (the browser may already have made that one request); a script can also freeze the tab with an endless loop.
+
+**Check layout** measures the look-only preview and adds measured findings ("Text that does not fit its box") next to the 2D findings, with the measured numbers and widths. The Skeleton Crew narrates them under Frontend. Nothing from the preview is saved.
+

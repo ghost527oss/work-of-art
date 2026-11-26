@@ -83,6 +83,15 @@ describe('workbench', () => {
   });
 });
 
+describe('templates are bounded (review finding)', () => {
+  it('a hostile 60 KB template is read in well under a second', () => {
+    const t = Date.now();
+    extractVue(`<template>${'<a '.repeat(20000)}</template>`);
+    extractSvelte('<a '.repeat(20000));
+    expect(Date.now() - t).toBeLessThan(1000);
+  });
+});
+
 describe('source view', () => {
   it('groups by label and builds redacted, numbered, bounded lines', async () => {
     const snap = buildSampleSnapshot('fullstack-api', 1);

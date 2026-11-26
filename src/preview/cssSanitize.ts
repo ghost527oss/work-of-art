@@ -1,6 +1,6 @@
 // @node: F7.3
 // Removes @import, non-data url(...), expression(), binding rules, and every "<". One linear pass over strings and comments.
-export function sanitizeCss(css: string): string {
+function pass(css: string): string {
   let out = '';
   let i = 0;
   const n = css.length;
@@ -18,10 +18,22 @@ export function sanitizeCss(css: string): string {
     i++;
   }
   out = out.replace(/@import[^;{}]*;?/gi, '');
-  out = out.replace(/url\(\s*(['"]?)\s*data:(?:image|font)\/[^)]*\1\s*\)/gi, (m) => m.replace(/</g, ''));
   out = out.replace(/url\(\s*(['"]?)[^)]*\1\s*\)/gi, (m) => (/^url\(\s*['"]?\s*data:(?:image|font)\//i.test(m) ? m : 'none'));
-  out = out.replace(/expression\s*\(/gi, 'none(').replace(/-moz-binding\s*:[^;}]*/gi, '').replace(/behavior\s*:[^;}]*/gi, '');
-  return out.replace(/</g, '');
+  return out.replace(/expression\s*\(/gi, 'none(').replace(/-moz-binding\s*:[^;}]*/gi, '').replace(/behavior\s*:[^;}]*/gi, '');
+}
+
+/**
+ * Removes every "<" and every backslash escape first (so "ur<l(" or "u\72l(" cannot be rebuilt into a keyword),
+ * then filters until the text stops changing.
+ */
+export function sanitizeCss(css: string): string {
+  let cur = css.replace(/</g, '').replace(/\\(?:[0-9a-fA-F]{1,6}\s?|[^\n])/g, ' ');
+  for (let i = 0; i < 6; i++) {
+    const next = pass(cur).replace(/</g, '');
+    if (next === cur) break;
+    cur = next;
+  }
+  return cur;
 }
 
 /** CSS placed inside a <style> element: every "<" is escaped so "</style>" cannot appear. */

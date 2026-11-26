@@ -30,6 +30,7 @@ export function SandboxPanel({ preview }: { preview: PreviewActions }) {
   const loads = useRef(0);
   const autoRan = useRef('');
   const [reloadN, setReloadN] = useState(0);
+  const keyRef = useRef('');
 
   const effective = useMemo(() => (p: string) => (snapshot ? practiceContent(snapshot, applied, p) : undefined), [snapshot, applied]);
   const nonce = useMemo(() => randomHex(), [pv.scripts, snapshot?.id]);
@@ -39,6 +40,7 @@ export function SandboxPanel({ preview }: { preview: PreviewActions }) {
   const choices: PreviewMode[] = detection ? modeChoices(detection) : ['source'];
   const contentKey = useMemo(() => hashText(`${snapshot?.id}|${applied.map((a) => a.id).join(',')}|${pv.entryPath}`), [snapshot?.id, applied, pv.entryPath]);
 
+  keyRef.current = contentKey;
   useEffect(() => { preview.init(); }, [preview, snapshot]);
 
   const build = useMemo<(PreviewBuild & { components?: Array<import('../preview/workbenchDocument').WorkbenchComponent>; chosen?: string }) | null>(() => {
@@ -72,12 +74,17 @@ export function SandboxPanel({ preview }: { preview: PreviewActions }) {
     return {
       setWidth: (px) => { f.style.width = `${px}px`; },
       restore: () => { f.style.width = pv.width === 0 ? '100%' : `${pv.width}px`; },
-      measure: () => (f.contentDocument && f.contentWindow ? gatherMeasurements(f.contentDocument, f.contentWindow) : null),
+      measure: () => {
+        const d = f.contentDocument;
+        // Not the built document yet (the frame briefly shows an empty page while srcdoc loads).
+        if (!d || !f.contentWindow || d.readyState !== 'complete' || !d.documentElement || d.URL !== 'about:srcdoc') return null;
+        return gatherMeasurements(d, f.contentWindow);
+      },
       elements: build.elements,
       contentKey,
     };
   };
-  const check = (widths: number[]) => { const r = runner(); if (r) void preview.checkLayout(r, widths); };
+  const check = (widths: number[]) => { const r = runner(); if (r) void preview.checkLayout(r, widths, () => keyRef.current); };
   useEffect(() => {
     if (canMeasure && autoRan.current !== contentKey && pv.layout.status === 'idle') { autoRan.current = contentKey; check([pv.width === 0 ? 1024 : pv.width]); }
   });
@@ -90,7 +97,7 @@ export function SandboxPanel({ preview }: { preview: PreviewActions }) {
       <h2 id="sandbox-heading">Sandbox</h2>
       <PreviewToolbar
         mode={pv.mode} choices={choices} width={pv.width} scripts={pv.scripts} canMeasure={canMeasure} measureReason={noMeasure}
-        onMode={preview.setMode} onWidth={preview.setWidth} onReload={() => setReloadN((n) => n + 1)}
+        onMode={preview.setMode} onWidth={preview.setWidth} onReload={() => { loads.current = 0; setReloadN((n) => n + 1); }}
         onCheck={() => check([pv.width === 0 ? 1024 : pv.width])} onCheckAll={() => check([375, 768, 1024])}
       />
       <PreviewNotes reason={pv.reason} mode={pv.mode} notes={pv.notes} invalid={pv.invalidMessages} />
@@ -115,7 +122,13 @@ export function SandboxPanel({ preview }: { preview: PreviewActions }) {
             allow={IFRAME_ATTRS.allow}
             {...({ csp: cspFor(pv.scripts) } as object)}
             style={{ width: pv.width === 0 ? '100%' : `${pv.width}px` }}
-            onLoad={() => { loads.current += 1; preview.onFrameLoad(loads.current); }}
+            onLoad={() => {
+              // In look-only mode only the built document counts (an empty first page can fire load too).
+              const d = frame.current?.contentDocument;
+              if (!pv.scripts && (!d || d.URL !== 'about:srcdoc')) return;
+              loads.current += 1;
+              preview.onFrameLoad(loads.current);
+            }}
           />
         </div>
       )}

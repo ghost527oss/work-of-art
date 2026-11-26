@@ -143,8 +143,9 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
           const h = attrs.find((a) => a.name === 'height')?.value ?? '80';
           const label = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src) ? 'outside address' : src.slice(0, 80) || name;
           report.placeholders.push(label);
-          const keep = attrs.filter((a) => ['id', 'class', 'style'].includes(a.name));
-          body.push(`<span class="pb-img"${writeAttrs(keep, 'span')} style="width:${/^\d{1,4}$/.test(w) ? w : 120}px;height:${/^\d{1,4}$/.test(h) ? h : 80}px">${escapeText(`image not loaded: ${label}`)}</span>`);
+          const keep = attrs.filter((a) => ['id', 'class'].includes(a.name));
+          const own = sanitizeCss(attrs.find((a) => a.name === 'style')?.value ?? '');
+          body.push(`<span class="pb-img"${writeAttrs(keep, 'span')} style="${escapeAttr(own)};width:${/^\d{1,4}$/.test(w) ? w : 120}px;height:${/^\d{1,4}$/.test(h) ? h : 80}px">${escapeText(`image not loaded: ${label}`)}</span>`);
         }
         continue;
       }

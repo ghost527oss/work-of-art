@@ -56,7 +56,7 @@ export function ScriptsSwitch({ on, available, onTurnOn, onStop }: { on: boolean
     <div>
       {!asking ? <p><button type="button" onClick={() => setAsking(true)}>Run scripts</button> <span className="note">Look-only is on. Scripts are off.</span></p> : (
         <section className="finding-detail" aria-label="Run scripts confirmation">
-          <p>The page&apos;s own scripts will run inside a locked box. The box has no access to PatchBay, your browser storage, or the internet. A script can still freeze this tab with an endless loop, or send the box to another address (it is then reset). Stop scripts at any time to go back to look-only.</p>
+          <p>The page&apos;s own scripts will run inside a locked box. The box has no access to PatchBay, your browser storage, or the internet. A script can still freeze this tab with an endless loop, or send the box to another address (it is then reset, but the browser may already have made that one request). Some browser features, such as peer-to-peer connections, are not covered by the box&apos;s rules, so do not run scripts from a repository you do not trust. Stop scripts at any time to go back to look-only.</p>
           <p><button type="button" onClick={() => { setAsking(false); onTurnOn(); }}>Yes, run scripts</button> <button type="button" onClick={() => setAsking(false)}>Cancel</button></p>
         </section>
       )}

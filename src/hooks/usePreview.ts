@@ -45,7 +45,7 @@ export interface PreviewActions {
   /** Called on every load event of the iframe with how many documents it has shown so far. */
   onFrameLoad(count: number): void;
   setBuilt(ok: boolean, notes: string[], error?: string): void;
-  checkLayout(runner: LayoutRunner, widths: number[]): Promise<void>;
+  checkLayout(runner: LayoutRunner, widths: number[], currentKey?: () => string): Promise<void>;
   markContent(key: string): void;
 }
 
@@ -97,10 +97,21 @@ export function createPreviewController(studio: Store<StudioState> = studioStore
       if (disposed) return;
       actions.stopBridge();
       limiter.current = new RateLimiter();
+      let invalidPending = 0;
+      let lastFlush = 0;
       stopListener = services.addMessageListener((event) => {
-        if (disposed) return;
-        const r = validateBridgeEvent(event, { source, nonce });
-        if (!r.ok || !limiter.current.allow(services.now())) { studio.update((st) => countInvalid(st)); return; }
+        if (disposed || event.source !== source) return; // other windows (extensions, devtools) are not ours to count
+        const now = services.now();
+        // Rate limit first, so a flood costs almost nothing. The invalid counter is flushed at most once a second.
+        const r = limiter.current.allow(now) ? validateBridgeEvent(event, { source, nonce }) : ({ ok: false } as const);
+        if (!r.ok) {
+          invalidPending++;
+          if (now - lastFlush >= 1000 || lastFlush === 0) {
+            const n = invalidPending; invalidPending = 0; lastFlush = now;
+            studio.update((st) => { let s2 = st; for (let i = 0; i < n; i++) s2 = countInvalid(s2); return s2; });
+          }
+          return;
+        }
         const m = r.message;
         if (m.type === 'ready') studio.update((st) => setPreviewStatus(st, 'ready', st.preview.notes));
         else if (m.type === 'console') studio.update((st) => addConsoleLine(st, m.level, m.text));
@@ -125,7 +136,7 @@ export function createPreviewController(studio: Store<StudioState> = studioStore
       const s = studio.getState();
       if (!disposed && s.preview.layout.contentKey && s.preview.layout.contentKey !== key) studio.update((st) => discardLayout(st));
     },
-    async checkLayout(runner, widths) {
+    async checkLayout(runner, widths, currentKey) {
       if (disposed) return;
       studio.update((st) => beginLayout(st, widths));
       if (studio.getState().preview.layout.status !== 'running') return;
@@ -139,7 +150,8 @@ export function createPreviewController(studio: Store<StudioState> = studioStore
           runner.setWidth(w);
           await services.raf();
           await services.raf();
-          const m = runner.measure();
+          let m = runner.measure();
+          for (let tries = 0; !m && tries < 20 && !stopped && !disposed; tries++) { await services.raf(); m = runner.measure(); }
           if (!m) { stopped = true; break; }
           results.push(...evaluateOverflow(m.measurements, w, m.docScrollWidth));
         }
@@ -151,6 +163,8 @@ export function createPreviewController(studio: Store<StudioState> = studioStore
       }
       if (disposed) return;
       if (stopped) { studio.update((st) => stopLayout(st, 'The layout check took too long and was stopped.')); return; }
+      // Content changed while measuring: line numbers would not match, so the result is dropped.
+      if (currentKey && currentKey() !== runner.contentKey) { studio.update((st) => stopLayout(st, 'The page changed while it was measured, so the result was dropped.')); return; }
       const s = studio.getState();
       const { findings, partialReasons } = layoutFindings(results, runner.elements, effectiveOf(s));
       studio.update((st) => finishLayout(st, findings as Finding[], runner.contentKey, partialReasons, services.now()));
@@ -181,7 +195,7 @@ export function usePreview(): PreviewActions {
       stopBridge: () => ref.current?.actions.stopBridge(),
       onFrameLoad: (c) => ref.current?.actions.onFrameLoad(c),
       setBuilt: (ok, notes, e) => ref.current?.actions.setBuilt(ok, notes, e),
-      checkLayout: (r, w) => ref.current?.actions.checkLayout(r, w) ?? Promise.resolve(),
+      checkLayout: (r, w, k) => ref.current?.actions.checkLayout(r, w, k) ?? Promise.resolve(),
       markContent: (k) => ref.current?.actions.markContent(k),
     }),
     [],
