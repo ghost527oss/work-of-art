@@ -5,6 +5,7 @@
 // @node: F5.11 (calls useUnderstanding once)
 // @node: F6.11 (calls useScan once)
 // @node: F7.10 (calls usePreview once)
+// @node: F8.8 (calls useEditPad once)
 // Switches between the Start, Loading, and Studio screens from the store's experience
 // stage. One ingestion hook instance and one assistant hook instance serve every screen.
 import { LoadingScene } from './components/LoadingScene';
@@ -16,6 +17,7 @@ import { useHarness } from './hooks/useHarness';
 import { useUnderstanding } from './hooks/useUnderstanding';
 import { useScan } from './hooks/useScan';
 import { usePreview } from './hooks/usePreview';
+import { useEditPad } from './hooks/useEditPad';
 import { useLayoutPersistence } from './hooks/useLayout';
 import { useShellReset } from './hooks/useShell';
 import { useStudioStore } from './store/useStudioStore';
@@ -28,6 +30,7 @@ export function App() {
   const understanding = useUnderstanding();
   const scan = useScan();
   const preview = usePreview();
+  const editPad = useEditPad();
   useLayoutPersistence();
   useShellReset();
 
@@ -54,6 +57,7 @@ export function App() {
           understanding={understanding}
           scan={scan}
           preview={preview}
+          editPad={editPad}
         />
       );
     default:

@@ -10,7 +10,7 @@ import { RateLimiter, validateBridgeEvent, type BridgeEvent } from '../preview/p
 import { evaluateOverflow, layoutFindings, type Measurement, type OverflowResult } from '../preview/layoutCheck';
 import type { ElementEntry } from '../preview/previewDocument';
 import {
-  addConsoleLine, beginLayout, countInvalid, discardLayout, finishLayout, initPreview, resetPreview, setPreviewComponent, setPreviewMode, setPreviewScripts,
+  addConsoleLine, beginLayout, countInvalid, discardLayout, finishLayout, initPreview, resetPreview, setPreviewComponent, setPreviewEntry, setPreviewMode, setPreviewScripts,
   setPreviewStatus, setPreviewWidth, stopLayout,
 } from '../store/previewActions';
 import type { PreviewWidth } from '../store/previewSlice';
@@ -38,6 +38,7 @@ export interface PreviewActions {
   setMode(mode: PreviewMode): void;
   setWidth(width: PreviewWidth): void;
   setComponent(key: string): void;
+  setEntry(path: string): void;
   setScripts(on: boolean): void;
   /** Starts listening for bridge messages from one iframe window with one nonce. */
   startBridge(source: unknown, nonce: string): void;
@@ -87,6 +88,11 @@ export function createPreviewController(studio: Store<StudioState> = studioStore
     },
     setComponent(key) {
       if (!disposed) studio.update((st) => setPreviewComponent(st, key));
+    },
+    setEntry(path) {
+      if (disposed) return;
+      actions.stopBridge();
+      studio.update((st) => setPreviewEntry(st, path));
     },
     setScripts(on) {
       if (disposed) return;
@@ -190,6 +196,7 @@ export function usePreview(): PreviewActions {
       setMode: (m) => ref.current?.actions.setMode(m),
       setWidth: (w) => ref.current?.actions.setWidth(w),
       setComponent: (k) => ref.current?.actions.setComponent(k),
+      setEntry: (p) => ref.current?.actions.setEntry(p),
       setScripts: (o) => ref.current?.actions.setScripts(o),
       startBridge: (s, n) => ref.current?.actions.startBridge(s, n),
       stopBridge: () => ref.current?.actions.stopBridge(),

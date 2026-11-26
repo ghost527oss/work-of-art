@@ -46,11 +46,13 @@ describe('workbench', () => {
     expect(defaultComponent(list)!.name).toBe('App');
     const r = buildWorkbench({ paths, effective, analysis, nonce: '0123456789abcdef', origin: 'http://a' });
     if (!r.ok) throw new Error(r.reason);
-    expect(r.html).toContain('<h1>Sample app</h1>');
-    expect(r.html).toContain('<form>');
+    expect(r.html).toMatch(/<h1 data-pb="\d+">Sample app<\/h1>/);
+    expect(r.html).toMatch(/<form data-pb="\d+">/);
     expect(r.html).toContain('class="pb-expr"');
     expect(r.html).not.toMatch(/onsubmit|onchange|onclick/i);
-    expect(r.html).not.toContain('data-pb');
+    // 2E-2: workbench elements are annotated, but never mappable (the picture is approximate).
+    expect(r.elements.length).toBeGreaterThan(0);
+    expect(r.elements.every((e) => e.mappable === false && e.reason === 'This element comes from a component picture, which is approximate.')).toBe(true);
     expect(r.html).toContain('font-family');
   });
   it('class names, htmlFor, literal styles, and boxes for unknown components; a bad component is isolated', () => {

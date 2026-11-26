@@ -46,6 +46,7 @@ const HistorySchema = z.strictObject({
   beforeHash: Hash,
   afterHash: Hash,
   area: z.enum(['frontend', 'backend', 'security', 'api_data']).optional(),
+  editKey: z.string().min(1).max(200).optional(),
 });
 
 export const WorkRecordSchema = z
@@ -109,6 +110,7 @@ export function buildRecord(state: StudioState, now: number): WorkRecord | null 
   const entry = (e: StudioState['work']['applied'][number]) => ({
     id: e.id, path: e.path, title: e.title, at: e.at, diff: e.diff, beforeHash: e.beforeHash, afterHash: e.afterHash,
     ...(e.area ? { area: e.area } : {}),
+    ...(e.editKey ? { editKey: e.editKey } : {}),
   });
   return {
     version: 1,

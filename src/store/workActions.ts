@@ -1,5 +1,6 @@
 // @node: F4.5
 // @node: F6.7 (crew runs: start crew, crew steps, re-check after changes)
+// @node: F8.5 (applyUserEdit)
 // Whole-state work actions: pure transitions from workSlice plus Log entries and chat replies,
 // as one atomic update. Imports withLog from useStudioStore, as aiActions.ts does.
 // useStudioStore imports only `idleWork` from workSlice, so there is no import cycle.
@@ -11,6 +12,10 @@ import { buildFixProposal } from '../engine/scanFix';
 import { rescanPaths, scanFile } from '../engine/scanProject';
 import { crewStartState, mergedFindings } from '../engine/scanView';
 import { refreshScan } from './scanActions';
+import { buildLineDiff } from '../edit/textDiff';
+import { REASONS as EDIT_REASONS } from '../edit/elementMap';
+import { containsSecret } from '../engine/redact';
+import { WORK_LIMITS } from '../config/workLimits';
 import { hashText, applyUnifiedDiff, reverseUnifiedDiff } from '../engine/diffApply';
 import { PRACTICE_COMMENT, buildPracticeDiff, buildPracticeScript, practiceContent } from '../engine/practiceScript';
 import { commentLineFor } from '../engine/unifiedDiff';
@@ -20,7 +25,7 @@ import { repoKeyOf, type WorkRecord } from './workStorage';
 import {
   addChat, decideProposal, decisionRefusal, idleWork, workProblems, pauseRefusal, pauseRun, redoChange, redoRefusal,
   resumeRefusal, resumeRun, runOneStep, setSelfEditingPause, startRefusal, startRun, stepRefusal,
-  stopRefusal, stopRun, undoChange, undoRefusal, type HistoryEntry, type ProposalBuilder, type Run, type WorkState,
+  stopRefusal, stopRun, undoChange, undoRefusal, amendLastEntry, appendEntry, dropLastEntry, type HistoryEntry, type ProposalBuilder, type Run, type WorkState,
 } from './workSlice';
 
 export type Mode = 'automation' | 'self_editing';
@@ -454,4 +459,57 @@ export function restoreWork(state: StudioState, record: WorkRecord, ctx: WorkCtx
   return logAll({ ...s, work: candidate }, ctx.now, [
     { action: 'work_restored', status: 'info', message: `Saved work restored: ${record.applied.length} applied, ${record.undone.length} undone.` },
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// Your own Edit pad changes (2E-2): applied at once, merged per burst, one atomic update.
+// ---------------------------------------------------------------------------
+
+export interface UserEdit { path: string; baseHash: string; newContent: string; editKey: string; title: string }
+export type UserEditResult = { state: StudioState; recorded: boolean; reason?: string };
+
+export function applyUserEdit(state: StudioState, edit: UserEdit, ctx: WorkCtx): UserEditResult {
+  const snap = state.snapshot;
+  if (!snap) return { state, recorded: false, reason: EDIT_REASONS.changed };
+  const w = state.work;
+  const current = practiceContent(snap, w.applied, edit.path);
+  if (current === undefined || hashText(current) !== edit.baseHash) return { state, recorded: false, reason: EDIT_REASONS.changed };
+  const last = w.applied[w.applied.length - 1];
+  const merging = !!last && last.editKey === edit.editKey && last.path === edit.path && w.undone.length === 0;
+  let work: WorkState;
+  let message: string;
+  let diff: string | null;
+  if (merging) {
+    const rev = reverseUnifiedDiff(last!.diff);
+    const orig = rev ? applyUnifiedDiff(current, rev) : null;
+    if (!orig || !orig.ok) return { state, recorded: false, reason: EDIT_REASONS.changed };
+    diff = buildLineDiff(edit.path, orig.text, edit.newContent);
+    if (diff === null) {
+      work = dropLastEntry(w);
+      const s = logAll(refreshFindings({ ...state, work }, [edit.path]), ctx.now, [{ action: 'style_reverted', status: 'undone', message: 'Style change reverted', affectedPaths: [edit.path] }]);
+      return { state: s, recorded: true };
+    }
+    const check = checkDiff(orig.text, diff, edit.newContent);
+    if (check) return { state, recorded: false, reason: check };
+    work = amendLastEntry(w, { ...last!, diff, at: ctx.now, title: edit.title.slice(0, 80), afterHash: hashText(edit.newContent) });
+    message = `Style change recorded: ${edit.title.slice(0, 80)}`;
+  } else {
+    if (w.applied.length + w.undone.length >= WORK_LIMITS.maxHistoryEntries) return { state, recorded: false, reason: EDIT_REASONS.full };
+    diff = buildLineDiff(edit.path, current, edit.newContent);
+    if (diff === null) return { state, recorded: false, reason: undefined };
+    const check = checkDiff(current, diff, edit.newContent);
+    if (check) return { state, recorded: false, reason: check };
+    work = appendEntry(w, { id: ctx.newId(), path: edit.path, title: edit.title.slice(0, 80), at: ctx.now, diff, beforeHash: hashText(current), afterHash: hashText(edit.newContent), editKey: edit.editKey.slice(0, 200) });
+    message = `Style change recorded: ${edit.title.slice(0, 80)}`;
+  }
+  const s = logAll(refreshFindings({ ...state, work }, [edit.path]), ctx.now, [{ action: 'style_recorded', status: 'applied', message, affectedPaths: [edit.path] }]);
+  return { state: s, recorded: true };
+}
+
+function checkDiff(from: string, diff: string, expected: string): string | null {
+  if (diff.length > WORK_LIMITS.maxDiffChars) return EDIT_REASONS.large;
+  if (containsSecret(diff)) return EDIT_REASONS.secret;
+  const r = applyUnifiedDiff(from, diff);
+  if (!r.ok || r.text !== expected) return EDIT_REASONS.changed;
+  return null;
 }

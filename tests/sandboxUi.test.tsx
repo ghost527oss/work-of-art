@@ -13,7 +13,7 @@ import { initialState, studioStore } from '../src/store/useStudioStore';
 
 const noop = () => undefined;
 const html = (e: React.ReactElement) => renderToStaticMarkup(e);
-const preview = { init: noop, setMode: noop, setWidth: noop, setComponent: noop, setScripts: noop, startBridge: noop, stopBridge: noop, onFrameLoad: noop, setBuilt: noop, checkLayout: async () => undefined, markContent: noop };
+const preview = { init: noop, setMode: noop, setWidth: noop, setComponent: noop, setEntry: noop, setScripts: noop, startBridge: noop, stopBridge: noop, onFrameLoad: noop, setBuilt: noop, checkLayout: async () => undefined, markContent: noop };
 const assistant = { send: () => null, cancel: noop, clear: noop };
 const buttons = (m: string) => [...m.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((x) => x[1]);
 

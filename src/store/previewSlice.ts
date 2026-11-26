@@ -42,6 +42,12 @@ export function pvMode(s: PreviewState, mode: PreviewMode, reason: string): Prev
   return { ...s, mode, chosenBy: 'user', reason, scripts: false, status: 'idle', error: undefined, console: [], invalidMessages: 0, layout: freshLayout() };
 }
 
+/** The Page selector (2E-2): another page, look-only, results cleared. */
+export function pvEntry(s: PreviewState, path: string): PreviewState {
+  if (s.entryPath === path || s.mode !== 'static') return s;
+  return { ...s, entryPath: path, scripts: false, status: 'idle', console: [], invalidMessages: 0, layout: freshLayout() };
+}
+
 export function pvComponent(s: PreviewState, key: string): PreviewState {
   return s.component === key ? s : { ...s, component: key, status: 'idle', layout: freshLayout() };
 }

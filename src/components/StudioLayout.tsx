@@ -12,6 +12,7 @@ import type { HarnessActions } from '../hooks/useHarness';
 import type { UnderstandingActions } from '../hooks/useUnderstanding';
 import type { ScanActions } from '../hooks/useScan';
 import type { PreviewActions } from '../hooks/usePreview';
+import type { EditActions } from '../hooks/useEditPad';
 import { SandboxPanel } from './SandboxPanel';
 import { closePanel, setCollapsed, toggleWidth, togglePanel, type PanelId } from '../store/layoutSlice';
 import { useStudioStore } from '../store/useStudioStore';
@@ -43,6 +44,8 @@ export interface StudioLayoutProps {
   scan?: ScanActions;
   /** Sub-phase 2E-1. When given, the Sandbox panel replaces the placeholder. */
   preview?: PreviewActions;
+  /** Sub-phase 2E-2. With `preview` and `harness`, the Edit panel becomes the Edit pad. */
+  editPad?: EditActions;
 }
 
 const PANEL_TITLES: Record<PanelId, string> = {
@@ -69,7 +72,7 @@ function HarnessBar({ harness }: { harness: HarnessActions }) {
   );
 }
 
-export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview }: StudioLayoutProps) {
+export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad }: StudioLayoutProps) {
   const hasSnapshot = useStudioStore((s) => s.snapshot !== undefined);
   if (!hasSnapshot) return null;
   return (
@@ -86,12 +89,13 @@ export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError,
         understanding={understanding}
         scan={scan}
         preview={preview}
+        editPad={editPad}
       />
     </div>
   );
 }
 
-function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview }: StudioLayoutProps) {
+function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad }: StudioLayoutProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const log = useStudioStore((s) => s.log);
   const work = useStudioStore((s) => s.work);
@@ -104,7 +108,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
     return (
       <main className="shell">
         <div className="shell-left">
-          {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
+          {preview ? <SandboxPanel preview={preview} pad={editPad} /> : <SandboxPlaceholder />}
         </div>
         <SkeletonCrewScreen onOpenArea={shellActions.openDomain} onBack={shellActions.backToStudio} live={harness && scan ? { harness, scan, onOpened: shellActions.backToStudio } : undefined} />
       </main>
@@ -115,7 +119,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
     return (
       <main className="shell">
         <div className="shell-left">
-          {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
+          {preview ? <SandboxPanel preview={preview} pad={editPad} /> : <SandboxPlaceholder />}
         </div>
         <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} live={harness ? { harness, onOpened: shellActions.backToStudio } : undefined} />
       </main>
@@ -127,7 +131,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
   return (
     <main className="shell">
       <div className={covered ? 'shell-left covered' : 'shell-left'}>
-        {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
+        {preview ? <SandboxPanel preview={preview} pad={editPad} /> : <SandboxPlaceholder />}
         <ProjectInfo onLoadFolders={onLoadFolders} onCancel={onCancel} onRetry={onRetry} onDismissError={onDismissError} onBack={onBack} understanding={understanding} />
       </div>
       <PanelFrame
@@ -150,7 +154,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
           <AIAssistantPanel key={snapshot.id} snapshot={snapshot} assistant={assistant} harness={harness} />
         </div>
         {open === 'log' && <LogPanel entries={log} />}
-        {open === 'edit' && <EditPanel mode="self_editing" />}
+        {open === 'edit' && <EditPanel mode="self_editing" pad={editPad} preview={preview} harness={harness} />}
         {open === 'history' && <HistoryPanel applied={work.applied} undone={work.undone} />}
         {open === 'journal' && <PlaceholderPanel title="Journal" phaseLabel="2F" />}
       </PanelFrame>

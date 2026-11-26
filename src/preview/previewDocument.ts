@@ -1,4 +1,5 @@
 // @node: F7.3
+// @node: F8.3 (element keys, mappable flags, and Preview Only styles)
 // The allowlist re-serializer: reads the page into tokens and writes a NEW document containing only allowed
 // tags and attributes, with every value escaped. Pure: no DOM, no network, no clock.
 import { PREVIEW_LIMITS as L } from '../config/previewLimits';
@@ -7,8 +8,17 @@ import { escapeAttr, escapeText, tokenizeHtml, VOID, type HtmlAttr } from './htm
 import { sanitizeCss, styleBody } from './cssSanitize';
 import { cspFor } from './previewFlags';
 import { INSPECTOR_SOURCE } from './previewBridge';
+import { isSafeDeclaration } from '../edit/styleModel';
 
-export interface ElementEntry { id: number; path: string; tag: string; line: number; col: number; startOffset: number; endOffset: number; endLine: number }
+export interface ElementEntry {
+  id: number; path: string; tag: string; line: number; col: number; startOffset: number; endOffset: number; endLine: number;
+  /** `path#tag#n` (n = 1-based count of that tag name so far in the file). Stable until the structure changes. */
+  key?: string;
+  mappable?: boolean;
+  reason?: string;
+}
+
+export interface PreviewStyle { elementKey: string; property: string; value: string }
 export interface PreviewReport { removed: Record<string, number>; blockedExternal: string[]; placeholders: string[]; inlinedFiles: number; unknownTags: number; truncated: boolean }
 export type PreviewBuild = { ok: true; html: string; elements: ElementEntry[]; report: PreviewReport; notes: string[] } | { ok: false; reason: string };
 
@@ -24,6 +34,10 @@ export interface StaticInput {
   idStart?: number;
   /** Entry content override (the workbench passes generated markup). */
   entrySource?: string;
+  /** Preview Only styles written as inline style on the matching elements (validated before use). */
+  previewStyles?: readonly PreviewStyle[];
+  /** Set by the workbench: elements are annotated but never mappable. */
+  approximate?: boolean;
 }
 
 const BASE_STYLE = '.pb-img{display:inline-block;border:1px dashed #000;font:12px monospace;box-sizing:border-box;overflow:hidden;padding:2px}.pb-expr{border:1px dashed #000;font:12px monospace}.pb-box{display:block;border:1px dashed #000;font:12px monospace;padding:4px}';
@@ -46,6 +60,12 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
     const source = input.entrySource ?? input.effective(input.entryPath);
     if (source === undefined) return { ok: false, reason: 'The page could not be read.' };
     const annotate = input.annotate !== false && !input.scripts;
+    const tagCounts = new Map<string, number>();
+    const styleFor = new Map<string, string>();
+    for (const ps of input.previewStyles ?? []) {
+      if (!isSafeDeclaration({ prop: ps.property, value: ps.value })) continue;
+      styleFor.set(ps.elementKey, `${styleFor.get(ps.elementKey) ?? ''};${ps.property}:${ps.value}`);
+    }
     const report: PreviewReport = { removed: {}, blockedExternal: [], placeholders: [], inlinedFiles: 0, unknownTags: 0, truncated: false };
     const elements: ElementEntry[] = [];
     const styles: string[] = [];
@@ -161,13 +181,22 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       const isSvg = SVG_TAGS.has(tag);
       if (isSvg && tag === 'svg') inSvg++;
       let marker = '';
+      const n = (tagCounts.get(name) ?? 0) + 1;
+      tagCounts.set(name, n);
+      const key = `${input.entryPath}#${name}#${n}`;
       if (annotate) {
         marker = ` data-pb="${id}"`;
-        const endLine = tokens.length ? tok.line + (source.slice(tok.start, tok.end).match(/\n/g)?.length ?? 0) : tok.line;
-        elements.push({ id, path: input.entryPath, tag, line: tok.line, col: tok.col, startOffset: tok.start, endOffset: tok.end, endLine });
+        const endLine = tok.line + (source.slice(tok.start, tok.end).match(/\n/g)?.length ?? 0);
+        const reason = input.approximate ? 'This element comes from a component picture, which is approximate.'
+          : inSvg > 0 || isSvg ? 'This element is inside an SVG.'
+          : !known ? 'This tag was not recognised.'
+          : !/\.html?$/i.test(input.entryPath) ? 'Only plain HTML pages can be written to the practice copy.' : undefined;
+        elements.push({ id, path: input.entryPath, tag, line: tok.line, col: tok.col, startOffset: tok.start, endOffset: tok.end, endLine, key, mappable: reason === undefined, ...(reason ? { reason } : {}) });
         id++;
       }
-      body.push(`<${SVG_CASE[tag] ?? tag}${writeAttrs(attrs, tag)}${marker}>`);
+      const extraStyle = styleFor.get(key);
+      const attrsOut = extraStyle ? withExtraStyle(writeAttrs(attrs, tag), extraStyle) : writeAttrs(attrs, tag);
+      body.push(`<${SVG_CASE[tag] ?? tag}${attrsOut}${marker}>`);
       if (!(tok.selfClosing || VOID.has(tag))) open.push({ tag }); else if (isSvg && tag === 'svg') inSvg = Math.max(0, inSvg - 1);
     }
     while (open.length) { const t = open.pop()!.tag; body.push(`</${SVG_CASE[t] ?? t}>`); }
@@ -183,6 +212,13 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
   } catch {
     return { ok: false, reason: 'The preview could not be built.' };
   }
+}
+
+/** Adds Preview Only declarations to the written attribute string (they win over the page's own inline style). */
+function withExtraStyle(attrs: string, extra: string): string {
+  const m = / style="([^"]*)"/.exec(attrs);
+  const add = escapeAttr(extra.replace(/^;/, ''));
+  return m ? attrs.replace(m[0], ` style="${m[1]};${add}"`) : `${attrs} style="${add}"`;
 }
 
 function notesFrom(r: PreviewReport): string[] {

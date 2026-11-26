@@ -12,6 +12,7 @@ export interface WorkbenchInput {
   effective: (path: string) => string | undefined;
   analysis?: AnalysisResult;
   componentKey?: string; // `${path}#${name}`
+  previewStyles?: ReadonlyArray<{ elementKey: string; property: string; value: string }>;
   nonce: string;
   origin: string;
 }
@@ -71,7 +72,7 @@ export function buildWorkbench(input: WorkbenchInput): PreviewBuild & { componen
     const css = `${comp.css ?? ''}\n${cssFor(input, comp.path)}`;
     const source = `<!doctype html><html><head><style>${css}</style></head><body>${body}</body></html>`;
     const built = buildStaticPreview({
-      entryPath: comp.path, effective: () => source, loaded: new Set([comp.path]), scripts: false, nonce: input.nonce, origin: input.origin, annotate: false, entrySource: source,
+      entryPath: comp.path, effective: () => source, loaded: new Set([comp.path]), scripts: false, nonce: input.nonce, origin: input.origin, annotate: true, approximate: true, entrySource: source, previewStyles: input.previewStyles,
     });
     return { ...built, components: list, chosen: comp.key };
   } catch {

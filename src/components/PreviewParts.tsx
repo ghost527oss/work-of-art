@@ -39,8 +39,8 @@ export function PreviewToolbar(p: PreviewToolbarProps) {
       )}
       {p.mode === 'static' && (
         <>
-          <button type="button" disabled={!p.canMeasure} onClick={p.onCheck}>Check layout</button>{' '}
-          <button type="button" disabled={!p.canMeasure} onClick={p.onCheckAll}>Check at all widths</button>
+          <button type="button" data-check="one" disabled={!p.canMeasure} onClick={p.onCheck}>Check layout</button>{' '}
+          <button type="button" data-check="all" disabled={!p.canMeasure} onClick={p.onCheckAll}>Check at all widths</button>
           {!p.canMeasure && p.measureReason && <span className="note"> {p.measureReason}</span>}
         </>
       )}

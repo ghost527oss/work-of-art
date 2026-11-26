@@ -549,3 +549,46 @@ textarea {
 .preview-toolbar {
   margin-bottom: 0.5rem;
 }
+
+/* @node: F8.7 — Edit pad and overlay (sub-phase 2E-2). Black, white, and dashes only. */
+.edit-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.edit-outline,
+.edit-lasso {
+  position: absolute;
+  border: 2px dashed #000;
+  box-shadow: 0 0 0 1px #fff;
+  pointer-events: none;
+}
+
+.edit-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid #000;
+}
+
+.edit-tools button,
+.property-form button,
+.property-form input,
+.property-form select {
+  min-height: 44px;
+}
+
+.property-form details {
+  border: 1px solid #000;
+  margin: 0.25rem 0;
+  padding: 0.25rem 0.5rem;
+}
+
+.link-button {
+  border: 0;
+  background: #fff;
+  text-decoration: underline;
+}

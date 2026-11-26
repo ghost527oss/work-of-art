@@ -40,6 +40,8 @@ export interface HistoryEntry {
   afterHash: string;
   /** Set for Skeleton Crew fixes (2D): the area the finding belongs to. */
   area?: 'frontend' | 'backend' | 'security' | 'api_data';
+  /** Set for your own Edit pad changes (2E-2): a burst of changes to the same elements merges into one entry. */
+  editKey?: string;
 }
 
 export interface ChatLine {
@@ -221,6 +223,23 @@ export function decideProposal(w: WorkState, decision: 'approve' | 'reject', ent
   if (decision === 'reject') return { ...w, proposal: null, run: nextRun };
   if (!entry) return w;
   return { ...w, proposal: null, run: nextRun, applied: [...w.applied, { ...entry }], undone: [] };
+}
+
+/** Replaces the newest applied entry (a merged burst). Refused when anything was undone. */
+export function amendLastEntry(w: WorkState, entry: HistoryEntry): WorkState {
+  const last = w.applied[w.applied.length - 1];
+  if (!last || w.undone.length > 0 || last.id !== entry.id) return w;
+  return { ...w, applied: [...w.applied.slice(0, -1), { ...entry }] };
+}
+
+export function dropLastEntry(w: WorkState): WorkState {
+  if (w.applied.length === 0 || w.undone.length > 0) return w;
+  return { ...w, applied: w.applied.slice(0, -1) };
+}
+
+export function appendEntry(w: WorkState, entry: HistoryEntry): WorkState {
+  if (w.applied.length + w.undone.length >= WORK_LIMITS.maxHistoryEntries) return w;
+  return { ...w, applied: [...w.applied, { ...entry }], undone: [] };
 }
 
 export function undoChange(w: WorkState): WorkState {

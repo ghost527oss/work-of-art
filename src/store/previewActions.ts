@@ -3,7 +3,7 @@
 import { MODE_NAMES, type PreviewMode } from '../preview/previewMode';
 import type { Finding } from '../engine/scanFindingTypes';
 import {
-  pvComponent, pvConsole, pvInit, pvInvalid, pvLayoutBegin, pvLayoutDiscard, pvLayoutDone, pvLayoutStop, pvMode, pvScripts, pvStatus, pvWidth,
+  pvComponent, pvConsole, pvEntry, pvInit, pvInvalid, pvLayoutBegin, pvLayoutDiscard, pvLayoutDone, pvLayoutStop, pvMode, pvScripts, pvStatus, pvWidth,
   type PreviewState, type PreviewWidth,
 } from './previewSlice';
 import { withLog, type StudioState } from './useStudioStore';
@@ -19,6 +19,10 @@ export function setPreviewMode(state: StudioState, mode: PreviewMode, reason: st
   const next = put(state, pvMode(state.preview, mode, reason));
   if (next === state) return state;
   return { ...next, ...withLog(next, now, { action: 'preview_mode', status: 'info', message: `Preview mode: ${MODE_NAMES[mode]}.` }) };
+}
+
+export function setPreviewEntry(state: StudioState, path: string): StudioState {
+  return put(state, pvEntry(state.preview, path));
 }
 
 export function setPreviewComponent(state: StudioState, key: string): StudioState {
