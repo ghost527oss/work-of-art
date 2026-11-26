@@ -90,19 +90,19 @@ describe('Studio shell (Screen 3)', () => {
     }
   });
 
-  it('the Log panel lists the session log entries and the 2B note', () => {
+  it('the Log panel lists the session log entries (the 2B note is gone)', () => {
     setLayout({ openPanel: 'log', collapsed: false, width: 'narrow' });
     const html = render();
     expect(html).toContain('Session log');
     expect(html).toContain('ingest_completed');
-    expect(html).toContain('Planning and skill entries arrive in sub-phase 2B.');
+    expect(html).not.toContain('Planning and skill entries arrive in sub-phase 2B.');
   });
 
   it('placeholder panels name their sub-phase', () => {
     setLayout({ openPanel: 'edit', collapsed: false, width: 'narrow' });
-    expect(render()).toContain('Arrives in sub-phase 2E.');
+    expect(render()).toContain('Editing tools arrive in sub-phase 2E.');
     setLayout({ openPanel: 'history', collapsed: false, width: 'narrow' });
-    expect(render()).toContain('Arrives in sub-phase 2B.');
+    expect(render()).toContain('No changes yet.');
     setLayout({ openPanel: 'journal', collapsed: false, width: 'narrow' });
     expect(render()).toContain('Arrives in sub-phase 2F.');
   });

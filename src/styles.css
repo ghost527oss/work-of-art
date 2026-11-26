@@ -375,3 +375,16 @@ textarea {
 .chat-replies .refused {
   font-style: italic;
 }
+
+.studio-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.studio-root > .shell {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}

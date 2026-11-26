@@ -2,7 +2,16 @@
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { StudioLayout } from '../src/components/StudioLayout';
+import { buildSampleSnapshot } from '../src/data/sampleRepos';
+import { layoutStore } from '../src/hooks/useLayout';
+import { shellStore } from '../src/hooks/useShell';
+import { DEFAULT_LAYOUT } from '../src/store/layoutSlice';
+import { INITIAL_VIEW } from '../src/store/shellView';
+import { beginIngestion, completeIngestion, initialState, studioStore } from '../src/store/useStudioStore';
+import { addChat, idleWork, startRun, runOneStep } from '../src/store/workSlice';
+import { buildPracticeScript } from '../src/engine/practiceScript';
 import { EditPanel } from '../src/components/EditPanel';
 import { HistoryPanel } from '../src/components/HistoryPanel';
 import { ProposalCard } from '../src/components/ProposalCard';
@@ -127,5 +136,69 @@ describe('no Pause, Resume, or Step button; static rules', () => {
     const colors = block.match(/#[0-9a-fA-F]{3,8}\b/g) ?? [];
     for (const c of colors) expect(['#000', '#fff']).toContain(c.toLowerCase());
     expect(block).not.toMatch(/rgb|hsl/i);
+  });
+});
+
+describe('wiring into the Studio (B9)', () => {
+  const snapshot = buildSampleSnapshot('fullstack-api', 1);
+  const harness = { submitText: () => false, run: noop, stop: noop };
+  const assistant = { send: () => null, cancel: noop, clear: noop };
+  const render = () =>
+    renderToStaticMarkup(
+      createElement(StudioLayout, { onLoadFolders: noop, onCancel: noop, onRetry: noop, onDismissError: noop, onBack: noop, assistant, harness }),
+    );
+  function seed(work = idleWork()) {
+    const target = { owner: 'sample', repo: 'x', source: 'sample' as const, sampleId: 'x' };
+    let st = beginIngestion(initialState(), target, 1);
+    st = completeIngestion(st, st.ingestion.runId, snapshot, 2);
+    studioStore.setState({ ...st, work });
+  }
+  beforeEach(() => {
+    layoutStore.setState(DEFAULT_LAYOUT);
+    shellStore.setState(INITIAL_VIEW);
+  });
+  afterEach(() => {
+    studioStore.setState(initialState());
+    layoutStore.setState(DEFAULT_LAYOUT);
+    shellStore.setState(INITIAL_VIEW);
+  });
+
+  it('the Stop bar is on Screens 3, 4, and 5', () => {
+    seed();
+    expect(render()).toContain('stop-bar');
+    shellStore.setState({ screen: 'skeleton' } as typeof INITIAL_VIEW);
+    expect(render()).toContain('stop-bar');
+    shellStore.setState({ screen: 'domain', area: 'frontend' } as typeof INITIAL_VIEW);
+    expect(render()).toContain('stop-bar');
+  });
+  it('without a harness there is no Stop bar (2A look)', () => {
+    seed();
+    const m = renderToStaticMarkup(createElement(StudioLayout, { onLoadFolders: noop, onCancel: noop, onRetry: noop, onDismissError: noop, onBack: noop, assistant }));
+    expect(m).not.toContain('stop-bar');
+  });
+  it('AI Chat shows the hint, the replies list, and a waiting proposal card', () => {
+    const steps = buildPracticeScript(snapshot)!;
+    let w = startRun(idleWork(), 'r1', steps, false);
+    for (let i = 0; i < 4; i++) w = runOneStep(w, 'p1');
+    w = addChat(w, 'help', 'LINE ONE', true);
+    seed(w);
+    const m = render();
+    expect(m).toContain('Type help for commands.');
+    expect(m).toContain('chat-replies');
+    expect(m).toContain('LINE ONE');
+    expect(m).toContain('proposal-card');
+    expect(m).toContain('Waiting for your decision.');
+    expect(buttons(m)).toEqual(expect.arrayContaining(['Approve', 'Reject', 'Stop']));
+  });
+  it('History and Edit panels show their new content, Log has no placeholder note', () => {
+    seed();
+    layoutStore.setState({ openPanel: 'history', collapsed: false, width: 'narrow' });
+    expect(render()).toContain('No changes yet.');
+    layoutStore.setState({ openPanel: 'edit', collapsed: false, width: 'narrow' });
+    const edit = render();
+    expect(edit).toContain('Editing tools arrive in sub-phase 2E.');
+    expect(edit).toContain('Mode: Self-editing.');
+    layoutStore.setState({ openPanel: 'log', collapsed: false, width: 'narrow' });
+    expect(render()).not.toContain('arrive in sub-phase 2B');
   });
 });
