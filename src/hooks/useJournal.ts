@@ -16,6 +16,7 @@ import { buildLogJson, buildLogMarkdown } from '../export/logExport';
 import { buildPatch, planPatchExport, type PatchPlan } from '../export/patchExport';
 import { logJournalExport, logLogExport, logPatchExport } from '../store/exportActions';
 import { layoutStore } from './useLayout';
+import { isScanStale } from './useScan';
 import { shellActions } from './useShell';
 
 export interface JournalActions {
@@ -78,6 +79,7 @@ export function journalInputOf(s: StudioState): JournalInput {
     mode: s.preview.mode,
     modeReason: s.preview.reason,
     entryPath: s.preview.entryPath,
+    scanStale: isScanStale(s),
   };
 }
 const EMPTY: never[] = [];

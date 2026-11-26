@@ -60,12 +60,16 @@ describe('JournalPanel', () => {
   });
 
   it('building, failed, and no-snapshot states', () => {
-    const base = { level: 'simple' as const, overview: [], flows: [], flowsHidden: 0, lessons: [], concepts: [], hidden: 0, notes: [] };
+    const base = { level: 'simple' as const, overview: [], flows: [], flowsHidden: 0, lessons: [], concepts: [], hidden: 0, notes: [], scan: 'done' as const };
     expect(panel({ ...base, status: 'analysing' })).toContain('Building the Journal...');
     const f = panel({ ...base, status: 'failed' }, { analysisError: 'Timed out', onRetry: noop });
     expect(f).toContain('The project analysis is not ready, so the Journal cannot be built. Reason: Timed out');
     expect(buttons(f)).toContain('Try again');
     expect(panel({ ...base, status: 'ready' })).toContain('PatchBay found nothing from the checks that ran.');
+    // never an all-clear when no scan ran or the scan is out of date
+    expect(panel({ ...base, status: 'ready', scan: 'none' })).toContain('PatchBay has not run its checks yet.');
+    expect(panel({ ...base, status: 'ready', scan: 'none' })).not.toContain('found nothing');
+    expect(panel({ ...base, status: 'ready', scan: 'stale' })).toContain('The scan is out of date');
   });
 
   it('the only buttons are levels, Open in viewer, Related cards, Download, Try again', async () => {
@@ -74,6 +78,30 @@ describe('JournalPanel', () => {
     for (const c of PLAYBOOK.cards) allowed.add(c.title); // Related buttons name a card
     for (const b of buttons(html)) expect(allowed.has(b), b).toBe(true);
     for (const no of ['Apply', 'Approve', 'Reject', 'Pause', 'Resume', 'Step']) expect(buttons(html)).not.toContain(no);
+  });
+});
+
+describe('flows and Learn more targets', () => {
+  it('a "uses" step names and opens the importing file at the import line', async () => {
+    const { FlowsSection } = await import('../src/components/FlowsSection');
+    const flow = { id: 'r', kind: 'request' as const, title: 'Request: PUT /x', notes: [], steps: [{ path: 'server/middleware/validate.js', line: 2, certainty: 'confirmed' as const, kind: 'uses', label: 'uses', target: 'server/routes/profile.js' }] };
+    const html = renderToStaticMarkup(createElement(FlowsSection, { flows: [flow], hidden: 0, level: 'practical', onOpenViewer: noop }));
+    expect(html).toContain('<code>server/routes/profile.js</code>, line 2');
+  });
+  it('Learn more on a measured finding asks for the layout-overflow lesson', () => {
+    const asked: string[] = [];
+    const f = { id: 'm', skillId: 'scan.frontend.layout-overflow', path: 'index.html', firstLine: 3, lastLine: 3, snippet: [], severity: 'low', certainty: 'found', fix: 'explanation', areas: ['frontend'], primary: 'frontend', extra: 'Measured at 375 px wide.' } as never;
+    const el = FindingDetail({ finding: f, onLearnMore: (id) => asked.push(id) });
+    const find = (n: unknown): { props: { onClick?: () => void; children?: unknown } } | undefined => {
+      if (!n || typeof n !== 'object') return undefined;
+      const node = n as { props?: { children?: unknown; onClick?: () => void } };
+      if (node.props?.children === 'Learn more' && node.props.onClick) return node as never;
+      const kids = node.props?.children;
+      for (const k of Array.isArray(kids) ? kids : [kids]) { const r = find(k); if (r) return r; }
+      return undefined;
+    };
+    find(el)!.props.onClick!();
+    expect(asked).toEqual(['lesson.scan.frontend.layout-overflow']);
   });
 });
 

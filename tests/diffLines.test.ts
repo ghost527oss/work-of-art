@@ -73,3 +73,15 @@ describe('diffLines', () => {
     expect(play(a, b, ops)).toEqual(b);
   });
 });
+
+describe('diffLines memory', () => {
+  it('a full 20,000-line rewrite stays bounded (falls back under the work limit, no huge trace)', () => {
+    const a = Array.from({ length: 20000 }, (_, i) => `a${i}\n`);
+    const b = Array.from({ length: 20000 }, (_, i) => `b${i}\n`);
+    const before = process.memoryUsage().heapUsed + process.memoryUsage().arrayBuffers;
+    const ops = diffLines(a, b);
+    const after = process.memoryUsage().heapUsed + process.memoryUsage().arrayBuffers;
+    expect(play(a, b, ops)).toEqual(b);
+    expect((after - before) / 1024 / 1024).toBeLessThan(200);
+  });
+});

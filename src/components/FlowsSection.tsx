@@ -39,8 +39,11 @@ export function FlowsSection({ flows, hidden, level, onOpenViewer }: FlowsSectio
       <ol>
         {flow.steps.map((s, i) => (
           <li key={i}>
-            {s.path && <code>{s.path}</code>}{s.line ? `, line ${s.line}` : ''}: {describeStep(s, level)}
-            {s.path && <> <button type="button" onClick={() => onOpenViewer(s.path!, s.line ?? 1)}>Open in viewer</button></>}
+            {s.kind === 'uses' && s.target
+              ? <><code>{s.target}</code>{s.line ? `, line ${s.line}` : ''}: {describeStep(s, level)}</>
+              : <>{s.path && <code>{s.path}</code>}{s.line ? `, line ${s.line}` : ''}: {describeStep(s, level)}</>}
+            {/* a "uses" step's line is the import line in the importing file (target), so open that file there */}
+            {s.path && <> <button type="button" onClick={() => (s.kind === 'uses' && s.target ? onOpenViewer(s.target, s.line ?? 1) : onOpenViewer(s.path!, s.line ?? 1))}>Open in viewer</button></>}
           </li>
         ))}
       </ol>

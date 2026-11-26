@@ -175,7 +175,7 @@ export const PLAYBOOK: Playbook = {
       levels: {
         simple: 'Joining text into a database command lets a visitor change the command. Use the safer form with placeholders.',
         practical: 'This command is built with + or a template, so text from a visitor becomes part of the command itself. Use placeholders such as $1 or ?, and pass the values separately. The database then treats them only as values.',
-        deeper: 'When a query is built by joining strings, a value that contains quote marks can end the intended command and start a new one, which is called SQL injection. Placeholders send the command and the values to the database separately, so values can never become commands. Most database libraries support placeholders directly.',
+        deeper: 'When a query is built by joining strings, a value that contains quote marks can end the intended command and start a new one, which is called SQL injection. Placeholders send the command and the values to the database separately, so the database reads the values as data, not as part of the command. Most database libraries support placeholders directly.',
       },
     },
     {

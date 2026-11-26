@@ -1,6 +1,6 @@
 // @node: F9.9
 // Lessons from your project: one block per lesson, its text at the level, and "In your project" with Open in viewer.
-import type { LessonView } from '../journal/journalModel';
+import { NO_LESSONS, type JournalModel, type LessonView } from '../journal/journalModel';
 import type { Level } from '../skillbook/playbookSchema';
 import { Fold } from './Fold';
 
@@ -11,12 +11,13 @@ export const lessonDomId = (id: string) => `lesson-${id.replace(/[^a-z0-9-]/gi, 
 export interface LessonsSectionProps {
   lessons: readonly LessonView[];
   level: Level;
+  scan: JournalModel['scan'];
   focus?: string;
   onOpenViewer(path: string, line: number): void;
 }
 
-export function LessonsSection({ lessons, level, focus, onOpenViewer }: LessonsSectionProps) {
-  if (lessons.length === 0) return <p>PatchBay found nothing from the checks that ran.</p>;
+export function LessonsSection({ lessons, level, scan, focus, onOpenViewer }: LessonsSectionProps) {
+  if (lessons.length === 0) return <p>{NO_LESSONS[scan]}</p>;
   return (
     <div className="journal-lessons">
       {lessons.map((l) => (

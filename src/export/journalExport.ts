@@ -5,12 +5,16 @@ import { describeStep } from '../journal/flows';
 import type { JournalModel } from '../journal/journalModel';
 import type { RepoSnapshot } from '../types/contracts';
 import { cardById } from '../skillbook';
+import { redact } from '../engine/redact';
+import { NO_LESSONS } from '../journal/journalModel';
+import { utf8Bytes } from './patchExport';
 
 const LEVEL_NAMES = { simple: 'Simple', practical: 'Practical', deeper: 'Deeper' } as const;
 
 export function buildJournalMarkdown(j: JournalModel, snap: RepoSnapshot, now?: Date): string {
   const sections: string[][] = [];
-  sections.push([`# PatchBay journal: ${snap.name}`, `Repository: ${snap.source} ${snap.owner}/${snap.name} @ ${snap.ref}`, ...(now ? [`Exported: ${now.toISOString()}`] : []), `Level: ${LEVEL_NAMES[j.level]}`, 'Built offline by PatchBay from the files it read. No AI was used.', '']);
+  const r = (t: string) => redact(t).text;
+  sections.push([`# PatchBay journal: ${r(snap.name)}`, `Repository: ${snap.source} ${r(snap.owner)}/${r(snap.name)} @ ${r(snap.ref)}`, ...(now ? [`Exported: ${now.toISOString()}`] : []), `Level: ${LEVEL_NAMES[j.level]}`, 'Built offline by PatchBay from the files it read. No AI was used.', '']);
   sections.push(['## Application overview', ...j.overview.flatMap((p) => [p.title ? `### ${p.title}` : '', p.sentences.join(' '), '']).filter((x, i, a) => !(x === '' && a[i - 1] === ''))]);
   const flows = ['## How things flow'];
   for (const f of j.flows) {
@@ -23,7 +27,7 @@ export function buildJournalMarkdown(j: JournalModel, snap: RepoSnapshot, now?: 
   if (j.flowsHidden) flows.push(`${j.flowsHidden} more flows are not shown.`, '');
   sections.push(flows);
   const lessons = ['## Lessons from your project'];
-  if (j.lessons.length === 0) lessons.push('No lessons: the checks that ran found nothing to look at.', '');
+  if (j.lessons.length === 0) lessons.push(NO_LESSONS[j.scan], '');
   for (const l of j.lessons) {
     lessons.push(`### ${l.lesson.title}`, l.lesson.levels[j.level], '', 'In your project:');
     for (const i of l.instances) lessons.push(i.firstLine ? `- ${i.path}, lines ${i.firstLine} to ${i.lastLine}: ${i.severity}, ${i.certainty}, ${i.fix}${i.extra ? `. ${i.extra}` : ''}` : `- ${i.path}: ${i.extra ?? ''}`);
@@ -36,9 +40,12 @@ export function buildJournalMarkdown(j: JournalModel, snap: RepoSnapshot, now?: 
   if (linked.length) sections.push(['## Related concepts', ...linked.flatMap((c) => [`### ${c!.title}`, c!.levels[j.level], '']), '']);
   sections.push(['## Notes', ...(j.notes.length ? j.notes : ['None.']), '']);
   let out = '';
+  let bytes = 0;
   for (const s of sections) {
     const block = s.join('\n') + '\n';
-    if (out.length + block.length > L.journalBytes) { out += 'Shortened to fit.\n'; break; }
+    const size = utf8Bytes(block);
+    if (bytes + size > L.journalBytes) { out += 'Shortened to fit.\n'; break; }
+    bytes += size;
     out += block;
   }
   return out;

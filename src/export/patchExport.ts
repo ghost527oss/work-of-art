@@ -67,15 +67,23 @@ export function planPatchExport(snapshot: RepoSnapshot, applied: readonly Histor
   return { files, previewOnlyCount };
 }
 
+const encoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+export const utf8Bytes = (t: string) => (encoder ? encoder.encode(t).length : t.length * 3);
+
 export function buildPatch(plan: PatchPlan, selected: ReadonlySet<string>): { text: string; files: number; hunks: number; sizeExcluded: string[] } {
   let text = '';
   let files = 0;
   let hunks = 0;
   const sizeExcluded: string[] = [];
+  let bytes = 0;
+  let full = false;
   for (const f of plan.files) {
     if (!selected.has(f.path) || !f.patch) continue;
     const block = `diff --git a/${f.path} b/${f.path}\n${f.patch}`;
-    if (text.length + block.length > L.patchBytes) { sizeExcluded.push(f.path); continue; }
+    const size = utf8Bytes(block);
+    // R7.6: once the limit is reached, every later file is excluded with the size reason.
+    if (full || bytes + size > L.patchBytes) { full = true; sizeExcluded.push(f.path); continue; }
+    bytes += size;
     text += block;
     files++;
     hunks += f.hunks;

@@ -29,7 +29,8 @@ export function JournalPanel({ model, onLevel, focus, onFocus, onFocusDone, onOp
   const conceptFocus = focus && model.concepts.some((c) => c.id === focus) ? focus : undefined;
 
   useEffect(() => {
-    if (!focus) return undefined;
+    // Keep the request until the Journal is built, so Learn more during analysis still lands on the lesson.
+    if (!focus || model.status !== 'ready') return undefined;
     // Wait one frame so the forced-open blocks are in the page, then scroll and hand focus to the lesson.
     const t = setTimeout(() => {
       const el = typeof document !== 'undefined' ? document.getElementById(lessonDomId(focus)) : null;
@@ -37,7 +38,7 @@ export function JournalPanel({ model, onLevel, focus, onFocus, onFocusDone, onOp
       onFocusDone();
     }, 0);
     return () => clearTimeout(t);
-  }, [focus, onFocusDone]);
+  }, [focus, onFocusDone, model.status]);
 
   return (
     <section aria-labelledby="journal-heading" className="journal-panel">
@@ -60,8 +61,9 @@ export function JournalPanel({ model, onLevel, focus, onFocus, onFocusDone, onOp
           <Fold title="How things flow" initialOpen={false}>
             <FlowsSection flows={model.flows} hidden={model.flowsHidden} level={model.level} onOpenViewer={onOpenViewer} />
           </Fold>
-          <Fold title="Lessons from your project" initialOpen={model.lessons.length > 0} force={!!lessonFocus}>
-            <LessonsSection lessons={model.lessons} level={model.level} focus={lessonFocus} onOpenViewer={onOpenViewer} />
+          {/* keyed so the block opens when the first lesson arrives after the scan */}
+          <Fold key={model.lessons.length > 0 ? 'has' : 'none'} title="Lessons from your project" initialOpen={model.lessons.length > 0} force={!!lessonFocus}>
+            <LessonsSection lessons={model.lessons} level={model.level} scan={model.scan} focus={lessonFocus} onOpenViewer={onOpenViewer} />
           </Fold>
           {model.notes.length > 0 && <div className="note">{model.notes.map((n, i) => <p key={i}>{n}</p>)}</div>}
         </>

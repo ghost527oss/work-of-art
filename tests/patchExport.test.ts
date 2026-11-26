@@ -95,6 +95,16 @@ describe('planPatchExport and buildPatch', () => {
     expect(out.files).toBe(1);
     expect(out.sizeExcluded).toEqual(['b.txt']);
     expect(out.text.length).toBeLessThanOrEqual(JOURNAL_LIMITS.patchBytes);
+    // R7.6: after the limit is reached, a later small file is excluded too
+    const files3 = [...files, { path: 'c.txt', size: 2, loadStatus: 'loaded', content: 'c\n' }] as unknown as RepoSnapshot['files'];
+    const s3 = { ...snap, files: files3 } as RepoSnapshot;
+    const big2 = 'y'.repeat(400 * 1024) + '\n';
+    const p3 = plan(s3, [entry('a.txt', 'a\n', big2), entry('b.txt', 'b\n', big2), entry('c.txt', 'c\n', 'd\n')]);
+    expect(buildPatch(p3, new Set(['a.txt', 'b.txt', 'c.txt'])).sizeExcluded).toEqual(['b.txt', 'c.txt']);
+    // the cap counts bytes: 300 K three-byte characters do not fit
+    const wide = '\u20ac'.repeat(200 * 1024) + '\n';
+    const p4 = plan(s, [entry('a.txt', 'a\n', wide)]);
+    expect(buildPatch(p4, new Set(['a.txt'])).sizeExcluded).toEqual(['a.txt']);
   });
 
   it('never mutates the snapshot or the History (frozen inputs)', () => {

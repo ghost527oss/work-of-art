@@ -9,6 +9,7 @@ export interface DownloadDeps {
 
 export function createDownloader(deps: DownloadDeps) {
   const urls = new Set<string>();
+  const timers = new Set<string>();
   const release = (u: string) => { if (urls.delete(u)) { try { deps.URL.revokeObjectURL(u); } catch { /* ignore */ } } };
   return {
     download(name: string, text: string, type = 'text/plain'): boolean {
@@ -20,11 +21,13 @@ export function createDownloader(deps: DownloadDeps) {
         a.download = name;
         a.rel = 'noopener';
         deps.document.body.appendChild(a);
-        a.click();
-        deps.document.body.removeChild(a);
-        deps.setTimeout(() => release(url), 10_000);
+        try { a.click(); } finally { try { deps.document.body.removeChild(a); } catch { /* already gone */ } }
+        timers.add(url);
+        deps.setTimeout(() => { timers.delete(url); release(url); }, 10_000);
         return true;
       } catch {
+        // release a URL made before the failure
+        for (const u of [...urls]) if (!timers.has(u)) release(u);
         return false;
       }
     },

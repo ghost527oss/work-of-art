@@ -31,6 +31,8 @@ export interface JournalModel {
   hidden: number;
   notes: string[];
   status: 'ready' | 'analysing' | 'failed' | 'no-snapshot';
+  /** 2D scan state for the lessons: none yet, done, partial, or out of date (labels changed). */
+  scan: 'none' | 'done' | 'partial' | 'stale';
 }
 
 export interface JournalInput {
@@ -43,14 +45,25 @@ export interface JournalInput {
   mode: 'static' | 'workbench' | 'source';
   modeReason: string;
   entryPath?: string;
+  /** True when the labels changed after the scan (2D isScanStale). */
+  scanStale?: boolean;
 }
 
 const SEV = { high: 0, medium: 1, low: 2 } as const;
+
+/** What the lessons block says when there is no lesson, by scan state (never an all-clear). */
+export const NO_LESSONS: Record<JournalModel['scan'], string> = {
+  none: 'PatchBay has not run its checks yet. Open Skeleton Crew to run them.',
+  done: 'PatchBay found nothing from the checks that ran.',
+  partial: 'PatchBay found nothing from the checks that ran, but the scan was partial. See the notes.',
+  stale: 'The scan is out of date because labels changed. Open Skeleton Crew and press Scan again.',
+};
 const FIX_WORDS = { auto: 'Auto-supported', guided: 'Guided', explanation: 'Explanation only' } as const;
 const DB = ['pg', 'mysql', 'mysql2', 'mongodb', 'mongoose', 'sqlite3', 'redis', 'knex', 'sequelize', 'typeorm', 'drizzle-orm', '@prisma/client'];
 
 export function buildJournal(input: JournalInput, level: Level): JournalModel {
-  const base: JournalModel = { level, overview: [], flows: [], flowsHidden: 0, lessons: [], concepts: [], hidden: 0, notes: [], status: 'ready' };
+  const scanState: JournalModel['scan'] = !input.scan ? 'none' : input.scanStale ? 'stale' : input.scan.partial ? 'partial' : 'done';
+  const base: JournalModel = { level, overview: [], flows: [], flowsHidden: 0, lessons: [], concepts: [], hidden: 0, notes: [], status: 'ready', scan: scanState };
   const concepts = PLAYBOOK.cards.filter((c) => c.kind === 'concept');
   if (!input.snapshot) return { ...base, concepts, status: 'no-snapshot' };
   if (input.analysisStatus !== 'done' || !input.analysis) return { ...base, concepts, status: input.analysisStatus === 'failed' ? 'failed' : 'analysing' };
@@ -123,13 +136,14 @@ export function buildJournal(input: JournalInput, level: Level): JournalModel {
   }
   const notes = [...facts.partialReasons];
   if (hidden > 0) notes.push(`${hidden} values were hidden.`);
-  return { level, overview, flows, flowsHidden, lessons, concepts, hidden, notes, status: 'ready' };
+  if (scanState === 'stale') notes.push('Out of date: labels changed after the scan. Open Skeleton Crew and press Scan again.');
+  return { level, overview, flows, flowsHidden, lessons, concepts, hidden, notes, status: 'ready', scan: scanState };
 }
 
 /** A one-slot memo: the same input identities and level return the same model object. */
 export function createJournalMemo(build: typeof buildJournal = buildJournal) {
   let last: { input: JournalInput; level: Level; model: JournalModel } | undefined;
-  const keys: Array<keyof JournalInput> = ['snapshot', 'analysis', 'analysisStatus', 'corrections', 'scan', 'measured', 'mode', 'modeReason', 'entryPath'];
+  const keys: Array<keyof JournalInput> = ['snapshot', 'analysis', 'analysisStatus', 'corrections', 'scan', 'measured', 'mode', 'modeReason', 'entryPath', 'scanStale'];
   return (input: JournalInput, level: Level): JournalModel => {
     if (last && last.level === level && keys.every((k) => last!.input[k] === input[k])) return last.model;
     const model = build(input, level);
