@@ -9,9 +9,10 @@ import { hashText, applyUnifiedDiff, reverseUnifiedDiff } from '../engine/diffAp
 import { PRACTICE_COMMENT, buildPracticeScript, practiceContent } from '../engine/practiceScript';
 import { commentLineFor } from '../engine/unifiedDiff';
 import type { PanelId } from './layoutSlice';
-import { type StudioState, withLog } from './useStudioStore';
+import { type StudioState, withLog, MAX_LOG_ENTRIES } from './useStudioStore';
+import { repoKeyOf, type WorkRecord } from './workStorage';
 import {
-  addChat, decideProposal, decisionRefusal, idleWork, pauseRefusal, pauseRun, redoChange, redoRefusal,
+  addChat, decideProposal, decisionRefusal, idleWork, workProblems, pauseRefusal, pauseRun, redoChange, redoRefusal,
   resumeRefusal, resumeRun, runOneStep, setSelfEditingPause, startRefusal, startRun, stepRefusal,
   stopRefusal, stopRun, undoChange, undoRefusal, type HistoryEntry, type Run, type WorkState,
 } from './workSlice';
@@ -261,4 +262,78 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
       return accept(s, label, 'Work reset.', [{ type: 'cancel_ai' }, { type: 'clear_slot' }]);
     }
   }
+}
+
+export const DISCARD_MESSAGE = 'Saved changes did not match the loaded files, so they were not restored.';
+
+/** Re-applies the saved history to the loaded files and compares every fingerprint. */
+function historyMatches(state: StudioState, record: WorkRecord): boolean {
+  const snap = state.snapshot;
+  if (!snap) return false;
+  const texts = new Map<string, string>();
+  const textOf = (path: string): string | undefined => {
+    if (texts.has(path)) return texts.get(path);
+    const f = snap.files.find((x) => x.path === path);
+    if (!f || f.loadStatus !== 'loaded' || f.truncated || typeof f.content !== 'string') return undefined;
+    texts.set(path, f.content);
+    return f.content;
+  };
+  const step = (e: WorkRecord['applied'][number], diff: string | null, from: string, to: string): boolean => {
+    const cur = textOf(e.path);
+    if (cur === undefined || diff === null || hashText(cur) !== from) return false;
+    const r = applyUnifiedDiff(cur, diff);
+    if (!r.ok || hashText(r.text) !== to) return false;
+    texts.set(e.path, r.text);
+    return true;
+  };
+  for (const e of record.applied) if (!step(e, e.diff, e.beforeHash, e.afterHash)) return false;
+  for (let i = record.undone.length - 1; i >= 0; i--) {
+    const e = record.undone[i]!;
+    if (!step(e, e.diff, e.beforeHash, e.afterHash)) return false;
+  }
+  // The redo chain was walked forward from the applied state; the files themselves are unchanged for later use.
+  return true;
+}
+
+/**
+ * Restores saved work for the loaded snapshot. A different repository key restores nothing.
+ * `restoreLog` is true only once per page load. A fingerprint or file mismatch discards the
+ * history, run, and proposal, keeps the log, and writes one Log line.
+ */
+export function restoreWork(state: StudioState, record: WorkRecord, ctx: WorkCtx, opts: { restoreLog: boolean }): StudioState {
+  const snap = state.snapshot;
+  if (!snap || record.repoKey !== repoKeyOf(snap)) return state;
+  let s = state;
+  if (opts.restoreLog && record.log.length > 0) {
+    let seq = s.logSeq;
+    const restored = record.log.map((e) => ({ ...e, id: `log-${++seq}`, affectedPaths: [...e.affectedPaths] }));
+    const log = [...restored, ...s.log];
+    s = { ...s, log: log.length > MAX_LOG_ENTRIES ? log.slice(log.length - MAX_LOG_ENTRIES) : log, logSeq: seq };
+  }
+  const hasWork = record.run !== null || record.proposal !== null || record.applied.length > 0 || record.undone.length > 0;
+  if (!hasWork) return s;
+  const w = s.work;
+  if (w.run !== null || w.proposal !== null || w.applied.length > 0 || w.undone.length > 0) return s;
+
+  const proposalFile = record.proposal ? snap.files.find((f) => f.path === record.proposal!.path) : undefined;
+  const candidate: WorkState = {
+    ...w,
+    run: record.run
+      ? { ...record.run, steps: record.run.steps.map((x) => ({ ...x })), status: record.run.status === 'running' ? 'paused' : record.run.status, autoAdvance: false }
+      : null,
+    proposal: record.proposal ? { ...record.proposal } : null,
+    applied: record.applied.map((e) => ({ ...e })),
+    undone: record.undone.map((e) => ({ ...e })),
+    runSeq: record.run ? Math.max(w.runSeq, 1) : w.runSeq,
+  };
+  const good =
+    historyMatches(s, record) &&
+    (record.proposal === null || (proposalFile !== undefined && proposalFile.loadStatus === 'loaded' && typeof proposalFile.content === 'string')) &&
+    workProblems(candidate).length === 0;
+  if (!good) {
+    return logAll(s, ctx.now, [{ action: 'work_discarded', status: 'failed', message: DISCARD_MESSAGE }]);
+  }
+  return logAll({ ...s, work: candidate }, ctx.now, [
+    { action: 'work_restored', status: 'info', message: `Saved work restored: ${record.applied.length} applied, ${record.undone.length} undone.` },
+  ]);
 }
