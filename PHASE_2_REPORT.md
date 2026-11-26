@@ -2,7 +2,7 @@
 
 **Status:** all eight sub-phases of Phase 2 (2A, 2B, 2C, 2D, 2E-1, 2E-2, 2F, 2G) are built, tested, reviewed, and pushed. This report replaces the checkpoint report that covered 2A to 2D.
 
-`Current Active Phase` in `.kiro/steering/build-phases.md` was **not** changed. It still says Phase 1. Moving to Phase 3 is your decision.
+`Current Active Phase` was **not** changed. The repository's `.kiro/steering/build-phases.md` still says "Phase 2 (Sub-phase 2A)", and the workspace-level steering copy still says "Phase 1". Moving to Phase 3 is your decision.
 
 All numbers are real command output from this workspace. **Unverified** means it was not run, or could not be run here, and the reason is given.
 
