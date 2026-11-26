@@ -866,3 +866,107 @@ Contract: After a browser refresh PatchBay reloads the saved repository address 
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2G gate (build-phases.md): refresh returns to the same screen with the same work; no secrets or file contents in storage; a failed reload shows a clear error and a reset path
 - Phase 2 exit gate (build-phases.md, original): every interactive control updates state predictably; state survives a page refresh and handles rapid repeated clicks without desyncing or crashing
+
+---
+
+> **Phase 2 complete.** Sub-phases 2A to 2G (F3 to F10) are built, tested, reviewed, and merged into `main` (see `PHASE_2_REPORT.md`; 92 test files, 1,666 tests at the end of 2G). The user moved the active phase to **Phase 3 (Sub-phase 3A)** on 2026-11-26. F3 to F10 below are the as-built record and are not open for change except where a spec lists a deliberate change.
+
+---
+
+> plan_id: `P3A-LIVE-CHAT` — Live AI in AI Chat (spec `.kiro/specs/11-live-ai-chat/`). Active product phase: Phase 3, Sub-phase 3A. Status: draft for approval; no node is approved for modification. Black-and-white wireframe, no animation, `AI_MODE=mock` stays the default, no new runtime dependency, free tiers only. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F11 — Live AI in AI Chat
+Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (Gemini, Groq, OpenRouter) through a Model Router, using a Context Engine that sends the smallest useful redacted context and a session cache. The AI can start safe actions and propose changes that enter the existing Approve, Reject, and Undo flow. Mock mode is unchanged. No change is applied without Approve, and only the practice copy changes.
+
+### F11.1 — Contracts, validators, limits, provider table, mock `act` branch
+- Inputs: an AI request or result, the environment names
+- Outputs: the extended schemas (`act`, `skillId`, `connections`, `startLine`, `action`, `meta`), `AI_LIVE`, the provider table
+- Invariants: mock output is byte-identical for every Phase 2 input; `approve`, `reject`, and `reset` can never be an action; `action` is valid only for `act` with no snippets; no key value anywhere in config
+- Files: `src/types/contracts.ts`, `src/engine/aiValidate.ts`, `src/engine/mockAssistant.ts`, `src/config/aiLive.ts`, `src/config/aiProviders.ts`, `src/config/budgets-proxy.ts`, `tests/aiContracts.test.ts`, `tests/aiValidate.test.ts`, `tests/mockAssistant.test.ts`, `tests/aiLiveConfig.test.ts`, `tests/aiProviderConfig.test.ts`
+- Depends on: F2.1, F2.3
+- verify: `npm run typecheck && npx vitest run tests/aiContracts.test.ts tests/aiValidate.test.ts tests/mockAssistant.test.ts tests/aiLiveConfig.test.ts tests/aiProviderConfig.test.ts`
+
+### F11.2 — Card picker and prompt builder
+- Inputs: a request, the playbook, a tier
+- Outputs: at most 2 cards; a prompt string
+- Invariants: cards are chosen on the server only; the prompt never exceeds 12,000 characters; question and snippets stay in their data sections; no secret reaches the prompt
+- Files: `src/engine/live/cardPicker.ts`, `src/engine/live/promptBuilder.ts`, `tests/cardPicker.test.ts`, `tests/promptBuilder.test.ts`
+- Depends on: F11.1, F9.1
+- verify: `npm run typecheck && npx vitest run tests/cardPicker.test.ts tests/promptBuilder.test.ts`
+
+### F11.3 — Answer parser, edits to diff, provider adapters
+- Inputs: model text; a prompt; a key and model
+- Outputs: a validated `AIResponse` or `bad_answer`; a provider result with an outcome word
+- Invariants: the model never writes diff headers; a diff applies to the snippet and reverses exactly; the key is only in a header; fixed endpoints; no provider body in any message
+- Files: `src/engine/live/answerParser.ts`, `src/engine/live/providers.ts`, `tests/answerParser.test.ts`, `tests/liveProviders.test.ts`, `tests/helpers/fakeProviders.ts`
+- Depends on: F11.1, F11.2
+- verify: `npm run typecheck && npx vitest run tests/answerParser.test.ts tests/liveProviders.test.ts`
+
+### F11.4 — Model Router and live assistant
+- Inputs: a request, the providers' settings, a clock, a signal
+- Outputs: an `AIResult` with `meta`, or a coded failure
+- Invariants: fixed order; 429 skips the provider for the request; no same-model retry; 5 s per attempt and 12 s total; heavy falls to light only after all heavy fail and sets `lighter`
+- Files: `src/engine/live/modelRouter.ts`, `src/engine/live/liveAssistant.ts`, `tests/modelRouter.test.ts`, `tests/liveAssistant.test.ts`
+- Depends on: F11.1, F11.2, F11.3
+- verify: `npm run typecheck && npx vitest run tests/modelRouter.test.ts tests/liveAssistant.test.ts`
+
+### F11.5 — `/api/assistant` live mode and status
+- Inputs: HTTP request, environment
+- Outputs: `200` result, `GET` status, or a coded error
+- Invariants: mock path unchanged and reads only `AI_MODE`; live with no provider is `503 unsupported` and never a mock answer; the status returns no key or model; logs hold codes only
+- Files: `api/assistant.ts`, `vite.config.ts`, `.env.example`, `README.md`, `tests/assistantApi.test.ts`, `tests/assistantApiLive.test.ts`
+- Depends on: F11.4, F2.4
+- verify: `npm run typecheck && npx vitest run tests/assistantApi.test.ts tests/assistantApiLive.test.ts`
+
+### F11.6 — Context Engine
+- Inputs: a snapshot, chosen paths, a finding, the contents flag, the connection analysis
+- Outputs: paths, snippets, up to 3 connection facts, a skill id, notes
+- Invariants: no snippet unless the contents box is ticked; whole file only when at most 2 KB; connection facts never hold source text; redacted
+- Files: `src/engine/contextEngine.ts`, `tests/contextEngine.test.ts`
+- Depends on: F11.1, F5.5
+- verify: `npm run typecheck && npx vitest run tests/contextEngine.test.ts`
+
+### F11.7 — Session cache
+- Inputs: a request and a live result
+- Outputs: a stored or reused result
+- Invariants: key includes every snippet fingerprint; failures, actions, and mock results are never stored; at most 30 entries and 256 KB; memory only
+- Files: `src/engine/aiCache.ts`, `tests/aiCache.test.ts`
+- Depends on: F11.1, F11.6
+- verify: `npm run typecheck && npx vitest run tests/aiCache.test.ts`
+
+### F11.8 — Client service, status, consent, controller, Log lines
+- Inputs: form values, the store, the status endpoint
+- Outputs: requests, results, slice changes, Log lines
+- Invariants: a cache hit makes no network call; the notice gates the first live request; no question, snippet, or answer text in the Log or slice; command words never reach the AI
+- Files: `src/engine/aiAssistant.ts`, `src/engine/aiStatus.ts`, `src/hooks/useAssistant.ts`, `src/store/aiSlice.ts`, `src/store/aiActions.ts`, `tests/aiAssistant.test.ts`, `tests/aiStatus.test.ts`, `tests/useAssistant.test.ts`, `tests/aiState.test.ts`
+- Depends on: F11.5, F11.6, F11.7, F2.5, F2.6
+- verify: `npm run typecheck && npx vitest run tests/aiAssistant.test.ts tests/aiStatus.test.ts tests/useAssistant.test.ts tests/aiState.test.ts tests/store.test.ts`
+
+### F11.9 — Action policy, AI proposals into Approve, attempt cap
+- Inputs: an AI result, the store state
+- Outputs: a harness command, or a queued proposal, or a plain reason
+- Invariants: an action can never approve, reject, or reset and never runs when snippets were sent; a queued AI change applies only after Approve, only to the practice copy, with a hash round-trip; at most 3 AI proposals per finding; a waiting AI proposal is never saved
+- Files: `src/engine/aiActionPolicy.ts`, `src/engine/aiProposal.ts`, `src/store/aiProposalActions.ts`, `src/store/workSlice.ts`, `src/store/workActions.ts`, `tests/aiActionPolicy.test.ts`, `tests/aiProposal.test.ts`, `tests/aiProposalFlow.test.ts`
+- Depends on: F11.1, F11.8, F4.4, F4.5
+- verify: `npm run typecheck && npx vitest run tests/aiActionPolicy.test.ts tests/aiProposal.test.ts tests/aiProposalFlow.test.ts tests/workState.test.ts tests/workStorage.test.ts`
+
+### F11.10 — The UI
+- Inputs: the store, the controller
+- Outputs: banner, notice, finding list, answers, proposal card
+- Invariants: wireframe only; the existing mock line is unchanged; no Approve on a display-only patch; all AI text is React text; buttons at least 44 px
+- Files: `src/engine/aiNotes.ts`, `src/components/AIStatusBanner.tsx`, `src/components/AINotice.tsx`, `src/components/FindingFocus.tsx`, `src/components/AIAssistantPanel.tsx`, `src/components/AIResponseView.tsx`, `src/components/ProposalCard.tsx`, `src/components/StudioLayout.tsx`, `src/App.tsx`, `src/styles.css`, `tests/aiNotes.test.ts`, `tests/aiPanelLive.test.tsx`, `tests/aiResponseView.test.tsx`
+- Depends on: F11.8, F11.9, F2.7, F4.8
+- verify: `npm run typecheck && npx vitest run && npm run build`
+
+### F11.11 — Privacy, injection, static, and exit-gate tests
+- Inputs: the whole app at store level with fakes
+- Outputs: the proofs
+- Invariants: sentinels never leave the server or enter the Log, storage, cache, or errors; injection changes nothing; the three Phase 3 exit-gate items pass with fake providers
+- Files: `tests/aiPrivacy.test.ts`, `tests/aiInjection.test.ts`, `tests/aiStatic.test.ts`, `tests/phase3aGate.test.ts`, `tests/helpers/aiHarness.ts`
+- Depends on: F11.1 to F11.10
+- verify: `npm run typecheck && npx vitest run tests/aiPrivacy.test.ts tests/aiInjection.test.ts tests/aiStatic.test.ts tests/phase3aGate.test.ts`
+
+### F11 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Phase 3 exit gate (build-phases.md), with fake providers: a deliberate bug is found, a valid patch is proposed and verified; the fix attempts halt at 3; a 429 on the primary falls back to the backup
+- manual gate (Unverified until run): the browser run with a fake provider server, and your own real-key check (design section 14)
