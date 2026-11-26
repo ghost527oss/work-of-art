@@ -140,7 +140,7 @@ AITaskTypeSchema = z.enum(['explain', 'suggest_change', 'review_finding', 'act']
 
 // AIResponseSchema gains a fifth member:
 { type: 'action',
-  action: z.enum(['help','status','start','pause','resume','step','stop','undo','redo','open']),
+  action: z.enum(['help','status','start','pause','resume','step','stop','open']),
   arg: z.enum(['practice','crew','edit','chat','log','history','journal']).optional(),
   summary: bstr }
 

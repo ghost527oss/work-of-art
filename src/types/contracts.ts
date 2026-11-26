@@ -397,7 +397,7 @@ export const AIRequestSchema = z.strictObject({
 export type AIRequest = z.infer<typeof AIRequestSchema>;
 
 /** Actions an AI `action` response may name (design 13.1). `approve`, `reject`, and `reset` are deliberately absent. */
-export const AI_ACTION_NAMES = ['help', 'status', 'start', 'pause', 'resume', 'step', 'stop', 'undo', 'redo', 'open'] as const;
+export const AI_ACTION_NAMES = ['help', 'status', 'start', 'pause', 'resume', 'step', 'stop', 'open'] as const;
 export const AI_ACTION_ARGS = ['practice', 'crew', 'edit', 'chat', 'log', 'history', 'journal'] as const;
 
 /** Five response shapes, each identified by `type`. */

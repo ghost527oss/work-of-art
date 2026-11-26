@@ -84,7 +84,7 @@ Existing tests changed on purpose (design 4.3): `assistantApi` (GET now returns 
 - A busy provider is retried on the next request, because the server remembers nothing (no shared cool-down).
 - AI patches are limited to one file, one block of lines, at most 2,000 characters, and files whose line endings can be undone exactly. Bigger changes become a plan.
 - The model's JSON answer is checked strictly. A sloppy free model that adds an unknown field is treated as a bad answer, and the next model is tried. This is easy to loosen later if it causes too many fallbacks.
-- `undo` and `redo` can be started by the AI (the spec allows it; the harness already refuses them while a change waits). Tell me if you want them removed from the AI's list.
+- `undo` and `redo` were removed from the AI's action list after review (your decision): only you can change History.
 - `GET /api/assistant` tells anyone who can reach it whether each provider has a key (never the key or the model). Fine for a personal deployment; revisit before a public one.
 - The Edit pad's changes also end the saved answers (they change the practice copy).
 
@@ -106,7 +106,7 @@ Existing tests changed on purpose (design 4.3): `assistantApi` (GET now returns 
 
 ## 7. For your review and decisions
 
-1. Keep `undo` and `redo` in the AI's action list, or remove them?
+1. Done: `undo` and `redo` removed from the AI's action list.
 2. Loosen the strict answer check if free models produce too many fallbacks?
 3. Open a pull request for `feat/live-ai-chat` into `main`? (The spec said to open one after L12. I have not, because you did not ask for it yet.)
 4. After your real-key check, decide whether 3A is accepted and whether to start 3B. I recommend nothing beyond: **3A built, 3B not started.**

@@ -13,7 +13,7 @@ const ALLOWED: ReadonlySet<string> = new Set(AI_ACTION_NAMES);
 
 /**
  * Rules that depend on the current state. A waiting proposal is the user's to decide: the AI may not stop (which rejects it).
- * Undo and redo are already refused by the harness while a proposal waits.
+ * Undo and redo are not in the AI's list at all: only the user can change History.
  */
 export function stateRefusal(state: { work: { proposal: unknown } }, command: AIActionCommand): string | null {
   if (command.name === 'stop' && state.work.proposal !== null) {

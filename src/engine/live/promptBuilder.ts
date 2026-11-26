@@ -46,7 +46,7 @@ function kindsFor(request: AIRequest, patchAllowed: boolean, actionAllowed: bool
     case 'act': {
       const out: string[] = [];
       if (actionAllowed) {
-        out.push('{"kind":"action","action":"start|pause|resume|step|stop|undo|redo|help|status|open","arg":"practice|crew (for start) or edit|chat|log|history|journal (for open)","summary":"..."}');
+        out.push('{"kind":"action","action":"start|pause|resume|step|stop|help|status|open","arg":"practice|crew (for start) or edit|chat|log|history|journal (for open)","summary":"..."}');
         out.push('Choose an action only when the QUESTION clearly asks for it. You can never approve, reject, or reset anything.');
       } else {
         out.push('Actions are NOT allowed for this request.');

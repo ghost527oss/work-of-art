@@ -116,7 +116,7 @@ In simple words: you type a question in AI Chat. PatchBay picks the few lines th
 
 ### R8. The AI and safe actions
 1. THE SYSTEM SHALL add the task type `act` ("Do something"). A mock request of this type returns a clear mock explanation and runs nothing.
-2. THE SYSTEM SHALL allow an `action` response to name only: `help`, `status`, `start` (with `practice` or `crew`), `pause`, `resume`, `step`, `stop`, `undo`, `redo`, or `open` (with a panel word). It SHALL NOT allow `approve`, `reject`, or `reset`.
+2. THE SYSTEM SHALL allow an `action` response to name only: `help`, `status`, `start` (with `practice` or `crew`), `pause`, `resume`, `step`, `stop`, or `open` (with a panel word). It SHALL NOT allow `approve`, `reject`, `reset`, `undo`, or `redo` (changed after review by the user: only the user can change History).
 3. THE SYSTEM SHALL run an allowed action through the same code path as a typed command, with the same refusals, and write a Log line "AI asked for: <action>".
 4. THE SYSTEM SHALL accept an `action` response only when the request was `act` and carried no snippets, so file text can never trigger an action. The server and the browser SHALL each check this.
 5. THE SYSTEM SHALL never let an action response apply, approve, or reject a change.

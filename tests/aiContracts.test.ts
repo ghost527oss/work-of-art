@@ -293,12 +293,14 @@ describe('Phase 3A: action response', () => {
     for (const action of AI_ACTION_NAMES) {
       expect(AIResponseSchema.safeParse({ type: 'action', action, summary: 'ok' }).success).toBe(true);
     }
-    for (const action of ['approve', 'reject', 'reset', 'delete', '']) {
+    for (const action of ['approve', 'reject', 'reset', 'undo', 'redo', 'delete', '']) {
       expect(AIResponseSchema.safeParse({ type: 'action', action, summary: 'ok' }).success).toBe(false);
     }
     expect(AI_ACTION_NAMES).not.toContain('approve');
     expect(AI_ACTION_NAMES).not.toContain('reject');
     expect(AI_ACTION_NAMES).not.toContain('reset');
+    expect(AI_ACTION_NAMES).not.toContain('undo');
+    expect(AI_ACTION_NAMES).not.toContain('redo');
   });
   it('rejects an unknown arg and an empty summary', () => {
     expect(AIResponseSchema.safeParse({ type: 'action', action: 'open', arg: 'settings', summary: 'x' }).success).toBe(false);

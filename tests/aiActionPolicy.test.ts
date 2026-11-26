@@ -9,7 +9,7 @@ const action = (a: string, arg?: string): AIResponse => ({ type: 'action', actio
 
 describe('checkAIAction: allowed actions equal the typed command', () => {
   const lines: Array<[string, string?]> = [
-    ['help'], ['status'], ['start', 'practice'], ['start', 'crew'], ['pause'], ['resume'], ['step'], ['stop'], ['undo'], ['redo'],
+    ['help'], ['status'], ['start', 'practice'], ['start', 'crew'], ['pause'], ['resume'], ['step'], ['stop'],
     ['open', 'edit'], ['open', 'chat'], ['open', 'log'], ['open', 'history'], ['open', 'journal'],
   ];
   for (const [a, arg] of lines) {
@@ -28,8 +28,8 @@ describe('checkAIAction: allowed actions equal the typed command', () => {
   });
 });
 
-describe('checkAIAction: never approve, reject, or reset', () => {
-  for (const a of ['approve', 'reject', 'reset', 'delete', '']) {
+describe('checkAIAction: never approve, reject, reset, undo, or redo', () => {
+  for (const a of ['approve', 'reject', 'reset', 'undo', 'redo', 'delete', '']) {
     it(`refuses "${a}"`, () => {
       const r = checkAIAction(act, action(a));
       expect(r.ok).toBe(false);
@@ -83,6 +83,6 @@ describe('connection facts and waiting proposals', () => {
     const idle = { work: { proposal: null } };
     expect(stateRefusal(waiting, { name: 'stop' })).toBe('A change is waiting for your decision. Only you can reject it, so the AI cannot stop here.');
     expect(stateRefusal(idle, { name: 'stop' })).toBeNull();
-    for (const name of ['help', 'status', 'pause', 'resume', 'step', 'undo', 'redo'] as const) expect(stateRefusal(waiting, { name })).toBeNull();
+    for (const name of ['help', 'status', 'pause', 'resume', 'step'] as const) expect(stateRefusal(waiting, { name })).toBeNull();
   });
 });
