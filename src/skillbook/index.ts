@@ -19,3 +19,7 @@ const SCAN_BY_ID = new Map(SCAN_SKILLS.map((s) => [s.id, s]));
 export function scanSkillById(id: string) {
   return SCAN_BY_ID.get(id);
 }
+
+export { PLAYBOOK } from './playbook';
+export { cardById, cardsByTag, cardsForSkill, searchCards } from './playbookLookup';
+export type { Card, Level, Playbook } from './playbookSchema';
