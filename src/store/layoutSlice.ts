@@ -1,4 +1,5 @@
 // @node: F3.1
+// @node: F4.5 (adds openPanelById)
 // Pure layout state for the Studio shell: which panel is open, whether it is collapsed,
 // and its width. Every action is a pure function. An action that would not change the
 // state returns the SAME object, so nothing re-renders and nothing is saved.
@@ -26,6 +27,12 @@ export function isPanelId(value: unknown): value is PanelId {
 /** Opens the panel when closed or another one is open; closes it when it is the open one (expanded or collapsed). */
 export function togglePanel(state: LayoutState, id: PanelId): LayoutState {
   if (state.openPanel === id) return { openPanel: null, collapsed: false, width: state.width };
+  return { openPanel: id, collapsed: false, width: state.width };
+}
+
+/** Opens and expands the panel without toggling it closed. Same object when already open and expanded. */
+export function openPanelById(state: LayoutState, id: PanelId): LayoutState {
+  if (state.openPanel === id && !state.collapsed) return state;
   return { openPanel: id, collapsed: false, width: state.width };
 }
 
