@@ -478,3 +478,95 @@ Contract: An offline scanner with 16 built-in checks in four areas (Frontend, Ba
 ### F6 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2D gate (build-phases.md): every finding shows its file, lines, snippet, and reason; no invented scores
+
+---
+
+> plan_id: `P2E1-SANDBOX` — Sandbox Preview (spec `.kiro/specs/07-sandbox-preview/`). Active product phase: Phase 2, Sub-phase 2E-1. Status: draft for approval; no node is approved for modification. Depends on 2A to 2D being built. PatchBay's own screens stay black-and-white wireframe with no animation, `AI_MODE=mock` only, no new dependency, no network and no AI call from PatchBay's code. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F7 — Sandbox Preview
+Contract: The left Sandbox shows a safe preview of the loaded project in one of three honest modes: Live Static Preview (look-only by default, with an explicit switch to run the project's own scripts in a locked iframe), an approximate static Component Workbench for React, Vue, and Svelte, and Source Inspection. The preview document is rewritten from an allowlist with everything escaped, loaded inside an iframe whose sandbox flags and content policy block scripts (look-only), external content, popups, forms, and any access to PatchBay. Messages from a script-running preview are validated and shown only as text. The layout overflow check is measured in the look-only preview and is the 17th finding. The preview is read only. No Edit pad, no code changes.
+
+### F7.1 — Limits and the 17th skill
+- Inputs: none
+- Outputs: `PREVIEW_LIMITS`; `scan.frontend.layout-overflow` (measured); merged findings and counts; updated "what was checked" text
+- Invariants: the text scan never runs a measured skill; the crew script ignores measured findings; the 2D sample expectations are unchanged; only the named 2D test assertions change
+- Files: `src/config/previewLimits.ts`, `src/skillbook/types.ts`, `src/skillbook/scanSkills.ts`, `src/engine/scanProject.ts`, `src/engine/scanView.ts`, `tests/previewLimits.test.ts`, `tests/scanSkills.test.ts`, `tests/scanView.test.ts`
+- Depends on: F6.1, F6.5
+- verify: `npm run typecheck && npx vitest run tests/previewLimits.test.ts tests/scanSkills.test.ts tests/scanView.test.ts tests/scanProject.test.ts tests/scanSamples.test.ts tests/crewScript.test.ts`
+
+### F7.2 — HTML tokenizer and allowlists
+- Inputs: HTML text
+- Outputs: tokens with offsets, lines, and columns; escape helpers; tag and attribute allowlists
+- Invariants: never throws and is linear; tokens reproduce the input; allowlists contain no script, frame, object, embed, base, meta, link, or `on...` attribute; no DOM and no `DOMParser`
+- Files: `src/preview/htmlTokens.ts`, `src/preview/htmlAllow.ts`, `tests/htmlTokens.test.ts`
+- Depends on: none
+- verify: `npm run typecheck && npx vitest run tests/htmlTokens.test.ts`
+
+### F7.3 — Flags, CSS sanitiser, and the static document builder
+- Inputs: effective page files, options (scripts, nonce, origin)
+- Outputs: sandbox flag string, policy string, sanitised CSS, the preview document with an element table and a report
+- Invariants: the sandbox string is exactly `allow-same-origin` or `allow-scripts` and never both or any other token; the policy is one of two fixed strings; the document is written from the allowlist with all text and attribute values escaped; exactly two `<meta>` tags; no PatchBay value in any output; bounded; deterministic; pure
+- Files: `src/preview/previewFlags.ts`, `src/preview/cssSanitize.ts`, `src/preview/previewDocument.ts`, `tests/previewFlags.test.ts`, `tests/previewDocument.test.ts`, `tests/previewHostile.test.ts`
+- Depends on: F7.2
+- verify: `npm run typecheck && npx vitest run tests/previewFlags.test.ts tests/previewDocument.test.ts tests/previewHostile.test.ts tests/htmlTokens.test.ts`
+
+### F7.4 — Mode detection and source viewer helpers
+- Inputs: a snapshot and the 2C result
+- Outputs: the mode, its reason, the entry page, the possible modes; grouped files; redacted numbered lines
+- Invariants: a fixed reason sentence per rule; `source` is always possible; viewer lines redacted and capped; unread files show their reason
+- Files: `src/preview/previewMode.ts`, `src/preview/sourceView.ts`, `tests/previewMode.test.ts`, `tests/sourceView.test.ts`
+- Depends on: F5.6, F7.1
+- verify: `npm run typecheck && npx vitest run tests/previewMode.test.ts tests/sourceView.test.ts`
+
+### F7.5 — Workbench extractors and builder
+- Inputs: JSX, TSX, Vue, and Svelte files, 2C imports
+- Outputs: component list and approximate static documents
+- Invariants: nothing is run or evaluated; expressions become visible markers; inlining at most 3 levels with cycle protection; one unreadable component does not stop the others; output goes through the same allowlist builder with no annotation; bounded
+- Files: `src/preview/jsxExtract.ts`, `src/preview/templateExtract.ts`, `src/preview/workbenchDocument.ts`, `tests/workbench.test.ts`
+- Depends on: F7.3, F5.5
+- verify: `npm run typecheck && npx vitest run tests/workbench.test.ts`
+
+### F7.6 — The bridge and the inspector
+- Inputs: message events from the preview iframe
+- Outputs: validated messages; the fixed inspector script text
+- Invariants: source, origin `null`, strict schema, size, rate, and nonce checks; only a console line, a ready signal, or an invalid count can result; the inspector posts to the exact parent origin, never `'*'`, and contains no PatchBay data
+- Files: `src/preview/previewBridge.ts`, `tests/previewBridge.test.ts`
+- Depends on: F7.1
+- verify: `npm run typecheck && npx vitest run tests/previewBridge.test.ts`
+
+### F7.7 — Layout overflow check (pure)
+- Inputs: measurement tables, the element table, effective content
+- Outputs: measured findings for `scan.frontend.layout-overflow`
+- Invariants: three fixed rules; `auto` and `scroll` excluded; one finding per element and kind across widths; at most 100 with a stated reason; numbers clamped; findings carry file, lines, a redacted snippet, and measured numbers
+- Files: `src/preview/layoutCheck.ts`, `tests/layoutCheck.test.ts`
+- Depends on: F7.1, F7.3
+- verify: `npm run typecheck && npx vitest run tests/layoutCheck.test.ts`
+
+### F7.8 — Preview state and actions
+- Inputs: panel and bridge events
+- Outputs: `StudioState.preview`; whole-state actions with Log entries
+- Invariants: scripts forced off on every mode change, snapshot change, and reset; scripts can only be on in `static` mode; console and counters bounded; stale updates ignored; Log entries hold titles and counts only; nothing from the preview state is saved; existing tests pass unedited
+- Files: `src/store/previewSlice.ts`, `src/store/previewActions.ts`, `src/store/useStudioStore.ts`, `tests/previewState.test.ts`
+- Depends on: F7.1, F7.7, F1.7
+- verify: `npm run typecheck && npx vitest run tests/previewState.test.ts tests/store.test.ts tests/workStorage.test.ts`
+
+### F7.9 — Panel components, browser adapter, and controller
+- Inputs: the preview state, effective content, the iframe
+- Outputs: the Sandbox panel and its parts; the read-only DOM adapter; the controller for the bridge listener and the layout check
+- Invariants: the iframe has no `src`, the exact sandbox value, `referrerpolicy="no-referrer"`, and `allow=""`; no PatchBay value in `srcdoc`; the confirmation text states both script-mode limits; the listener exists only while scripts are on and is always released; the adapter only reads; text rendered as text; black and white chrome only
+- Files: `src/components/SandboxPanel.tsx`, `src/components/PreviewToolbar.tsx`, `src/components/ScriptsSwitch.tsx`, `src/components/PreviewNotes.tsx`, `src/components/ConsolePane.tsx`, `src/components/WorkbenchPicker.tsx`, `src/components/SourceViewer.tsx`, `src/preview/previewDom.ts`, `src/hooks/usePreview.ts`, `src/styles.css`, `tests/sandboxUi.test.tsx`, `tests/previewController.test.ts`
+- Depends on: F7.3, F7.4, F7.5, F7.6, F7.7, F7.8
+- verify: `npm run typecheck && npx vitest run tests/sandboxUi.test.tsx tests/previewController.test.ts`
+
+### F7.10 — Wiring into the Studio and the 2D views
+- Inputs: the panel, the findings
+- Outputs: the panel on Screens 3, 4, and 5; measured findings in the 2D views; Open in viewer
+- Invariants: only the named placeholder and check-count assertions in 2A and 2D tests change; screens remount the panel and scripts turn off; the crew script is unchanged
+- Files: `src/components/StudioLayout.tsx`, `src/components/SkeletonCrewScreen.tsx`, `src/components/DomainScreen.tsx`, `src/components/ScanSummary.tsx`, `src/components/FindingsTable.tsx`, `src/components/FindingDetail.tsx`, `src/components/WhatWasChecked.tsx`, `src/App.tsx`, `src/styles.css`, `tests/sandboxUi.test.tsx`
+- Depends on: F7.9, F3.5, F6.11
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- manual gate (Unverified until run): the isolation browser test and the browser run in `requirements.md` section 6, items 13 and 14
+
+### F7 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Sub-phase 2E-1 gate (build-phases.md): imported code cannot read PatchBay data, cookies, or secrets, or load external scripts or any other external content; messages from the preview are validated and shown only as plain text
