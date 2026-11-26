@@ -22,7 +22,7 @@ export function FindingDetail({ finding }: { finding: Finding }) {
       <p><strong>Why it matters:</strong> {skill.why}</p>
       <p><strong>Plan:</strong></p>
       <ol>{skill.how.map((h, i) => <li key={i}>{h}</li>)}</ol>
-      <p>{finding.certainty === 'found' ? 'Found by the check.' : 'Possible: only the loaded files were read, so protection or handling may exist elsewhere.'}</p>
+      <p>{skill.kind === 'measured' ? 'Measured in the preview (not read from the code).' : finding.certainty === 'found' ? 'Found by the check.' : 'Possible: only the loaded files were read, so protection or handling may exist elsewhere.'}</p>
       <p>{FIX_MEANING[finding.fix]}{finding.fixNote ? ` ${finding.fixNote}` : ''}</p>
       <p className="note">Check: {skill.id}</p>
     </section>

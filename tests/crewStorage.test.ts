@@ -98,7 +98,7 @@ describe('harness changes', () => {
   });
   it('the 12-per-area script is the same data the run uses', async () => {
     const s = await state(AUTO);
-    expect(start(s).work.run!.steps).toEqual(buildCrewScript(s.scan.result!));
+    expect(start(s).work.run!.steps).toEqual(buildCrewScript(s.scan.result!, undefined, undefined, false));
     void buildSampleSnapshot;
   });
 });

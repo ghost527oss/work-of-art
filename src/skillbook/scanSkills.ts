@@ -35,4 +35,7 @@ export const SCAN_SKILLS: readonly ScanSkill[] = [
     explain: 'This file reads the reply of a request and never checks whether the request succeeded.', why: 'An error reply may be treated as good data.', how: ['Check the ok or status value of the response before reading it.'] },
   { id: 'scan.api.insecure-url', title: 'Request sent over an unprotected address', primary: 'api_data', also: ['security'], severity: 'medium', certainty: 'found', fix: 'guided',
     explain: 'This code calls an http:// address, which is not encrypted.', why: 'Anyone on the network can read or change what is sent.', how: ['Use https:// instead.'] },
+  { id: 'scan.frontend.layout-overflow', title: 'Text that does not fit its box', primary: 'frontend', also: [], severity: 'medium', certainty: 'found', fix: 'guided', kind: 'measured',
+    explain: 'In the preview, the text of this element is wider than its box or is cut off.', why: 'On a screen of this width, people may not be able to read all of the text.',
+    how: ['Let the box grow or wrap the text, or give the text more room at this screen width.'] },
 ];

@@ -47,7 +47,7 @@ const CHECKS: readonly Check[] = [
   { id: 'scan.security.cors-wildcard', area: 'security', exts: set('js ts mjs cjs py'), run: scanCorsWildcard },
 ];
 
-export const CHECK_COUNT = 16;
+export const CHECK_COUNT = 17;
 
 export interface ScanInputs {
   snapshot: RepoSnapshot;

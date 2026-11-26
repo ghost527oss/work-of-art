@@ -7,10 +7,11 @@ import { SKILLBOOK, scanSkillById } from '../src/skillbook';
 const JARGON = /\b(AST|regex|heuristic|DOM|middleware|endpoint|polymorphi|namespace|transpil|bundler)\b/i;
 
 describe('scan skills', () => {
-  it('there are exactly 16 with unique stable ids, areas, severities, and plain text', () => {
+  it('there are exactly 17 (16 text checks and one measured) with unique stable ids, areas, severities, and plain text', () => {
     const ids = SKILLBOOK.scan.map((s) => s.id);
-    expect(ids).toHaveLength(16);
-    expect(new Set(ids).size).toBe(16);
+    expect(ids).toHaveLength(17);
+    expect(new Set(ids).size).toBe(17);
+    expect(SKILLBOOK.scan.filter((s) => s.kind === 'measured').map((s) => s.id)).toEqual(['scan.frontend.layout-overflow']);
     for (const s of SKILLBOOK.scan) {
       expect(s.id).toMatch(/^scan\.(frontend|backend|security|api)\.[a-z-]+$/);
       expect(['frontend', 'backend', 'security', 'api_data']).toContain(s.primary);

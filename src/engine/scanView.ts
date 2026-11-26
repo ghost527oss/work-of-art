@@ -8,6 +8,18 @@ import { labelsKeyOf } from './scanProject';
 import type { Finding, ScanResult, Severity } from './scanFindingTypes';
 import type { AnalysisResult, FileUnderstanding } from './understandTypes';
 
+const SEV: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
+
+/** Text findings from the scan plus measured findings from the layout check, in the same order the scan uses. */
+export function allFindings(scan: readonly Finding[], measured: readonly Finding[]): Finding[] {
+  if (measured.length === 0) return scan as Finding[];
+  return [...scan, ...measured].sort((a, b) => SEV[a.severity] - SEV[b.severity] || (a.path === b.path ? 0 : a.path < b.path ? -1 : 1) || a.firstLine - b.firstLine || (a.skillId < b.skillId ? -1 : a.skillId > b.skillId ? 1 : 0));
+}
+
+export function mergedFindings(state: StudioState): Finding[] {
+  return allFindings(state.scan.result?.findings ?? [], state.preview.layout.status === 'done' ? state.preview.layout.findings : []);
+}
+
 export function countsBy(findings: readonly Finding[]): Record<Severity, number> {
   const c: Record<Severity, number> = { high: 0, medium: 0, low: 0 };
   for (const f of findings) c[f.severity]++;
@@ -71,7 +83,7 @@ export type WorkerStatus = string;
 
 export function workerSlots(state: StudioState): Array<{ area: AreaId; name: string; status: WorkerStatus }> {
   const run = state.work.run;
-  const findings = state.scan.result?.findings ?? [];
+  const findings = mergedFindings(state);
   const crew = run && run.kind === 'crew' ? run : null;
   const lastStep = crew ? crew.steps[crew.position - 1] : undefined;
   const activeArea: AreaId | undefined = lastStep?.area;
@@ -98,7 +110,7 @@ export function whatWasChecked(result: ScanResult): {
     filesNotRead: result.coverage.filesNotRead,
     checks: SKILLBOOK.scan.map((s) => ({ id: s.id, title: s.title, area: s.primary, fix: s.fix === 'auto' ? 'Auto-supported' : s.fix === 'guided' ? 'Guided' : 'Explanation only' })),
     notChecked: Object.entries(result.coverage.notChecked).sort(),
-    notCheckedLines: ['Layout overflow is not checked (it arrives in sub-phase 2E).', 'Data shapes are not checked.', 'Imported code is never run.'],
+    notCheckedLines: ['Layout overflow: measured in the preview (look-only mode, static pages only).', 'Data shapes are not checked.', 'Imported code is never run.'],
     couldNotCheck: result.coverage.couldNotCheck.length,
   };
 }

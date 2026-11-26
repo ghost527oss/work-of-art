@@ -9,7 +9,7 @@ import { ACTIONS, HELP_LINES, PANEL_WORDS, type ActionName, type CommandArg } fr
 import { buildCrewScript, narrate } from '../engine/crewScript';
 import { buildFixProposal } from '../engine/scanFix';
 import { rescanPaths, scanFile } from '../engine/scanProject';
-import { crewStartState } from '../engine/scanView';
+import { crewStartState, mergedFindings } from '../engine/scanView';
 import { refreshScan } from './scanActions';
 import { hashText, applyUnifiedDiff, reverseUnifiedDiff } from '../engine/diffApply';
 import { PRACTICE_COMMENT, buildPracticeDiff, buildPracticeScript, practiceContent } from '../engine/practiceScript';
@@ -142,7 +142,7 @@ function crewStepAndLog(state: StudioState, ctx: WorkCtx): StudioState {
   const step = before?.steps[before.position];
   const inputs = scanInputsOf(state);
   if (!before || !step || !inputs) return state;
-  const findings = state.scan.result?.findings ?? [];
+  const findings = mergedFindings(state);
   // Ids can shift after an earlier fix (same text, new counter), so fall back to skill, path, and line.
   const finding = step.findingId ? (findings.find((f) => f.id === step.findingId && (step.line === undefined || f.firstLine === step.line)) ?? findings.find((f) => f.skillId === step.skill && f.path === step.path && f.firstLine === step.line)) : undefined;
   const build: ProposalBuilder = () => {
@@ -264,7 +264,7 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
       if (cmd.arg === 'crew') {
         const gate = crewStartState(state, selfEditing);
         if (!gate.enabled) return refuse(state, label, gate.reason!);
-        const crewSteps = buildCrewScript(state.scan.result!);
+        const crewSteps = buildCrewScript({ ...state.scan.result!, findings: mergedFindings(state) }, undefined, undefined, state.preview.layout.status === 'done');
         const crewWork = startRun(w, ctx.newId(), crewSteps, selfEditing, 'crew');
         if (crewWork === w) return refuse(state, label, 'The crew script is too long to start.');
         const cs = logAll({ ...state, work: crewWork }, ctx.now, [{ action: 'run_started', status: 'info', message: `Skeleton Crew run started with ${crewSteps.length} steps.` }]);

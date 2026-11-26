@@ -3,6 +3,7 @@
 import { SCAN_LIMITS as L } from '../config/scanLimits';
 import { scanSkillById } from '../skillbook';
 import { AREAS, type AreaId } from '../store/shellView';
+import { CHECK_COUNT } from './scanProject';
 import type { Finding, ScanResult } from './scanFindingTypes';
 import type { RunStep } from './practiceScript';
 
@@ -11,7 +12,9 @@ export const CREW_FIX_PLAN = 'add rel="noopener noreferrer" to the link.';
 const areaName = (id: AreaId) => AREAS.find((a) => a.id === id)?.label ?? id;
 
 /** At most 12 findings per area (by primary area), at most 150 steps in all. */
-export function buildCrewScript(result: ScanResult, filesScanned = result.coverage.filesScanned, checks = 16): RunStep[] {
+export const NOT_MEASURED = 'Layout was not measured. Use Check layout in the Sandbox to include layout findings.';
+
+export function buildCrewScript(result: ScanResult, filesScanned = result.coverage.filesScanned, checks = CHECK_COUNT, layoutMeasured = true): RunStep[] {
   const steps: RunStep[] = [{ kind: 'info', title: `Skeleton Crew starts: ${result.findings.length} findings from ${checks} checks over ${filesScanned} files.` }];
   let leftOut = 0;
   for (const area of AREAS.map((a) => a.id)) {
@@ -19,7 +22,7 @@ export function buildCrewScript(result: ScanResult, filesScanned = result.covera
     const shown = mine.slice(0, L.crewPerArea);
     const more = mine.length - shown.length;
     leftOut += more;
-    steps.push({ kind: 'area', area, title: `${areaName(area)} crew${more > 0 ? `: ${more} more findings are listed on the area screen but not narrated.` : ''}` });
+    steps.push({ kind: 'area', area, title: `${areaName(area)} crew${more > 0 ? `: ${more} more findings are listed on the area screen but not narrated.` : ''}${area === 'frontend' && !layoutMeasured ? ` ${NOT_MEASURED}` : ''}` });
     for (const f of shown) {
       const skill = scanSkillById(f.skillId)!;
       steps.push({ kind: 'finding', area, findingId: f.id, path: f.path, line: f.firstLine, title: `${skill.title} in ${f.path}`, skill: skill.id });

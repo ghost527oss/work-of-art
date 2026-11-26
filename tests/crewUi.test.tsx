@@ -48,7 +48,7 @@ describe('Screen 4', () => {
     const m = render();
     expect(m).toContain('Skeleton Crew');
     expect(m).toContain('stop-bar');
-    expect(m).toContain('Scan is up to date: 2 findings from 16 checks over 1 files.');
+    expect(m).toContain('Scan is up to date: 2 findings from 17 checks over 1 files.');
     for (const a of ['Frontend', 'Backend', 'Security', 'APIs &amp; Data']) expect(m).toContain(`${a} crew`);
     expect(m).toContain('Workers take turns in this version.');
     expect(m).toContain('No findings from the checks that ran.');
@@ -129,9 +129,9 @@ describe('command box and helpers', () => {
     expect(filterFindings(result.findings, { text: 'nope' })).toHaveLength(0);
     expect(linksBetweenAreas(analysis, applyCorrections(analysis, {}))).toEqual([]);
     const w = whatWasChecked(result);
-    expect(w.checks).toHaveLength(16);
+    expect(w.checks).toHaveLength(17);
     expect(w.notCheckedLines).toHaveLength(3);
-    expect(SKILLBOOK.scan).toHaveLength(16);
+    expect(SKILLBOOK.scan).toHaveLength(17);
   });
   it('new files carry node tags; no dangerous HTML; the CSS block is black and white without motion', () => {
     for (const f of ['CommandBar', 'AreaMap', 'WorkerSlots', 'FindingsTable', 'FindingDetail', 'CrewNarration', 'RequestTrace', 'ChangesMade', 'WhatWasChecked']) {

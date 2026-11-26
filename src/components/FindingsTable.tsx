@@ -29,7 +29,7 @@ export function FindingsTable({ area, findings, selectedId, onDetails }: Finding
             <tr key={f.id} aria-selected={f.id === selectedId}>
               <td>{f.severity}</td><td>{scanSkillById(f.skillId)?.title}</td><td>{f.path}</td>
               <td>{f.firstLine === f.lastLine ? f.firstLine : `${f.firstLine} to ${f.lastLine}`}</td>
-              <td>{f.certainty === 'found' ? 'Found' : 'Possible'}</td><td>{FIX_TEXT[f.fix]}</td>
+              <td>{scanSkillById(f.skillId)?.kind === 'measured' ? 'Measured' : f.certainty === 'found' ? 'Found' : 'Possible'}</td><td>{FIX_TEXT[f.fix]}</td>
               <td>{f.areas.filter((a) => a !== area).map(areaLabel).join(', ')}</td>
               <td><button type="button" onClick={() => onDetails(f.id)}>Details</button></td>
             </tr>

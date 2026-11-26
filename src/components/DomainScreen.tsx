@@ -2,8 +2,7 @@
 // @node: F6.11 (live Screen 5 when `live` is given; otherwise the 2A empty page)
 // Screen 5 (Domain Debugging): one area. No toolbar here.
 import { useState } from 'react';
-import { findingsForArea } from '../engine/scanView';
-import { areaCounts } from '../engine/scanView';
+import { areaCounts, findingsForArea, mergedFindings } from '../engine/scanView';
 import { isScanStale } from '../hooks/useScan';
 import type { HarnessActions } from '../hooks/useHarness';
 import { areaLabel, type AreaId } from '../store/shellView';
@@ -32,12 +31,13 @@ function LiveScreen5({ area, live }: { area: AreaId; live: LiveDomain }) {
   const state = useStudioStore((s) => s);
   const [selected, setSelected] = useState<string | undefined>();
   const result = state.scan.result;
-  const findings = findingsForArea(result?.findings ?? [], area);
-  const counts = areaCounts(result?.findings ?? []).byArea[area];
+  const merged = mergedFindings(state);
+  const findings = findingsForArea(merged, area);
+  const counts = areaCounts(merged).byArea[area];
   const selectedFinding = findings.find((f) => f.id === selected);
   const lines = state.log.filter((e) => e.action === `crew_${area}`);
   const proposal = state.work.proposal;
-  const proposalArea = proposal?.findingId ? result?.findings.find((f) => f.id === proposal.findingId)?.primary : undefined;
+  const proposalArea = proposal?.findingId ? merged.find((f) => f.id === proposal.findingId)?.primary : undefined;
   return (
     <>
       <CommandBar onSubmit={live.harness.submitText} replies={state.work.chat} onOpened={live.onOpened} />

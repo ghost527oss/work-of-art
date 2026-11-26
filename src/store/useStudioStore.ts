@@ -2,6 +2,7 @@
 // @node: F4.5 (adds the `work` field)
 // @node: F5.7 (adds `understanding` and the classifying stage actions)
 // @node: F6.6 (adds `scan`)
+// @node: F7.8 (adds `preview`)
 // Shared application state for the experience stage, the ingestion run, the loaded
 // snapshot, and the session log. State changes are pure functions; the store is a small
 // subscribe/update container read with `useSyncExternalStore`.
@@ -26,6 +27,7 @@ import {
 } from '../types/contracts';
 
 import { idleAI, type AIState } from './aiSlice';
+import { idlePreview, type PreviewState } from './previewSlice';
 import { idleScan, type ScanState } from './scanSlice';
 import { idleUnderstanding, type UnderstandingState } from './understandingSlice';
 import { idleWork, type WorkState } from './workSlice';
@@ -68,6 +70,7 @@ export interface StudioState {
   work: WorkState;
   understanding: UnderstandingState;
   scan: ScanState;
+  preview: PreviewState;
   log: SessionLogEntry[];
   logSeq: number;
 }
@@ -93,7 +96,7 @@ function idleIngestion(runId: number): IngestionState {
 }
 
 export function initialState(): StudioState {
-  return { experience: 'start', ingestion: idleIngestion(0), ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), scan: idleScan(), log: [], logSeq: 0 };
+  return { experience: 'start', ingestion: idleIngestion(0), ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), scan: idleScan(), preview: idlePreview(), log: [], logSeq: 0 };
 }
 
 export function describeTarget(target: IngestTarget): string {
@@ -142,7 +145,7 @@ export function beginIngestion(
 ): StudioState {
   if (state.ingestion.status === 'running') return state;
   const background = options.keepSnapshot === true && state.snapshot !== undefined;
-  const base: StudioState = background ? state : { ...state, snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), scan: idleScan() };
+  const base: StudioState = background ? state : { ...state, snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), scan: idleScan(), preview: idlePreview() };
   return {
     ...base,
     experience: background ? 'studio' : 'loading',
@@ -206,6 +209,7 @@ export function completeIngestion(state: StudioState, runId: number, snapshot: R
     work: idleWork(),
     understanding: understanding ?? idleUnderstanding(),
     scan: idleScan(),
+    preview: idlePreview(),
     ingestion: { ...ing, status: 'done', background: false },
     ...withLog(state, now, {
       action: 'ingest_completed',
@@ -237,7 +241,7 @@ export function cancelIngestion(state: StudioState, now: number): StudioState {
   if (state.ingestion.background && state.snapshot) {
     return { ...state, experience: 'studio', ingestion: { ...idleIngestion(state.ingestion.runId), status: 'done' }, ...log };
   }
-  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), scan: idleScan(), ingestion: idleIngestion(state.ingestion.runId), ...log };
+  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), scan: idleScan(), preview: idlePreview(), ingestion: idleIngestion(state.ingestion.runId), ...log };
 }
 
 /**
@@ -251,7 +255,7 @@ export function dismissError(state: StudioState): StudioState {
 
 /** Returns to the Start screen and clears the snapshot. The session log is kept. */
 export function reset(state: StudioState): StudioState {
-  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), scan: idleScan(), ingestion: idleIngestion(state.ingestion.runId) };
+  return { ...state, experience: 'start', snapshot: undefined, ai: idleAI(), work: idleWork(), understanding: idleUnderstanding(), scan: idleScan(), preview: idlePreview(), ingestion: idleIngestion(state.ingestion.runId) };
 }
 
 // ---------------------------------------------------------------------------

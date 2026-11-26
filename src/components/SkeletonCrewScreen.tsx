@@ -2,7 +2,8 @@
 // @node: F6.11 (live Screen 4 when `live` is given; otherwise the 2A empty page)
 // Screen 4 (Skeleton Crew). The right-hand content only; the Studio shell supplies the left Sandbox.
 import { useEffect } from 'react';
-import { areaCounts } from '../engine/scanView';
+import { CHECK_COUNT } from '../engine/scanProject';
+import { areaCounts, mergedFindings } from '../engine/scanView';
 import { crewStartState, linksBetweenAreas, workerSlots } from '../engine/scanView';
 import { applyCorrections, summarize } from '../engine/understandingView';
 import type { HarnessActions } from '../hooks/useHarness';
@@ -41,14 +42,15 @@ function LiveScreen4({ live, onOpenArea, onBack }: { live: LiveCrew } & Pick<Ske
   const stale = isScanStale(state);
   const files = understanding.result ? applyCorrections(understanding.result, understanding.corrections) : [];
   const sum = summarize(files);
-  const counts = areaCounts(result?.findings ?? []);
+  const merged = mergedFindings(state);
+  const counts = areaCounts(merged);
   const crewLines = state.log.filter((e) => e.action.startsWith('crew_') && e.action !== 'crew_stopped').slice(-5);
   const line =
     scan.status === 'running' ? <p role="status">Scanning {scan.progress?.done ?? 0} of {scan.progress?.total ?? 0} files. <button type="button" onClick={live.scan.cancel}>Cancel</button></p>
     : scan.status === 'failed' ? <p role="alert">Scan failed: {scan.error ?? 'unknown problem'} <button type="button" onClick={live.scan.run}>Scan again</button></p>
     : understanding.status !== 'done' ? <p>Project understanding is not ready, so the scan cannot start.</p>
     : scan.status === 'done' && result ? (
-      <p>{stale ? 'Out of date: labels changed. ' : `Scan is up to date: ${result.findings.length} findings from 16 checks over ${result.coverage.filesScanned} files. `}
+      <p>{stale ? 'Out of date: labels changed. ' : `Scan is up to date: ${merged.length} findings from ${CHECK_COUNT} checks over ${result.coverage.filesScanned} files. `}
         {stale && <button type="button" onClick={live.scan.run}>Scan again</button>}</p>)
     : <p>Scan was cancelled. <button type="button" onClick={live.scan.run}>Scan again</button></p>;
   return (

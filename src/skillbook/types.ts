@@ -35,4 +35,6 @@ export interface ScanSkill {
   explain: string;
   why: string;
   how: string[];
+  /** `measured` skills are run by the preview, not by the text scan. Missing means `text`. */
+  kind?: 'text' | 'measured';
 }
