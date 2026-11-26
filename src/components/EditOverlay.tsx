@@ -1,7 +1,8 @@
 // @node: F8.7
 // The overlay above the preview in Edit mode: it takes the pointer (so no page code ever gets an event),
 // draws dashed outlines, three handles for one element, and the lasso box. Black, white, and dashes only.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { previewHandle, previewInfoStore } from '../edit/previewHandle';
 import { hitTest, lassoSelect, resizeFromHandle, type Handle, type Rect } from '../edit/geometry';
 import { elementAtPoint, readRects, scrollPreview } from '../edit/previewEditDom';
 import { size as sizeDecl } from '../edit/styleModel';
@@ -10,16 +11,17 @@ import type { ElementEntry } from '../preview/previewDocument';
 import type { EditTool } from '../store/editSlice';
 
 export interface EditOverlayProps {
-  frame: HTMLIFrameElement | null;
-  elements: readonly ElementEntry[];
   selection: readonly string[];
   tool: EditTool;
-  buildId: number;
   enabled: boolean;
   pad: EditActions;
 }
 
-export function EditOverlay({ frame, elements, selection, tool, buildId, enabled, pad }: EditOverlayProps) {
+export function EditOverlay({ selection, tool, enabled, pad }: EditOverlayProps) {
+  const info = useSyncExternalStore(previewInfoStore.subscribe, previewInfoStore.getState, previewInfoStore.getState);
+  const elements: readonly ElementEntry[] = info.elements;
+  const buildId = info.buildId;
+  const frame = previewHandle.frame;
   const [rects, setRects] = useState<Rect[]>([]);
   const [lasso, setLasso] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const drag = useRef<{ handle: Handle; rect: Rect; x: number; y: number; last?: { width?: number; height?: number }; frame: number | null } | null>(null);
@@ -40,9 +42,10 @@ export function EditOverlay({ frame, elements, selection, tool, buildId, enabled
   useEffect(() => () => { if (drag.current?.frame) cancelAnimationFrame(drag.current.frame); drag.current = null; }, [buildId]);
 
   if (!enabled || !frame) return null;
-  const doc = frame.contentDocument;
+  // Always the frame's CURRENT document (it is replaced on every rebuild).
+  const docNow = () => previewHandle.frame?.contentDocument ?? null;
   const local = (e: React.PointerEvent | React.MouseEvent) => {
-    const r = frame.getBoundingClientRect();
+    const r = (previewHandle.frame ?? frame).getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
   const single = rects.length === 1 ? rects[0]! : null;
@@ -53,6 +56,7 @@ export function EditOverlay({ frame, elements, selection, tool, buildId, enabled
       role="application"
       aria-label="Edit overlay: click to select an element, drag to draw a lasso"
       onPointerDown={(e) => {
+        const doc = docNow();
         if (!doc) return;
         const p = local(e);
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -79,6 +83,7 @@ export function EditOverlay({ frame, elements, selection, tool, buildId, enabled
         });
       }}
       onPointerUp={() => {
+        const doc = docNow();
         if (lasso && doc) {
           const box = { left: Math.min(lasso.x0, lasso.x1), top: Math.min(lasso.y0, lasso.y1), width: Math.abs(lasso.x1 - lasso.x0), height: Math.abs(lasso.y1 - lasso.y0) };
           const all = readRects(doc, [...known.current.keys()]);
@@ -97,7 +102,7 @@ export function EditOverlay({ frame, elements, selection, tool, buildId, enabled
         }
       }}
       onPointerCancel={() => { const d = drag.current; drag.current = null; if (d?.frame) cancelAnimationFrame(d.frame); pad.cancelLive(['width', 'height']); setLasso(null); }}
-      onWheel={(e) => { if (doc?.defaultView) scrollPreview(doc.defaultView, e.deltaX, e.deltaY); }}
+      onWheel={(e) => { const doc = docNow(); if (doc?.defaultView) scrollPreview(doc.defaultView, e.deltaX, e.deltaY); }}
     >
       {rects.map((r) => <div key={r.id} className="edit-outline" style={{ left: r.left, top: r.top, width: r.width, height: r.height }} />)}
       {single && (['right', 'bottom', 'corner'] as Handle[]).map((h) => (

@@ -592,3 +592,11 @@ textarea {
   background: #fff;
   text-decoration: underline;
 }
+
+.property-form input,
+.property-form select,
+.edit-tools select {
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+}

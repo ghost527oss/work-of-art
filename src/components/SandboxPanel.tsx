@@ -153,7 +153,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
         <div className="preview-frame-box" style={{ position: 'relative' }}>
           <iframe
             key={`${pv.mode}-${pv.scripts}-${contentKey}-${pv.component ?? ''}-${nonce}-${reloadN}`}
-            ref={frame}
+            ref={(el) => { frame.current = el; if (el) previewHandle.frame = el; }}
             title={IFRAME_ATTRS.title}
             sandbox={sandboxFlags(pv.scripts)}
             srcDoc={build.html}
@@ -172,7 +172,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
               preview.onFrameLoad(loads.current);
             }}
           />
-          {pad && editOpen && <EditOverlay frame={frame.current} elements={build.elements} selection={edit.selection} tool={edit.tool} buildId={previewInfoStore.getState().buildId} enabled={!pv.scripts && pv.status === 'ready'} pad={pad} />}
+          {pad && editOpen && <EditOverlay selection={edit.selection} tool={edit.tool} enabled={!pv.scripts && pv.status === 'ready'} pad={pad} />}
         </div>
       )}
       {pv.scripts && <ConsolePane lines={pv.console} />}
