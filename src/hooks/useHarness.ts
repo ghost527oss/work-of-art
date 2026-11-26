@@ -1,4 +1,5 @@
 // @node: F4.7
+// @node: F11.9 (resetAI service)
 // The harness controller: owns the single run timer, turns typed commands and button presses
 // into one pure update each, bridges the layout store (Edit panel opening), and saves and
 // restores the work with the restore gate. No network and no AI request: the only AI
@@ -26,6 +27,8 @@ export interface HarnessServices {
   now(): number;
   newId(): string;
   cancelAI(): void;
+  /** Phase 3A: the `reset` command also forgets saved AI answers and any held request. */
+  resetAI?(): void;
   /** Shared across controllers of one page so the saved log is restored once per page load. */
   page?: { logRestored: boolean };
 }
@@ -139,6 +142,7 @@ export function createHarnessController(
       if (e.type === 'cancel_ai') services.cancelAI();
       else if (e.type === 'open_panel') layout.update((l) => openPanelById(l, e.panel));
       else if (e.type === 'clear_slot') {
+        services.resetAI?.();
         clearWorkSlot(services.storage);
         lastSaved = null;
         pendingReplacedKey = null;
@@ -313,7 +317,7 @@ let idCounter = 0;
  * Creates the controller in an effect (so a dev-mode remount gets a fresh one) and releases
  * the timer and both subscriptions on unmount. The returned actions are stable.
  */
-export function useHarness(assistant: { cancel(): void }): HarnessActions {
+export function useHarness(assistant: { cancel(): void; reset?(): void }): HarnessActions {
   const assistantRef = useRef(assistant);
   assistantRef.current = assistant;
   const controllerRef = useRef<HarnessController | null>(null);
@@ -333,6 +337,7 @@ export function useHarness(assistant: { cancel(): void }): HarnessActions {
       now: () => Date.now(),
       newId: () => `w-${Date.now().toString(36)}-${++idCounter}`,
       cancelAI: () => assistantRef.current.cancel(),
+      resetAI: () => assistantRef.current.reset?.(),
       page: pageFlags,
     });
     controllerRef.current = controller;

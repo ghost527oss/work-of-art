@@ -22,6 +22,8 @@ export interface AIState {
   fromCache?: boolean;
   /** Phase 3A: AI change proposals queued per finding, for the 3-attempt cap. Cleared with the slice on a new snapshot. */
   attempts?: Readonly<Record<string, number>>;
+  /** Phase 3A: a plain sentence about what happened to a patch the AI proposed ("Queued for your approval" or the reason it was not). Not saved. */
+  proposalNote?: string;
 }
 
 /** The fields that survive a request ending: only the attempt counts. */
@@ -72,4 +74,10 @@ export function aiReuse(state: AIState, requestId: string, summary: AISummary, r
 export function aiCountAttempt(state: AIState, findingKey: string): AIState {
   const n = (state.attempts?.[findingKey] ?? 0) + 1;
   return { ...state, attempts: { ...(state.attempts ?? {}), [findingKey]: n } };
+}
+
+/** Sets the plain note about the proposed patch. Only while an answer is showing. */
+export function aiSetProposalNote(state: AIState, note: string): AIState {
+  if (state.status !== 'done') return state;
+  return { ...state, proposalNote: note };
 }
