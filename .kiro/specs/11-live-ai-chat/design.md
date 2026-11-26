@@ -291,7 +291,7 @@ The user message has fixed labelled sections: TASK, FILES, QUESTION, CONNECTIONS
 | `suggest_change` | `patch` (one file), `plan`, `clarification` | `patch_proposal`, `plan`, `clarification` |
 | `act` | `action`, `explanation`, `clarification` | `action`, `explanation`, `clarification` |
 
-Rules applied after parsing, each a `bad_answer` if broken: strict Zod per kind (extra fields rejected); every path is one of the selected paths; `patch` only when exactly one path is selected and its snippet was sent; `plan` needs at least 2 selected paths (with 0 or 1 path the model is expected to give `patch` or `clarification`, and a `plan` is mapped to `clarification` asking which file); `action` only for `act` with no snippets; no likely secret in any string; string and list sizes within the existing bounds.
+Rules applied after parsing, each a `bad_answer` if broken: strict Zod per kind (extra fields rejected); every path is one of the selected paths; `patch` only when exactly one path is selected and its snippet was sent; `plan` with no selected file is mapped to a `clarification` asking which file (with one or more selected files a plan is accepted); `action` only for `act` with no snippets; no likely secret in any string; string and list sizes within the existing bounds.
 
 The mapped `explanation` always gets two added limitations: "This answer was written by an AI model (<provider>). Check it before you rely on it." and, when `cards_covered` is false, "The reference cards did not cover this question."
 
