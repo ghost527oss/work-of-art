@@ -210,8 +210,10 @@ export function useSessionRestore(ingestion: IngestionActions, preview: SessionD
   useEffect(() => {
     const detach = controller.attach();
     const detachSave = attachSessionPersistence({ studio: studioStore, shell: shellStore, session: sessionStore, storage: browserStorage(), now: () => Date.now() });
-    controller.actions.startup();
-    return () => { detach(); detachSave(); controller.dispose(); };
+    // Start after the mount has settled: React's StrictMode runs effects twice in development and the first
+    // cleanup disposes the ingestion controller, which would cancel a restore started in the first pass.
+    const t = setTimeout(() => controller.actions.startup(), 0);
+    return () => { clearTimeout(t); detach(); detachSave(); controller.dispose(); };
   }, [controller]);
   return controller.actions;
 }

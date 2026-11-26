@@ -24,9 +24,13 @@ export function attachSessionPersistence(deps: SessionPersistenceDeps): () => vo
     if (snap !== entryFor) { entryFor = snap; try { entry = detectPreviewMode(snap).entryPath; } catch { entry = undefined; } }
     return entry;
   };
+  // The target of the load that produced each snapshot, captured when the snapshot first appears (completion).
+  let targetFor: StudioState['snapshot'];
+  let loadedTarget: StudioState['ingestion']['target'];
   const check = () => {
     const state = deps.studio.getState();
-    const body = buildSessionRecord({ state, view: deps.shell.getState(), detectedEntry: state.snapshot ? detected(state.snapshot) : undefined, restoreStatus: deps.session.getState().status });
+    if (state.snapshot !== targetFor) { targetFor = state.snapshot; loadedTarget = state.snapshot ? state.ingestion.target : undefined; }
+    const body = buildSessionRecord({ state, view: deps.shell.getState(), detectedEntry: state.snapshot ? detected(state.snapshot) : undefined, restoreStatus: deps.session.getState().status, loadedTarget });
     // Nothing may be saved now (Start, Loading, a load or restore running). Forget the last text, so the
     // next allowed state is written even when it equals a record that Back to Start has since deleted.
     if (!body) { lastText = null; return; }

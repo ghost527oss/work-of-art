@@ -127,15 +127,17 @@ export interface BuildInput {
   /** The detected entry page for the snapshot (the page saved only when the user chose another). */
   detectedEntry?: string;
   restoreStatus: 'idle' | 'pending' | 'applying' | 'done' | 'failed' | 'cancelled';
+  /** The target of the load that produced the current snapshot (a later failed, cancelled, or dismissed reload does not change it). */
+  loadedTarget?: IngestTarget;
 }
 
 /** The record without savedAt, or null when nothing should be saved now. */
-export function buildSessionRecord({ state, view, detectedEntry, restoreStatus }: BuildInput): SessionBody | null {
+export function buildSessionRecord({ state, view, detectedEntry, restoreStatus, loadedTarget }: BuildInput): SessionBody | null {
   const snap = state.snapshot;
   if (state.experience !== 'studio' || !snap) return null;
   if (state.ingestion.status === 'running') return null;
   if (restoreStatus === 'pending' || restoreStatus === 'applying') return null;
-  const t = state.ingestion.target;
+  const t = loadedTarget ?? state.ingestion.target;
   let target: SessionTarget;
   if (snap.source === 'sample') {
     const id = t?.sampleId ?? snap.name;

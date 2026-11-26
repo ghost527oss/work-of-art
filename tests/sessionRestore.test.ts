@@ -102,3 +102,43 @@ describe('session restore end to end', () => {
     p.dispose();
   });
 });
+
+describe('review fixes', () => {
+  it('the saved scope is the one that was loaded: a failed, dismissed, or cancelled folder reload does not change it', async () => {
+    const storage = recordingStorage(); const net = network();
+    net.repos.set('o/r', githubFixture('o', 'r', 'main', { 'a/x.js': 'x\n', 'b/y.js': 'y\n', 'README.md': 'hi\n' }));
+    const p = makePage(storage, net);
+    p.ingestion.actions.submitInput('https://github.com/o/r');
+    await p.settle(); p.mountSandbox(); await p.settle();
+    p.ingestion.actions.loadFolders(['a']); await p.settle(); p.mountSandbox(); await p.settle();
+    const scope = () => loadSession(storage)?.target.scope;
+    expect(scope()).toEqual(['a']);
+    net.fail = { code: 'upstream_failure', message: 'down' };
+    p.ingestion.actions.loadFolders(['b']); await p.settle();
+    expect(p.studio.getState().ingestion.status).toBe('failed');
+    expect(scope()).toEqual(['a']);
+    p.ingestion.actions.dismissError(); await p.settle();
+    p.preview.actions.setWidth(1024); // any later save keeps the loaded scope
+    expect(scope()).toEqual(['a']);
+    net.fail = undefined;
+    p.ingestion.actions.loadFolders(['b']);
+    p.ingestion.actions.cancel(); await p.settle();
+    p.preview.actions.setWidth(375);
+    expect(scope()).toEqual(['a']);
+    p.dispose();
+  });
+  it('the app starts the restore after the mount settles (StrictMode double effect cannot cancel it)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const t = readFileSync('src/hooks/useSessionRestore.ts', 'utf8');
+    expect(t).toContain('const t = setTimeout(() => controller.actions.startup(), 0);');
+    expect(t).toContain('return () => { clearTimeout(t); detach(); detachSave(); controller.dispose(); };');
+    // controller level: an ingestion dispose before the start (the StrictMode cleanup) does not stop the later start
+    const r = { version: 1 as const, savedAt: 1, target: { source: 'sample' as const, owner: 'sample', repo: 'static-site', sampleId: 'static-site' }, screen: { screen: 'studio' as const }, preview: { width: 768 as const, mode: 'auto' as const }, notes: { crewWasActive: false, previewOnlyCount: 0 } };
+    const p = makePage(recordingStorage({ [SESSION_KEY]: JSON.stringify(r) }), network());
+    p.ingestion.dispose();
+    p.sessionCtl.actions.startup();
+    await p.settle(); p.mountSandbox(); await p.settle();
+    expect(p.session.getState().status).toBe('done');
+    p.dispose();
+  });
+});
