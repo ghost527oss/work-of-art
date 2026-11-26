@@ -1,15 +1,23 @@
-// @node: F2.7
-// Studio STUB for this spec: repository identity, coverage, the inventory, the session
-// log, and the AI Assistant panel. The real Studio (preview, action rail) is a later spec.
-import { useState } from 'react';
-import { describeTarget, useStudioStore } from '../store/useStudioStore';
-import { formatResetTime } from './LoadingScene';
-import { CoveragePanel } from './CoveragePanel';
-import { AIAssistantPanel } from './AIAssistantPanel';
+// @node: F3.5
+// The Studio shell (sub-phase 2A). Screen 3 has a left area (Sandbox placeholder and Project
+// info), one right-hand panel, and the vertical toolbar on the far right edge. Screens 4 and 5
+// are empty pages without the toolbar. The screen comes from the screen store and the layout
+// from the layout store; this component owns no screen state of its own. The AI panel is
+// always rendered (hidden when another panel is open) so its form and request survive switching.
+import { layoutStore, useLayout } from '../hooks/useLayout';
+import { shellActions, useShellView } from '../hooks/useShell';
 import type { AssistantActions } from '../hooks/useAssistant';
-
-const PAGE = 500;
-const LOG_SHOWN = 50;
+import { closePanel, setCollapsed, toggleWidth, togglePanel, type PanelId } from '../store/layoutSlice';
+import { useStudioStore } from '../store/useStudioStore';
+import { AIAssistantPanel } from './AIAssistantPanel';
+import { DomainScreen } from './DomainScreen';
+import { LogPanel } from './LogPanel';
+import { PanelFrame } from './PanelFrame';
+import { PlaceholderPanel } from './PlaceholderPanel';
+import { ProjectInfo } from './ProjectInfo';
+import { SandboxPlaceholder } from './SandboxPlaceholder';
+import { SkeletonCrewScreen } from './SkeletonCrewScreen';
+import { StudioToolbar } from './StudioToolbar';
 
 export interface StudioLayoutProps {
   onLoadFolders(folders: string[]): void;
@@ -20,115 +28,74 @@ export interface StudioLayoutProps {
   assistant: AssistantActions;
 }
 
+const PANEL_TITLES: Record<PanelId, string> = {
+  edit: 'Edit',
+  ai: 'AI Chat',
+  log: 'Log',
+  history: 'History',
+  journal: 'Journal',
+};
+
 export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant }: StudioLayoutProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
-  const ingestion = useStudioStore((s) => s.ingestion);
   const log = useStudioStore((s) => s.log);
-  const [shown, setShown] = useState(PAGE);
+  const view = useShellView();
+  const layout = useLayout((l) => l);
 
   if (!snapshot) return null;
-  const isSample = snapshot.source === 'sample';
-  const reloading = ingestion.status === 'running' && ingestion.background;
-  const reloadFailed = ingestion.status === 'failed' && ingestion.background;
-  const entries = snapshot.inventory.entries;
-  const resetTime = formatResetTime(ingestion.error?.resetAt);
 
+  if (view.screen === 'skeleton') {
+    return (
+      <main className="shell">
+        <div className="shell-left">
+          <SandboxPlaceholder />
+        </div>
+        <SkeletonCrewScreen onOpenArea={shellActions.openDomain} onBack={shellActions.backToStudio} />
+      </main>
+    );
+  }
+
+  if (view.screen === 'domain') {
+    return (
+      <main className="shell">
+        <div className="shell-left">
+          <SandboxPlaceholder />
+        </div>
+        <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} />
+      </main>
+    );
+  }
+
+  const open = layout.openPanel;
+  const covered = open !== null && !layout.collapsed;
   return (
-    <main className="screen studio">
-      <header>
-        <h1>
-          {isSample ? `Sample: ${snapshot.name}` : `${snapshot.owner}/${snapshot.name}`}
-          <span className="note"> ref {snapshot.ref}</span>
-        </h1>
-        <p className="banner">Studio is a placeholder in this build. Only repository loading is available.</p>
-        <p>
-          <button type="button" onClick={onBack}>
-            Back to Start
-          </button>{' '}
-          <span className="note">Clears this session&apos;s loaded data. The original repository is never changed.</span>
-        </p>
-      </header>
-
-      {reloading && (
-        <p role="status">
-          Reloading selected folders from {ingestion.target ? describeTarget(ingestion.target) : 'the repository'}. The current data stays visible until the
-          new data is ready.{' '}
-          <button type="button" onClick={onCancel}>
-            Cancel
-          </button>
-        </p>
-      )}
-
-      {reloadFailed && ingestion.error && (
-        <section className="error-panel" role="alert">
-          <p>
-            <strong>{ingestion.error.code}</strong>: {ingestion.error.message}
-          </p>
-          {resetTime && <p>The rate limit resets at {resetTime}.</p>}
-          <p>The previous data is still loaded.</p>
-          <p>
-            <button type="button" onClick={onRetry}>
-              Retry
-            </button>{' '}
-            <button type="button" onClick={onDismissError}>
-              Keep current data
-            </button>
-          </p>
-        </section>
-      )}
-
-      <CoveragePanel snapshot={snapshot} busy={reloading} onLoadFolders={onLoadFolders} />
-
-      <section aria-labelledby="inventory-heading">
-        <h2 id="inventory-heading">Inventory ({entries.length} paths)</h2>
-        {entries.length === 0 ? (
-          <p>No paths.</p>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Path</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.slice(0, shown).map((e) => (
-                  <tr key={e.path}>
-                    <td><code>{e.path}</code></td>
-                    <td>{e.entryType}</td>
-                    <td>{e.loadStatus ?? 'n/a'}</td>
-                    <td>{e.reason ?? ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {entries.length > shown && (
-          <p>
-            Showing {shown} of {entries.length}.{' '}
-            <button type="button" onClick={() => setShown((n) => n + PAGE)}>
-              Show more
-            </button>
-          </p>
-        )}
-      </section>
-
-      <section aria-labelledby="log-heading">
-        <h2 id="log-heading">Session log</h2>
-        <ol className="log">
-          {log.slice(-LOG_SHOWN).map((entry) => (
-            <li key={entry.id}>
-              <span className="note">{new Date(entry.timestamp).toLocaleTimeString()}</span> {entry.action} [{entry.status}]: {entry.message}
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <AIAssistantPanel key={snapshot.id} snapshot={snapshot} assistant={assistant} />
+    <main className="shell">
+      <div className={covered ? 'shell-left covered' : 'shell-left'}>
+        <SandboxPlaceholder />
+        <ProjectInfo onLoadFolders={onLoadFolders} onCancel={onCancel} onRetry={onRetry} onDismissError={onDismissError} onBack={onBack} />
+      </div>
+      <PanelFrame
+        title={PANEL_TITLES[open ?? 'ai']}
+        open={open !== null}
+        collapsed={layout.collapsed}
+        width={layout.width}
+        onToggleCollapsed={() => layoutStore.update((s) => setCollapsed(s, !s.collapsed))}
+        onToggleWidth={() => layoutStore.update(toggleWidth)}
+        onClose={() => layoutStore.update(closePanel)}
+      >
+        <div hidden={open !== 'ai'}>
+          <AIAssistantPanel key={snapshot.id} snapshot={snapshot} assistant={assistant} />
+        </div>
+        {open === 'log' && <LogPanel entries={log} />}
+        {open === 'edit' && <PlaceholderPanel title="Edit" phaseLabel="2E" />}
+        {open === 'history' && <PlaceholderPanel title="History" phaseLabel="2B" />}
+        {open === 'journal' && <PlaceholderPanel title="Journal" phaseLabel="2F" />}
+      </PanelFrame>
+      <StudioToolbar
+        openPanel={open}
+        onTogglePanel={(id) => layoutStore.update((s) => togglePanel(s, id))}
+        onSkeleton={shellActions.openSkeleton}
+      />
     </main>
   );
 }
