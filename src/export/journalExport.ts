@@ -4,12 +4,13 @@ import { JOURNAL_LIMITS as L } from '../config/journalLimits';
 import { describeStep } from '../journal/flows';
 import type { JournalModel } from '../journal/journalModel';
 import type { RepoSnapshot } from '../types/contracts';
+import { cardById } from '../skillbook';
 
 const LEVEL_NAMES = { simple: 'Simple', practical: 'Practical', deeper: 'Deeper' } as const;
 
-export function buildJournalMarkdown(j: JournalModel, snap: RepoSnapshot): string {
+export function buildJournalMarkdown(j: JournalModel, snap: RepoSnapshot, now?: Date): string {
   const sections: string[][] = [];
-  sections.push([`# PatchBay journal: ${snap.name}`, `Repository: ${snap.source} ${snap.owner}/${snap.name} @ ${snap.ref}`, `Level: ${LEVEL_NAMES[j.level]}`, 'Built offline by PatchBay from the files it read. No AI was used.', '']);
+  sections.push([`# PatchBay journal: ${snap.name}`, `Repository: ${snap.source} ${snap.owner}/${snap.name} @ ${snap.ref}`, ...(now ? [`Exported: ${now.toISOString()}`] : []), `Level: ${LEVEL_NAMES[j.level]}`, 'Built offline by PatchBay from the files it read. No AI was used.', '']);
   sections.push(['## Application overview', ...j.overview.flatMap((p) => [p.title ? `### ${p.title}` : '', p.sentences.join(' '), '']).filter((x, i, a) => !(x === '' && a[i - 1] === ''))]);
   const flows = ['## How things flow'];
   for (const f of j.flows) {
@@ -30,6 +31,9 @@ export function buildJournalMarkdown(j: JournalModel, snap: RepoSnapshot): strin
     lessons.push('');
   }
   sections.push(lessons);
+  // R9.1: concept cards are included only when a lesson links to them.
+  const linked = [...new Set(j.lessons.flatMap((l) => l.lesson.related))].map((id) => cardById(id)).filter((c) => c?.kind === 'concept');
+  if (linked.length) sections.push(['## Related concepts', ...linked.flatMap((c) => [`### ${c!.title}`, c!.levels[j.level], '']), '']);
   sections.push(['## Notes', ...(j.notes.length ? j.notes : ['None.']), '']);
   let out = '';
   for (const s of sections) {

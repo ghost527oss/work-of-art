@@ -242,13 +242,19 @@ export function appendEntry(w: WorkState, entry: HistoryEntry): WorkState {
   return { ...w, applied: [...w.applied, { ...entry }], undone: [] };
 }
 
+const CLOSED = '#u';
+/** A closed key keeps its "edit:" start and can never equal a fresh key (fresh keys never end with "#u"). */
+export function closeEditKey(key: string): string {
+  return key.endsWith(CLOSED) ? key : key.slice(0, 200 - CLOSED.length) + CLOSED;
+}
+
 export function undoChange(w: WorkState): WorkState {
   if (undoRefusal(w) !== null) return w;
   const last = w.applied[w.applied.length - 1] as HistoryEntry;
-  // Undo ends a merge burst (2E-2): the entry no longer carries its edit key.
-  const { editKey: _k, ...plain } = last;
-  void _k;
-  return { ...w, applied: w.applied.slice(0, -1), undone: [...w.undone, plain] };
+  // Undo ends a merge burst (2E-2). 2F (@node: F9.10): the key is closed ("#u") instead of removed, so a later
+  // edit never merges into it, while "edit:" still marks it as your edit for the patch export.
+  const closed: HistoryEntry = last.editKey ? { ...last, editKey: closeEditKey(last.editKey) } : last;
+  return { ...w, applied: w.applied.slice(0, -1), undone: [...w.undone, closed] };
 }
 
 export function redoChange(w: WorkState): WorkState {

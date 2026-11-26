@@ -2,6 +2,8 @@
 // Reads only the name, the script NAMES, and the dependency NAMES from package.json. Never a command or a value.
 import type { RepoFile } from '../types/contracts';
 
+const MAX_NAMES = 50;
+
 export interface PackageFacts { name?: string; scripts: string[]; dependencies: string[] }
 
 export function readPackageFacts(files: readonly Pick<RepoFile, 'path' | 'content'>[]): PackageFacts {
@@ -12,8 +14,8 @@ export function readPackageFacts(files: readonly Pick<RepoFile, 'path' | 'conten
     const keys = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v as object).filter((k) => /^[@\w./:-]{1,80}$/.test(k)) : []);
     return {
       ...(typeof j.name === 'string' && /^[@\w./-]{1,100}$/.test(j.name) ? { name: j.name } : {}),
-      scripts: keys(j.scripts).sort(),
-      dependencies: [...new Set([...keys(j.dependencies), ...keys(j.devDependencies)])].sort(),
+      scripts: keys(j.scripts).sort().slice(0, MAX_NAMES),
+      dependencies: [...new Set([...keys(j.dependencies), ...keys(j.devDependencies)])].sort().slice(0, MAX_NAMES),
     };
   } catch {
     return { scripts: [], dependencies: [] };

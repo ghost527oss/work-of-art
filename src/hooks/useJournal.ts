@@ -140,7 +140,7 @@ export function createExporter(studio: Store<StudioState>, downloader: Downloade
       const s = studio.getState();
       if (!s.snapshot || model.status !== 'ready') return false;
       const name = nameOf(`journal-${model.level}`, 'md');
-      if (!downloader.download(name, buildJournalMarkdown(model, s.snapshot))) return false;
+      if (!downloader.download(name, buildJournalMarkdown(model, s.snapshot, new Date(now())))) return false;
       studio.update((st) => logJournalExport(st, now(), model.level));
       return name;
     },

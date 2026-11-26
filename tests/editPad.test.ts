@@ -243,7 +243,11 @@ describe('review findings (2E-2)', () => {
     const w = rewriteStartTag(index, el, [{ prop: 'width', value: '200px' }])!;
     let s = applyUserEdit({ ...initialState(), experience: 'studio', snapshot: snap }, { path: 'index.html', baseHash: hashText(index), newContent: w, editKey: 'k', title: 't' }, ctx2).state;
     s = runCommandUndoRedo(s);
-    expect(s.work.applied[0]!.editKey).toBeUndefined();
+    // 2F: the key is closed, not removed (it still marks your edit); a new edit with key 'k' does not merge into it.
+    expect(s.work.applied[0]!.editKey).toBe('k#u');
+    const w2 = w.replace('Order now', 'Order today');
+    const s2 = applyUserEdit(s, { path: 'index.html', baseHash: hashText(w), newContent: w2, editKey: 'k', title: 't' }, ctx2).state;
+    expect(s2.work.applied).toHaveLength(2);
   });
   it('existing styles with quotes or !important are not rewritten (too complex)', () => {
     const el = table().find((e) => e.tag === 'button')!;

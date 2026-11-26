@@ -110,7 +110,7 @@ export function describeStep(step: FlowStep, level: Level): string {
     case 'outside': return level === 'simple' ? `${step.path} contacts an outside service.${cert}` : `${where} contacts ${step.target}.${cert}`;
     case 'route': return level === 'simple' ? `${step.path} answers it.${cert}` : `${where} handles ${step.target}.${step.note && step.note.startsWith('mounted at') ? ` It is ${step.note.replace(/:(\d+)$/, ', line $1')}.` : ''}${cert}`;
     case 'uses': return level === 'simple' ? `It uses ${step.path}.${cert}` : `It uses ${step.path}. (line ${step.line}${step.certainty ? `, ${CERT[step.certainty]}` : ''})`;
-    case 'setting': return level === 'simple' ? `${step.path} reads the setting ${step.target}.` : `${where} reads the setting ${step.target}.${cert}`;
+    case 'setting': return level === 'simple' ? `${step.path} reads the setting ${step.target}.${cert}` : `${where} reads the setting ${step.target}.${cert}`;
     default: return `${where}${cert}`;
   }
 }
