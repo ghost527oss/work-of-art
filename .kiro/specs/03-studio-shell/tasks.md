@@ -152,3 +152,33 @@ The spec files are on `spec/03-studio-shell`. Proposed: after you approve the sp
 1. **Branch and commits.** Commit and push this spec on `spec/03-studio-shell` and open a pull request now, then use a `feat/studio-shell` branch with one commit per task? Or keep everything on one branch?
 2. **Requirement questions 1 to 5** at the end of `requirements.md` (screen not saved, sandbox on Screens 4 and 5, area buttons, default layout and widths, shared collapse setting).
 3. **Approval of the spec** and then your explicit "Go" naming **S1**.
+
+---
+
+## Build report (sub-phase 2A, as built)
+
+Copied from `PHASE_2_REPORT.md` at the repository root, which also has the summary table and the Phase 2 exit evidence. Numbers are real command output; **Unverified** items say why.
+
+
+**What was built.** After a repository loads, the Studio is a workspace with a vertical toolbar on the right: Edit, AI Chat, Log, History, Journal, and Skeleton Crew.
+- The first five buttons open one panel at a time. A panel can collapse, switch between narrow and wide, and close.
+- Skeleton Crew opens Screen 4. Its area buttons open Screen 5.
+- The panel layout is saved under `patchbay.studio-layout.v1`: four fields, no repository data.
+
+**Files.** Created:
+- `src/store/{layoutSlice,layoutStorage,shellView}.ts`
+- `src/hooks/{useLayout,useShell}.ts`
+- `src/components/{StudioToolbar,PanelFrame,PlaceholderPanel,SandboxPlaceholder,SkeletonCrewScreen,DomainScreen,ProjectInfo,LogPanel}.tsx`
+- 6 test files
+
+Changed: `StudioLayout.tsx` (rewritten as the shell), `App.tsx`, `styles.css`, `README.md`, `PLAN.md`.
+
+**Results.**
+- 27 files, 868 tests. Build 384.14 kB (116.98 kB gzip).
+- 10 of 10 mutations killed.
+- Browser run 28 of 28, zero console errors. It covered panels, wide, collapse, layout after a refresh, 50 and 51 rapid presses, Screens 4 and 5, AI Chat, 375 px, and blocked storage.
+- The review found a keyboard-focus loss on collapse and close. It was fixed.
+
+**Known limits.** The AI form text and Project info local state reset when you visit Screens 4 and 5.
+
+**Unverified.** None.

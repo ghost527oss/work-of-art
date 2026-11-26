@@ -199,3 +199,64 @@ The spec on `spec/10-session-restore`, code on `feat/session-restore` from the s
 1. **Requirements questions 1 to 11** at the end of `requirements.md` (also written out in the chat message).
 2. **Branch pattern** for code: same as before. Confirm or change.
 3. **Approval of the spec**, and then, once 2A to 2F are built and you advance the active sub-phase to 2G, your explicit "Go" naming **K1**.
+
+---
+
+## Build report (sub-phase 2G, as built)
+
+Copied from `PHASE_2_REPORT.md` at the repository root, which also has the summary table and the Phase 2 exit evidence. Numbers are real command output; **Unverified** items say why.
+
+
+**What was built.** A refresh is harmless.
+- A small record, `patchbay.session.v1`, holds only the repository address, the screen, the Sandbox width, mode, and page, and two notes. It is checked by a strict schema and capped at 4 KB.
+- After a refresh the Loading screen says **Restoring your session** and loads the repository again. Then it puts back:
+  - the screen and the Sandbox settings
+  - the layout
+  - History and edits
+  - the Log
+  - a paused practice run
+  - label corrections
+  - the reading level
+- **Not restored, on purpose:** a crew run in progress and Preview Only changes (the Log says so for both), plus the selection, scripts-on, and AI Chat text. The scan runs again.
+- **Failures** (offline, rate limited, private repository, timeout) keep everything and offer Retry, Reset session, and Back to Start.
+- **Cancel** goes to Start with **Resume last session**.
+- **Back to Start** forgets only the session record.
+- **Reset session** asks first, then deletes the session, History, Log, and corrections, and keeps the layout and reading level.
+- **Saved in this browser** lists the five saved parts with their sizes.
+
+**Files.** Created:
+- `src/config/sessionLimits.ts`
+- `src/store/{sessionRecord,sessionStore,sessionActions,sessionPersistence}.ts`
+- `src/hooks/useSessionRestore.ts`
+- `src/components/{ResumeBanner,SavedDataPanel,ResetSessionButton,RestoreNotice}.tsx`
+- 11 test files and 2 test helpers (`sessionHarness`, `sessionFakes`)
+
+Changed: `useIngestion.ts` (adds `restore`), `StartScreen`, `LoadingScene`, `ProjectInfo`, `StudioLayout`, `DomainScreen` (starts the scan on Screen 5), `App`, `styles.css`, docs. The only existing test changed is `tests/useIngestion.test.ts`, which gained an appended block.
+
+**Results.**
+- 92 files, 1,666 tests. Build 684.48 kB (211.65 kB gzip).
+- 22 mutations killed, 1 equivalent.
+- **Store-level exit tests:**
+  - A refresh matrix of 18 scenarios.
+  - 3 seeds × 1,000 random actions over 26 controls, with a refresh every 50 actions. Each seed made 15 or 16 full state comparisons and the invariants were checked after every step.
+  - A storage privacy test. It ran secret, AI, preview, and snippet sentinels and found only the five keys and no file contents outside the 2B History diffs.
+- **Browser refresh matrix: 49 of 49.** Every scenario in requirements section 6, item 14 passed, including each panel, the Sandbox width and page, Screens 4 and 5, crew fix, Edit pad change, practice proposal, moved branch, Back to Start, Reset with confirmation, offline, 429 with reset time, private repository, server timeout, Retry, Cancel then Resume, invalid record, blocked storage, and rapid clicks with reloads. Storage was dumped and checked after each scenario.
+- The review found 2 defects, both fixed with tests:
+  - React's StrictMode double effect cancelled the startup restore in development. The restore now starts after the mount settles.
+  - The saved folder scope came from the last attempted load. It now comes from the load that actually completed.
+
+**Deviations.**
+- A session `retry()` was added: the ingestion retry starts an unrelated run.
+- The component is saved as `path#Name`.
+- The Screen 5 scan start is proved by a store test, a source check, and the browser, because effects do not run in the server-render tests.
+
+**Known limits.**
+- Two tabs overwrite each other; the last write wins.
+- A branch that moved drops your changes to files that changed.
+- Every refresh downloads the repository again, so GitHub limits apply. Samples cost nothing.
+- A repository whose 2B slot is held by another repository's real work does not get its Log back. This is the earlier 2E-1 rule that protects saved work.
+
+**Unverified.**
+- The StrictMode fix in a real dev-server browser. The dev server cannot run here, and the built app has no double effect.
+- A real network timeout of 30 seconds or more. The server's timeout error was simulated.
+- Real GitHub.

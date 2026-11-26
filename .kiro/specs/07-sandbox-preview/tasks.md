@@ -231,3 +231,29 @@ The spec on `spec/07-sandbox-preview`, code on `feat/sandbox-preview` from the s
 1. **Requirements questions 1 to 7** at the end of `requirements.md` (also written out in the chat message).
 2. **Branch pattern** for code: same as before. Confirm or change.
 3. **Approval of the spec**, and then, once 2A to 2D are built and you advance the active sub-phase to 2E-1, your explicit "Go" naming **E1**.
+
+---
+
+## Build report (sub-phase 2E-1, as built)
+
+Copied from `PHASE_2_REPORT.md` at the repository root, which also has the summary table and the Phase 2 exit evidence. Numbers are real command output; **Unverified** items say why.
+
+
+**What was built.** The Sandbox panel shows the project in a locked frame.
+- **Look-only:** the frame sandbox is exactly `allow-same-origin`. The page is rebuilt by an allowlist, and the security policy (CSP) comes first.
+- **Scripts on:** the frame sandbox is exactly `allow-scripts`, after a confirmation that names the remaining risks.
+- **Other views:** a component **workbench** shows an approximate picture of React components, and **Source** view shows the files.
+- A **layout check** measures text that does not fit at chosen widths. The result appears as a Measured finding (the 17th check).
+
+**Files.** Created: `src/preview/*` (tokenizer, allowlist, document builder, flags and CSP, bridge, workbench, mode detection, layout check, source view), `src/store/{previewSlice,previewActions}.ts`, `src/hooks/usePreview.ts`, `SandboxPanel` and `PreviewParts`, and tests.
+
+**Results.**
+- 62 files, 1,448 tests. Build 567.65 kB (174.85 kB gzip).
+- 9 of 9 mutations killed.
+- **Isolation browser test with a hostile page: 24 of 24.**
+  - Parent document, top location, local and session storage, IndexedDB, and cookies were all blocked.
+  - fetch, XHR, WebSocket, beacon, image, iframe, popup, form, worker, and dynamic import made zero network requests.
+  - The one documented exception is a self-navigation of the frame. It is detected and reset to look-only, with a Log line.
+- 8 of 10 review findings fixed.
+
+**Unverified.** WebRTC and data:/blob: self-navigation in scripts mode were not probed. **Open in viewer** was not built in 2E-1; 2F added it.

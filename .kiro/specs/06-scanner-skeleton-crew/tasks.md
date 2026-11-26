@@ -246,3 +246,36 @@ Same pattern as before: the spec on `spec/06-scanner-skeleton-crew`, code on `fe
 1. **Requirements questions 1 to 9** at the end of `requirements.md` (they are also written out in the chat message).
 2. **Branch pattern** for code: same as before. Confirm or change.
 3. **Approval of the spec**, and then, once 2A to 2C are built and you advance the active sub-phase to 2D, your explicit "Go" naming **D1**.
+
+---
+
+## Build report (sub-phase 2D, as built)
+
+Copied from `PHASE_2_REPORT.md` at the repository root, which also has the summary table and the Phase 2 exit evidence. Numbers are real command output; **Unverified** items say why.
+
+
+**What was built.** Skeleton Crew (Screen 4) scans the loaded files offline and groups findings into Frontend, Backend, Security, and APIs & Data.
+- Each finding shows the file, lines, a redacted snippet, a plain explanation, why it matters, and **Found** or **Possible**. There are no scores.
+- `start crew` walks the findings.
+- The one automatic fix adds `rel="noopener noreferrer"` to a link. It is applied only after you approve, and only when the fix is re-checked as exact and safe.
+- Screen 5 shows one area: its findings, details, narration, changes made, and the request trace.
+
+There were 16 checks in 2D. 2E-1 adds a 17th, a layout check measured in the preview.
+
+**Files.** Created:
+- `src/config/scanLimits.ts`
+- `src/skillbook/scanSkills.ts`
+- 9 engine files
+- `src/store/{scanSlice,scanActions}.ts`
+- `src/hooks/useScan.ts`
+- 11 components, 10 test files
+
+Changed: `commands.ts`, the work slice, actions and storage, `useHarness.ts`, `StopBar`, `ProposalCard`, and Screens 4 and 5.
+
+**Results.**
+- 57 files, 1,385 tests. Build 525.46 kB (159.99 kB gzip).
+- 10 of 10 mutations killed.
+- Browser run 25 of 25.
+- Most of the 16 review items were fixed (items 10, 11, and 16 only in part). Not fixed: `rescanPaths` does not re-apply the finding caps (documented).
+
+**Unverified.** None left: the automatic fix in a real browser was later proven in the 2F and 2G runs (fixture repository).

@@ -204,3 +204,27 @@ The spec on `spec/08-edit-pad`, code on `feat/edit-pad` from the spec branch, **
 1. **Requirements questions 1 to 9** at the end of `requirements.md` (also written out in the chat message).
 2. **Branch pattern** for code: same as before. Confirm or change.
 3. **Approval of the spec**, and then, once 2A to 2E-1 are built and you advance the active sub-phase to 2E-2, your explicit "Go" naming **P1**.
+
+---
+
+## Build report (sub-phase 2E-2, as built)
+
+Copied from `PHASE_2_REPORT.md` at the repository root, which also has the summary table and the Phase 2 exit evidence. Numbers are real command output; **Unverified** items say why.
+
+
+**What was built.** The Edit panel became an edit pad over the preview.
+- A clear overlay takes every click, so page code never receives one.
+- Tools: Select, Lasso, Background, Pick from list, and drag handles.
+- A property form with checked values only: size, corners, spacing, border, shadow, text, and background.
+- On plain HTML, a change is written to the practice copy at once as a `style` change and recorded in History. Changes it cannot map are **Preview Only** and never saved.
+- After each change the layout check runs again, and **Try a fix** offers fixed suggestions.
+
+**Files.** Created: `src/edit/*` (style model, inline style, text diff, element map, geometry, preview handle, suggestions), `src/store/{editSlice,editActions}.ts`, `src/hooks/useEditPad.ts`, `EditOverlay`, `EditPads`, `EditPanel`, and tests.
+
+**Results.**
+- 64 files, 1,482 tests. Build 604.44 kB (186.17 kB gzip).
+- 8 mutations killed, 1 equivalent.
+- Browser run 20 of 20.
+- 16 of 17 review items fixed. Not fixed: Try a fix matches by line only. Also left as known limits: no live preview while typing in number fields, no narrow-window re-check on resize, and workbench "line N" labels.
+
+**Unverified.** Touch input on a real device. The colour picker in other browsers.

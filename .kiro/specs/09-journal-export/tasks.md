@@ -233,3 +233,65 @@ The spec on `spec/09-journal-export`, code on `feat/journal-export` from the spe
 1. **Requirements questions 1 to 10** at the end of `requirements.md` (also written out in the chat message).
 2. **Branch pattern** for code: same as before. Confirm or change.
 3. **Approval of the spec**, and then, once 2A to 2E-2 are built and you advance the active sub-phase to 2F, your explicit "Go" naming **J1**.
+
+---
+
+## Build report (sub-phase 2F, as built)
+
+Copied from `PHASE_2_REPORT.md` at the repository root, which also has the summary table and the Phase 2 exit evidence. Numbers are real command output; **Unverified** items say why.
+
+
+**What was built.**
+- **Learning Journal** panel with three reading levels (Simple, Practical, Deeper). The level is saved under `patchbay.journal.v1`. It has these parts:
+  - **Application overview**
+  - **How things flow:** page, request, route, and setting traces that stop with a plain reason
+  - **Lessons from your project**
+  - **Concepts:** 12 cards
+  - **Download**
+- All teaching text is in one playbook file, `src/skillbook/playbook.ts`: 30 cards (12 concepts, 17 checks, 1 sorting card) with tags, keywords, and lookups ready for Phase 3.
+- **Open in viewer** jumps to a file and line in the Source viewer. **Learn more** on a Screen 5 finding opens its lesson.
+- **Export changes** (History panel) downloads a git patch of your applied changes. Practice-run files are unchecked by default. Partly read files, odd paths, likely secrets, and patches that fail their own check are excluded, each with a reason.
+- **Log** downloads (Markdown and JSON, redacted) and a **Journal** download.
+
+**Files.** Created:
+- `src/config/journalLimits.ts`
+- `src/skillbook/{playbookSchema,playbook,playbookLookup}.ts`
+- `src/journal/{lessonRules,packageFacts,overview,flows,journalModel}.ts`
+- `src/export/{diffLines,unifiedDiff,patchExport,logExport,journalExport,exportName,download}.ts`
+- `src/store/{journalPrefs,exportActions}.ts`
+- `src/hooks/useJournal.ts`
+- 11 components (`JournalPanel`, `LevelPicker`, `OverviewSection`, `FlowsSection`, `LessonsSection`, `ConceptsSection`, `JournalDownload`, `ExportChanges`, `LogExportButtons`, `ExportButton`, `Fold`)
+- 16 test files, plus a new independent test applier `tests/helpers/applyHunks.ts`
+
+Changed: `HistoryPanel`, `LogPanel`, `FindingDetail`, `DomainScreen`, `StudioLayout`, `App`, `SandboxPanel` and `previewHandle.ts` (for Open in viewer), `workSlice.ts` (see deviations), `styles.css`, and docs. Deleted: `PlaceholderPanel.tsx` (approved).
+
+**Results.**
+- 79 files, 1,582 tests. Build 671.40 kB (207.44 kB gzip). Most of the growth is lesson text.
+- 27 of 27 mutations killed. Five survived at first; new tests now kill them.
+- The design's worked patch example is reproduced exactly. Every diff applies with two independent appliers and reverses exactly.
+- **`git apply`:** downloaded patches applied with `git apply --check`, `git apply`, and `patch -p1 --dry-run` in throwaway repositories for four projects: the fixture (crew fix plus Edit pad change) and the static, React, and full-stack samples.
+- Browser run 34 of 34.
+- The review found no secret leak (sentinel probes) and ran about 7,000 patches against real `git apply` with zero failures. 8 of 11 findings fixed:
+  - Open in viewer opened the wrong line on "uses" steps.
+  - The Journal showed an all-clear when no scan had run.
+  - The Journal header was not redacted.
+  - Size caps now count bytes and stop at the first file that does not fit.
+  - The download helper now cleans up after a failure.
+  - The diff memory is banded (it was about 900 MB on a full 20,000-line rewrite).
+  - The lesson focus is kept while the Journal builds.
+  - One lesson wording was changed (see below).
+
+**Deviations.**
+- Open in viewer is new (2E-1 had not built it).
+- Undo now closes the Edit pad key (`#u`) instead of removing it, so an undone and redone edit is still exported as **Your edits**. One 2E-2 test assertion was updated for this.
+- Learn more is on Screen 5 only (Screen 4 has no finding detail).
+- The test file names differ from the design; the list is in `PLAN.md` "F9 as built".
+
+**Known limits.**
+- Journal lines can drift after edits, because the analysis is not re-run.
+- The viewer marks the line but does not scroll to it.
+- Files that mix CRLF and LF fail the patch self-check and are excluded with "could not be verified".
+
+**Needs your review.** All 30 lesson cards are written data, as the spec says. One wording was changed after the code review: the SQL lesson, Deeper level, now says "the database reads the values as data, not as part of the command".
+
+**Unverified.** The patch's secret exclusion in a browser. No UI path can create such a change (2D and 2E-2 refuse it), so it is proved by unit tests only.

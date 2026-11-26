@@ -225,3 +225,36 @@ Same pattern as 2A (decision in the 2A tasks file): the spec on `spec/04-action-
 1. **Requirements questions 1 to 7** at the end of `requirements.md`: practice-only proposals, commands in the AI box, one saved slot, undo and redo only when paused, Stop effects, provisional limits, and Edit not resuming.
 2. **Branch pattern** for code: same as 2A (spec branch, then a feature branch with one commit per task). Confirm or change.
 3. **Approval of the spec**, and then, once 2A is built and you advance the active sub-phase, your explicit "Go" naming **B1**.
+
+---
+
+## Build report (sub-phase 2B, as built)
+
+Copied from `PHASE_2_REPORT.md` at the repository root, which also has the summary table and the Phase 2 exit evidence. Numbers are real command output; **Unverified** items say why.
+
+
+**What was built.** AI Chat understands fixed command words: `help`, `status`, `start`, `pause`, `resume`, `step`, `stop`, `approve`, `reject`, `undo`, `redo`, `open <panel>`, and `reset`.
+- `start` runs an offline **practice run** that proposes practice comments.
+- Approving a proposal changes only PatchBay's practice copy. Undo and Redo are checked by fingerprints.
+- A Stop button is always visible. Opening Edit pauses the run.
+- History and the Log are real. The work (run, proposal, History diffs, last 200 Log lines) is saved for one repository under `patchbay.work.v1`. After a refresh it comes back, and a running run comes back paused.
+
+**Files.** Created:
+- `src/engine/{diffApply,commands,practiceScript}.ts`
+- `src/config/workLimits.ts`
+- `src/store/{workSlice,workActions,workStorage}.ts`
+- `src/hooks/useHarness.ts`
+- `src/components/{StopBar,ProposalCard,HistoryPanel,EditPanel}.tsx`
+- 9 test files
+
+Changed: `useStudioStore.ts`, `layoutSlice.ts`, `AIAssistantPanel.tsx`, `LogPanel.tsx`, `StudioLayout.tsx`, `App.tsx`, `styles.css`, docs, and 3 named assertions in `tests/studioLayout.test.tsx`.
+
+**Results.**
+- 36 files, 1,185 tests. Build 416.17 kB (127.17 kB gzip).
+- 11 of 11 mutations killed.
+- Browser run 47 of 47, zero console errors. It included rapid Approve, Reject, and Stop presses, refresh and restore, slot replacement, and blocked storage.
+- All 7 review findings were fixed.
+
+**Known limits.** The `reset` command has no confirmation, as specified.
+
+**Unverified.** One scripted item, "refused text stays in the box", is tested only by logic.

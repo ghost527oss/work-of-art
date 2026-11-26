@@ -255,3 +255,34 @@ Same pattern as 2A and 2B: the spec on `spec/05-project-understanding`, code on 
 1. **Requirements questions A to E** at the end of `requirements.md`: the stage order on the Loading screen, the two changed store tests, slower loading for big repositories, analysis failure not blocking loading, and the basic scope of Python.
 2. **Branch pattern** for code: same as 2A and 2B. Confirm or change.
 3. **Approval of the spec**, and then, once 2A and 2B are built and you advance the active sub-phase to 2C, your explicit "Go" naming **C1**.
+
+---
+
+## Build report (sub-phase 2C, as built)
+
+Copied from `PHASE_2_REPORT.md` at the repository root, which also has the summary table and the Phase 2 exit evidence. Numbers are real command output; **Unverified** items say why.
+
+
+**What was built.** An offline analysis runs as the "Classify files" loading stage.
+- Every file gets labels, a confidence, and plain reasons.
+- Files with no clue go to **Needs Review** instead of being guessed.
+- A connection map lists imports, page loads, routes, API calls, outside calls, and setting reads. Each is marked Confirmed, Inferred, or Broken.
+- You can correct labels. Corrections are saved per repository (`patchbay.corrections.v1`, paths and label names only).
+
+**Files.** Created:
+- `src/skillbook/{types,sortSkills,index}.ts`
+- `src/config/understandingLimits.ts`
+- `src/engine/{sourceScan,sourceScanPy,scanTypes,sortFiles,connectionMap,analyzeProject,understandTypes,understandingView}.ts`
+- `src/store/{understandingSlice,understandingActions,correctionsStorage}.ts`
+- `src/hooks/useUnderstanding.ts`
+- 4 components, 12 test files
+
+Changed: `useIngestion.ts`, `LoadingScene.tsx`, `ProjectInfo.tsx`, `StudioLayout.tsx`, `App.tsx`, and two named tests in `tests/store.test.ts`.
+
+**Results.**
+- 48 files, 1,303 tests. Build 477.73 kB (145.51 kB gzip).
+- 9 mutations killed, 1 equivalent.
+- Browser run 24 of 24.
+- 11 of 12 review findings fixed. The 12th (area counts include Low labels) follows the spec text.
+
+**Unverified.** A real GitHub repository load. The browser runs use fixtures and samples.
