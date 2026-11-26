@@ -570,3 +570,79 @@ Contract: The left Sandbox shows a safe preview of the loaded project in one of 
 ### F7 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2E-1 gate (build-phases.md): imported code cannot read PatchBay data, cookies, or secrets, or load external scripts or any other external content; messages from the preview are validated and shown only as plain text
+
+---
+
+> plan_id: `P2E2-EDITPAD` — Edit Pad (spec `.kiro/specs/08-edit-pad/`). Active product phase: Phase 2, Sub-phase 2E-2. Status: draft for approval; no node is approved for modification. Depends on 2A to 2E-1 (`P2E1-SANDBOX`) being built. PatchBay's own screens stay black-and-white wireframe with no animation, `AI_MODE=mock` only, no new dependency, no network and no AI call. The 2E-1 isolation files are read only. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F8 — Edit Pad
+Contract: In the Edit panel the user selects elements in the look-only preview (click, lasso, background, or a list) and changes size, corners, spacing, border, shadow, text, and colours through validated tools and drag handles. When an element in a plain HTML page can be mapped exactly, the change is written as that element's `style` attribute in the in-memory practice copy and recorded in History (merged per element burst, with Undo and Redo and the 2B fingerprint checks). Everything else is Preview Only, with one fixed reason. Layout findings are re-checked after edits, with Try a fix suggestions to Keep or Discard. Nothing changes the loaded snapshot or the real repository. Export is 2F.
+
+### F8.1 — Limits, style model, inline style
+- Inputs: user field values
+- Outputs: `EDIT_LIMITS`; validated `StyleDeclaration`s; merged inline style text
+- Invariants: only the listed properties; numeric ranges and `#rrggbb` colours enforced; generated values never contain `url(`, `expression(`, quotes, semicolons, braces, angle brackets, or backslashes (fuzz proof); a complex `style` attribute is reported as too complex; pure
+- Files: `src/config/editLimits.ts`, `src/edit/styleModel.ts`, `src/edit/inlineStyle.ts`, `tests/styleModel.test.ts`, `tests/inlineStyle.test.ts`
+- Depends on: none
+- verify: `npm run typecheck && npx vitest run tests/styleModel.test.ts tests/inlineStyle.test.ts`
+
+### F8.2 — Text diff, mapping, start-tag rewrite, builder changes
+- Inputs: file text, an element table entry, declarations
+- Outputs: one-hunk diffs with 3 context lines; map results with fixed reasons; rewritten start tags; element keys and Preview Only application in the preview builders
+- Invariants: only the start tag's text changes; a stale table or unknown tag or SVG element or complex style is not mapped; workbench elements are never mappable; the 2E-1 isolation tests still pass; only the named 2E-1 test assertions change
+- Files: `src/edit/textDiff.ts`, `src/edit/elementMap.ts`, `src/preview/previewDocument.ts`, `src/preview/workbenchDocument.ts`, `tests/textDiff.test.ts`, `tests/elementMap.test.ts`, `tests/previewDocument.test.ts`, `tests/workbench.test.ts`
+- Depends on: F8.1, F7.3, F7.5
+- verify: `npm run typecheck && npx vitest run tests/textDiff.test.ts tests/elementMap.test.ts tests/previewDocument.test.ts tests/previewHostile.test.ts tests/workbench.test.ts tests/previewFlags.test.ts`
+
+### F8.3 — Selection geometry and suggestions
+- Inputs: element rectangles, pointer positions, layout findings
+- Outputs: hit test, lasso selection (outermost, at most 20), handle resize maths, layout suggestions
+- Invariants: whole pixels from 1 to 5000; inputs clamped; fixed suggestion per finding kind passing the validators; pure
+- Files: `src/edit/geometry.ts`, `src/edit/suggestions.ts`, `tests/editGeometry.test.ts`
+- Depends on: F8.1
+- verify: `npm run typecheck && npx vitest run tests/editGeometry.test.ts`
+
+### F8.4 — History integration
+- Inputs: a path, a new text, an edit key
+- Outputs: `applyUserEdit`; amended or appended or removed History entries; optional `editKey`
+- Invariants: practice copy, History, Log, and findings change in one update; amend only for the same key, last entry, and empty redo list; text equal to the original removes the entry; refusals (stale, full, too large, no apply, secret) change nothing and become Preview Only; Undo and Redo restore exact text; old saved records still load; the snapshot is never mutated
+- Files: `src/store/workSlice.ts`, `src/store/workActions.ts`, `src/store/workStorage.ts`, `tests/userEdit.test.ts`
+- Depends on: F8.2, F4.4, F4.5, F4.6, F6.5
+- verify: `npm run typecheck && npx vitest run tests/userEdit.test.ts tests/workState.test.ts tests/workActions.test.ts tests/workStorage.test.ts tests/crewRun.test.ts tests/crewStorage.test.ts`
+
+### F8.5 — Edit state and actions
+- Inputs: tool and selection events, Preview Only changes
+- Outputs: `StudioState.edit`; whole-state actions; the page change
+- Invariants: selection at most 20 with a notice; Preview Only at most 50 with a refusal message; element keys survive a rebuild or are reported missing; opening Edit turns scripts off; nothing saved; existing tests pass unedited
+- Files: `src/store/editSlice.ts`, `src/store/editActions.ts`, `src/store/useStudioStore.ts`, `src/store/previewSlice.ts`, `src/store/previewActions.ts`, `tests/editState.test.ts`
+- Depends on: F8.3, F8.4, F7.8
+- verify: `npm run typecheck && npx vitest run tests/editState.test.ts tests/store.test.ts tests/previewState.test.ts tests/workStorage.test.ts`
+
+### F8.6 — Browser adapter and controller
+- Inputs: pointer, keyboard, and field events; the preview document
+- Outputs: live style changes; the commit pipeline; selection and scroll restore; the layout re-check; suggestions
+- Invariants: the only writes to the preview are `style.setProperty` and `style.removeProperty` with validated values on known `data-pb` numbers; one live update per frame; commits only on release, blur, Enter, or `change`; offsets rewritten from the end of the file backwards; everything released on close, rebuild, and unmount; no fetch or AI import
+- Files: `src/edit/previewEditDom.ts`, `src/hooks/useEditPad.ts`, `tests/editController.test.ts`
+- Depends on: F8.2, F8.3, F8.4, F8.5, F7.9
+- verify: `npm run typecheck && npx vitest run tests/editController.test.ts`
+
+### F8.7 — Panel components and overlay
+- Inputs: props only
+- Outputs: the Edit panel, tools, property form, selection details, Preview Only list, layout block, overlay, page selector
+- Invariants: text rendered as text; labelled inputs with units and ranges; only Undo and Redo act on History; no Apply, Approve, Reject, Pause, Resume, or Step button; black and white only, no transition or animation
+- Files: `src/components/EditPanel.tsx`, `src/components/EditTools.tsx`, `src/components/PropertyForm.tsx`, `src/components/SelectionInfo.tsx`, `src/components/PreviewOnlyList.tsx`, `src/components/LayoutFixList.tsx`, `src/components/EditOverlay.tsx`, `src/components/PageSelect.tsx`, `src/styles.css`, `tests/editUi.test.tsx`
+- Depends on: F8.1, F8.5
+- verify: `npm run typecheck && npx vitest run tests/editUi.test.tsx`
+
+### F8.8 — Wiring and the Page selector
+- Inputs: the controller, the Sandbox panel
+- Outputs: the Edit panel for the Edit toolbar button; the overlay above the iframe in Edit mode; the Page selector; `useEditPad()` in `App`
+- Invariants: no edit to any test beyond the named ones; Screens 4 and 5 have no Edit panel or overlay; choosing a page keeps History; opening Edit turns scripts off
+- Files: `src/components/StudioLayout.tsx`, `src/components/SandboxPanel.tsx`, `src/components/PreviewToolbar.tsx`, `src/App.tsx`, `src/styles.css`, `tests/editUi.test.tsx`
+- Depends on: F8.6, F8.7, F7.10
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- manual gate (Unverified until run): the drawing browser run in `requirements.md` section 6, item 11
+
+### F8 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- Sub-phase 2E-2 gate (build-phases.md): no edit changes anything except the in-memory practice copy; unmapped changes never reach the code; every recorded change can be undone
