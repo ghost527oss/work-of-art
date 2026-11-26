@@ -10,6 +10,7 @@ Implements `requirements.md` in this folder. Active product phase: **Phase 2, Su
 | Your 2E answers | Look-only by default with an explicit run-scripts switch in a locked iframe with no outside network. Block external content, strip risky tags, placeholders for unloaded images. A static, approximate Component Workbench with no compiler. Everything from the preview is untrusted plain text and messages are validated. Split into 2E-1 (this) and 2E-2. The layout overflow check is the 17th finding. |
 | Phase 2 text | Offline, no new dependency, no AI, no running of imported servers. |
 | 2D | Findings need file, lines, snippet, and reason. The measured finding follows that rule using the element table. |
+| Your 2E-1 answers | Question 2 changed: the Skeleton Crew narrates measured layout findings under Frontend, reading what was already measured. |
 
 ## 2. Phase 2E-1 compliance
 
@@ -62,6 +63,7 @@ All paths are relative to `work-of-art/`.
 |---|---|
 | `src/skillbook/types.ts`, `scanSkills.ts` (2D) | `ScanSkill` gains `kind: 'text' | 'measured'` (default `'text'`). One new skill, `scan.frontend.layout-overflow` (`measured`). |
 | `src/engine/scanProject.ts` (2D) | Skips `measured` skills. |
+| `src/engine/crewScript.ts`, `src/store/workActions.ts` (2D) | `start crew` builds the script from the merged findings. The Frontend area step carries the "not measured" sentence when no layout check has run. |
 | `src/engine/scanView.ts` (2D) | `allFindings`, counts, and `whatWasChecked` accept the measured findings. The "not checked" lines change. |
 | `src/components/ScanSummary.tsx`, `FindingsTable.tsx`, `FindingDetail.tsx`, `WhatWasChecked.tsx` (2D) | Show "Measured" and the width. `FindingDetail` gains **Open in viewer**. The check list shows 17 checks. |
 | `src/store/useStudioStore.ts` | `StudioState` gains `preview`, cleared with the other slices. |
@@ -73,7 +75,7 @@ All paths are relative to `work-of-art/`.
 | `traceability/PLAN.md` | Adds plan `P2E1-SANDBOX` with nodes F7.1 to F7.10. |
 
 ### 4.3 Not touched
-`api/*`, all spec 01 and 02 files, the 2B run machine and storage, the 2C analysis, the 2D crew script and run logic, `AIAssistantPanel.tsx`, and every existing test except those named above.
+`api/*`, all spec 01 and 02 files, the 2B run machine and storage, the 2C analysis, the rest of the 2D crew script and run logic, `AIAssistantPanel.tsx`, and every existing test except those named above.
 
 ## 5. Data model
 
@@ -195,7 +197,7 @@ Picks the component (default `App`), inlines it, collects CSS files imported by 
 - **Evaluate (`layoutCheck.ts`, pure):** the three rules in requirements R8.3, skipping `auto` and `scroll`. One result per element and kind, with the list of widths.
 - **Findings:** `layoutFindings(results, elements, effective)` builds a `Finding` for each: `skillId: 'scan.frontend.layout-overflow'`, primary Frontend, severity Medium, certainty Found, fix Guided, the start-tag lines from the element table, a snippet from `snippetFor` on the effective content (redacted), `extra` with the numbers and width, and an id from `makeFindingId`. At most 100.
 - **Run (`usePreview`):** for the chosen width (or the three widths) set the iframe width, wait two animation frames, measure, restore the width. A timer stops the run at 3,000 ms with "The layout check took too long and was stopped." It runs only when the preview is `ready`, in look-only mode, in `static` mode. The content key (a hash of the entry page's and its files' effective contents) is stored with the result, and a changed key discards it.
-- **Merge:** `allFindings(scan.result.findings, preview.layout.findings)` is used by every 2D view. The crew script keeps using `scan.result.findings` only.
+- **Merge:** `allFindings(scan.result.findings, preview.layout.findings)` is used by every 2D view **and by the crew**. `runCommand('start', 'crew')` builds the script from the merged list at the moment it is accepted, so measured findings are narrated under Frontend with their measured numbers. The crew code reads only state. It never touches the preview or the DOM. When `preview.layout.status` is not `done`, the Frontend area step title carries the sentence "Layout was not measured. Use Check layout in the Sandbox to include layout findings." Measured findings are Guided, so they get no `propose` or `verify` step.
 
 ## 14. State, controller, and panel
 
