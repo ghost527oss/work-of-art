@@ -350,3 +350,52 @@ describe('validateAIResult: rejection cases', () => {
     expect(r.ok).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// @node: F11.1 Phase 3A additions
+// ---------------------------------------------------------------------------
+
+describe('validateAIRequest: Phase 3A fields', () => {
+  it('accepts a known skillId and safe connections', () => {
+    const r = ok({ ...baseReq, skillId: 'scan.frontend.img-alt', connections: ['src/a.js calls /api/x (confirmed, line 3)'] });
+    expect(r.skillId).toBe('scan.frontend.img-alt');
+  });
+  it('rejects an unknown skillId', () => {
+    expect(bad({ ...baseReq, skillId: 'scan.frontend.not-real' }).code).toBe('invalid_request');
+  });
+  it('rejects a connection that matches a secret pattern, without echoing it', () => {
+    const r = bad({ ...baseReq, connections: ['key=AKIAABCDEFGHIJKLMNOP'] });
+    expect(r.code).toBe('invalid_request');
+    expect(r.message).not.toContain('AKIA');
+  });
+  it('accepts a snippet with startLine inside selectedPaths', () => {
+    ok({ ...baseReq, sourceContext: [{ filePath: 'src/main.ts', content: 'a', startLine: 12 }] });
+  });
+});
+
+describe('validateAIResult: action responses', () => {
+  const act: AIRequest = { requestId: 'req-1', instruction: 'start the crew', taskType: 'act', selectedPaths: [] };
+  const result = (response: unknown) => ({ requestId: 'req-1', mode: 'live', response }) as unknown as AIResult;
+  it('accepts start crew, open log, and help for an act request', () => {
+    expect(validateAIResult(act, result({ type: 'action', action: 'start', arg: 'crew', summary: 's' })).ok).toBe(true);
+    expect(validateAIResult(act, result({ type: 'action', action: 'open', arg: 'log', summary: 's' })).ok).toBe(true);
+    expect(validateAIResult(act, result({ type: 'action', action: 'help', summary: 's' })).ok).toBe(true);
+  });
+  it('rejects an action for any other task type', () => {
+    for (const taskType of ['explain', 'suggest_change', 'review_finding'] as const) {
+      expect(validateAIResult({ ...act, taskType }, result({ type: 'action', action: 'help', summary: 's' })).ok).toBe(false);
+    }
+  });
+  it('rejects an action when file text was sent', () => {
+    const withText: AIRequest = { ...act, selectedPaths: ['a.ts'], sourceContext: [{ filePath: 'a.ts', content: 'x' }] };
+    expect(validateAIResult(withText, result({ type: 'action', action: 'help', summary: 's' })).ok).toBe(false);
+  });
+  it('enforces the argument rules', () => {
+    const v = (response: unknown) => validateAIResult(act, result(response)).ok;
+    expect(v({ type: 'action', action: 'start', summary: 's' })).toBe(false);
+    expect(v({ type: 'action', action: 'start', arg: 'log', summary: 's' })).toBe(false);
+    expect(v({ type: 'action', action: 'open', summary: 's' })).toBe(false);
+    expect(v({ type: 'action', action: 'open', arg: 'crew', summary: 's' })).toBe(false);
+    expect(v({ type: 'action', action: 'pause', arg: 'crew', summary: 's' })).toBe(false);
+  });
+});

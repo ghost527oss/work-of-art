@@ -250,3 +250,75 @@ describe('AI_LIMITS', () => {
     expect(AI_LIMITS.maxPickerRows).toBe(200);
   });
 });
+
+// ---------------------------------------------------------------------------
+// @node: F11.1 Phase 3A additions
+// ---------------------------------------------------------------------------
+
+import { AIMetaSchema, AI_ACTION_NAMES } from '../src/types/contracts';
+
+describe('Phase 3A: AIRequestSchema additions', () => {
+  it('accepts the act task type', () => {
+    expect(AIRequestSchema.safeParse({ ...validReq, taskType: 'act' }).success).toBe(true);
+  });
+  it('accepts skillId, connections, and startLine', () => {
+    const r = {
+      ...validReq,
+      skillId: 'scan.frontend.img-alt',
+      connections: ['src/a.js calls /api/x (confirmed, line 3)'],
+      sourceContext: [{ filePath: 'src/main.ts', content: 'x', startLine: 40 }],
+    };
+    expect(AIRequestSchema.safeParse(r).success).toBe(true);
+  });
+  it('rejects a malformed skillId, too many or empty connections, and a bad startLine', () => {
+    expect(AIRequestSchema.safeParse({ ...validReq, skillId: 'img-alt' }).success).toBe(false);
+    expect(AIRequestSchema.safeParse({ ...validReq, skillId: 'scan.Front.x' }).success).toBe(false);
+    expect(AIRequestSchema.safeParse({ ...validReq, connections: ['a', 'b', 'c', 'd'] }).success).toBe(false);
+    expect(AIRequestSchema.safeParse({ ...validReq, connections: [''] }).success).toBe(false);
+    expect(AIRequestSchema.safeParse({ ...validReq, connections: ['x'.repeat(201)] }).success).toBe(false);
+    for (const startLine of [0, -1, 1.5, 1_000_001]) {
+      const r = { ...validReq, sourceContext: [{ filePath: 'src/main.ts', content: 'x', startLine }] };
+      expect(AIRequestSchema.safeParse(r).success).toBe(false);
+    }
+  });
+  it('still rejects unknown fields at both levels', () => {
+    expect(AIRequestSchema.safeParse({ ...validReq, tier: 'heavy' }).success).toBe(false);
+    const r = { ...validReq, sourceContext: [{ filePath: 'src/main.ts', content: 'x', extra: 1 }] };
+    expect(AIRequestSchema.safeParse(r).success).toBe(false);
+  });
+});
+
+describe('Phase 3A: action response', () => {
+  it('parses each allowed action and never approve, reject, or reset', () => {
+    for (const action of AI_ACTION_NAMES) {
+      expect(AIResponseSchema.safeParse({ type: 'action', action, summary: 'ok' }).success).toBe(true);
+    }
+    for (const action of ['approve', 'reject', 'reset', 'delete', '']) {
+      expect(AIResponseSchema.safeParse({ type: 'action', action, summary: 'ok' }).success).toBe(false);
+    }
+    expect(AI_ACTION_NAMES).not.toContain('approve');
+    expect(AI_ACTION_NAMES).not.toContain('reject');
+    expect(AI_ACTION_NAMES).not.toContain('reset');
+  });
+  it('rejects an unknown arg and an empty summary', () => {
+    expect(AIResponseSchema.safeParse({ type: 'action', action: 'open', arg: 'settings', summary: 'x' }).success).toBe(false);
+    expect(AIResponseSchema.safeParse({ type: 'action', action: 'help', summary: '' }).success).toBe(false);
+  });
+});
+
+describe('Phase 3A: result meta', () => {
+  const response = { type: 'clarification', questions: ['Which file?'] } as const;
+  const meta = { tier: 'light', provider: 'groq', model: 'openai/gpt-oss-20b', lighter: false, attempts: [{ provider: 'gemini', outcome: 'rate_limited' }] };
+  it('a result without meta still parses (mock results)', () => {
+    expect(AIResultSchema.safeParse({ requestId: 'r', mode: 'mock', response }).success).toBe(true);
+  });
+  it('accepts a valid meta and rejects extra fields, bad providers, bad outcomes, and too many attempts', () => {
+    expect(AIResultSchema.safeParse({ requestId: 'r', mode: 'live', response, meta }).success).toBe(true);
+    expect(AIMetaSchema.safeParse({ ...meta, extra: 1 }).success).toBe(false);
+    expect(AIMetaSchema.safeParse({ ...meta, provider: 'openai' }).success).toBe(false);
+    expect(AIMetaSchema.safeParse({ ...meta, attempts: [{ provider: 'groq', outcome: 'nope' }] }).success).toBe(false);
+    expect(AIMetaSchema.safeParse({ ...meta, attempts: Array.from({ length: 10 }, () => ({ provider: 'groq', outcome: 'error' })) }).success).toBe(false);
+    expect(AIMetaSchema.safeParse({ ...meta, model: '' }).success).toBe(false);
+    expect(AIMetaSchema.safeParse({ ...meta, model: 'm'.repeat(81) }).success).toBe(false);
+  });
+});

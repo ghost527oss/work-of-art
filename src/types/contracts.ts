@@ -355,9 +355,10 @@ export function assertCoverageConsistent(snapshot: RepoSnapshot): void {
 
 // ---------------------------------------------------------------------------
 // @node: F2.1 — AI Adapter contracts
+// @node: F11.1 — Phase 3A additions: `act`, skillId, connections, startLine, `action`, `meta`
 // ---------------------------------------------------------------------------
 
-export const AITaskTypeSchema = z.enum(['explain', 'suggest_change', 'review_finding']);
+export const AITaskTypeSchema = z.enum(['explain', 'suggest_change', 'review_finding', 'act']);
 export type AITaskType = z.infer<typeof AITaskTypeSchema>;
 
 const MAX_STR = 2000;
@@ -374,6 +375,8 @@ const bstr = z.string().min(1).max(MAX_STR);
 const SourceContextItemSchema = z.strictObject({
   filePath: z.string().min(1).max(250),
   content: z.string(),
+  /** Phase 3A: the 1-based file line where `content` starts (a snippet window). Absent means the whole file. */
+  startLine: z.number().int().min(1).max(1_000_000).optional(),
 });
 
 /**
@@ -386,10 +389,18 @@ export const AIRequestSchema = z.strictObject({
   taskType: AITaskTypeSchema,
   selectedPaths: z.array(z.string().min(1).max(250)).max(10),
   sourceContext: z.array(SourceContextItemSchema).max(5).optional(),
+  /** Phase 3A: a scan skill id (checked against the skill-book in `validateAIRequest`). */
+  skillId: z.string().min(1).max(60).regex(/^scan\.[a-z]+\.[a-z-]+$/, 'skillId must look like scan.area.name').optional(),
+  /** Phase 3A: up to 3 one-line connection facts (paths and addresses, never source text). */
+  connections: z.array(z.string().min(1).max(200)).max(3).optional(),
 });
 export type AIRequest = z.infer<typeof AIRequestSchema>;
 
-/** Four response shapes, each identified by `type`. */
+/** Actions an AI `action` response may name (design 13.1). `approve`, `reject`, and `reset` are deliberately absent. */
+export const AI_ACTION_NAMES = ['help', 'status', 'start', 'pause', 'resume', 'step', 'stop', 'undo', 'redo', 'open'] as const;
+export const AI_ACTION_ARGS = ['practice', 'crew', 'edit', 'chat', 'log', 'history', 'journal'] as const;
+
+/** Five response shapes, each identified by `type`. */
 export const AIResponseSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('clarification'),
@@ -416,13 +427,35 @@ export const AIResponseSchema = z.discriminatedUnion('type', [
     tests: z.array(bstr).min(1).max(MAX_TESTS),
     risks: z.array(bstr).min(1).max(MAX_RISKS),
   }),
+  z.object({
+    type: z.literal('action'),
+    action: z.enum(AI_ACTION_NAMES),
+    arg: z.enum(AI_ACTION_ARGS).optional(),
+    summary: bstr,
+  }),
 ]);
 export type AIResponse = z.infer<typeof AIResponseSchema>;
 
 /** Envelope returned by POST /api/assistant. Strict: no extra fields. */
+export const AIProviderIdSchema = z.enum(['gemini', 'groq', 'openrouter']);
+export type AIProviderId = z.infer<typeof AIProviderIdSchema>;
+export const AIAttemptOutcomeSchema = z.enum(['rate_limited', 'timeout', 'error', 'bad_answer', 'key_rejected', 'out_of_time']);
+export type AIAttemptOutcome = z.infer<typeof AIAttemptOutcomeSchema>;
+
+/** Live results only: which provider answered and which earlier attempts failed. Never holds text from a question or file. */
+export const AIMetaSchema = z.strictObject({
+  tier: z.enum(['light', 'heavy']),
+  provider: AIProviderIdSchema,
+  model: z.string().min(1).max(80),
+  lighter: z.boolean(),
+  attempts: z.array(z.strictObject({ provider: AIProviderIdSchema, outcome: AIAttemptOutcomeSchema })).max(9),
+});
+export type AIMeta = z.infer<typeof AIMetaSchema>;
+
 export const AIResultSchema = z.strictObject({
   requestId: z.string().min(1).max(64),
   mode: z.enum(['mock', 'live']),
   response: AIResponseSchema,
+  meta: AIMetaSchema.optional(),
 });
 export type AIResult = z.infer<typeof AIResultSchema>;

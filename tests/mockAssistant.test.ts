@@ -360,3 +360,27 @@ describe('mockResponse: frozen input is not mutated', () => {
 beforeAll(() => {
   // Already tested in determinism above; keep spies clean across the whole file.
 });
+
+// ---------------------------------------------------------------------------
+// @node: F11.1 Phase 3A: the act task in mock mode
+// ---------------------------------------------------------------------------
+
+describe('mockResponse: act task', () => {
+  it('returns a labelled explanation, runs nothing, and is deterministic', () => {
+    const r = req({ taskType: 'act', selectedPaths: [], instruction: 'start the crew' });
+    const a = mockResponse(r, { redactionCount: 0 });
+    const b = mockResponse(r, { redactionCount: 0 });
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(a.type).toBe('explanation');
+    if (a.type === 'explanation') {
+      expect(a.limitations[0]).toBe(MOCK_NOTICE);
+      expect(a.limitations).toContain('No action was run.');
+    }
+    const result = { requestId: 'req-1', mode: 'mock' as const, response: a };
+    expect(validateAIResult(r, result).ok).toBe(true);
+  });
+  it('never echoes the instruction', () => {
+    const r = req({ taskType: 'act', selectedPaths: [], instruction: 'SENTINEL_ACT_TEXT' });
+    expect(JSON.stringify(mockResponse(r, { redactionCount: 0 }))).not.toContain('SENTINEL_ACT_TEXT');
+  });
+});

@@ -1,4 +1,5 @@
 // @node: F2.1
+// @node: F11.1 (Phase 3A: skillId, connections, startLine, the `action` response, `meta`)
 // Cross-field and byte-size validation for AIRequest and AIResult.
 // Messages name the field, never the value, so user-supplied text cannot
 // appear in an error response.
@@ -10,6 +11,7 @@ import {
   type AIResult,
   type ApiErrorCode,
 } from '../types/contracts';
+import { scanSkillById } from '../skillbook';
 import { containsSecret } from './redact';
 import { isSafeRepoPath } from './repoUrl';
 
@@ -73,6 +75,13 @@ export function validateAIRequest(input: unknown): ValidateRequestResult {
     seenPaths.add(path);
   }
 
+  if (req.skillId !== undefined && scanSkillById(req.skillId) === undefined) {
+    return fail('invalid_request', 'skillId is not a known scan skill.');
+  }
+  if (req.connections !== undefined && req.connections.some((c) => containsSecret(c))) {
+    return fail('invalid_request', 'connections contains text that matched a secret pattern.');
+  }
+
   if (req.sourceContext !== undefined) {
     const seenContextPaths = new Set<string>();
     let totalBytes = 0;
@@ -105,6 +114,7 @@ export type ValidateResultFail = { ok: false; problems: string[] };
 export type ValidateResultResult = ValidateResultOk | ValidateResultFail;
 
 const DIFF_MAX_BYTES = 20 * 1024;
+const PANEL_ARGS = new Set<string>(['edit', 'chat', 'log', 'history', 'journal']);
 
 /**
  * Validates an AIResult against its originating request:
@@ -158,6 +168,17 @@ export function validateAIResult(request: AIRequest, result: unknown): ValidateR
     if (diffBytes > DIFF_MAX_BYTES) {
       problems.push(`unifiedDiff is ${diffBytes} bytes, exceeding the ${DIFF_MAX_BYTES}-byte limit.`);
     }
+  }
+
+  if (response.type === 'action') {
+    // An action may come only from an `act` request that carried no file text (design 13.1). The browser checks this too.
+    if (request.taskType !== 'act') problems.push('an action response is valid only for the act task.');
+    if (request.sourceContext !== undefined) problems.push('an action response is not allowed when file text was sent.');
+    const needsStart = response.action === 'start';
+    const needsPanel = response.action === 'open';
+    if (needsStart && response.arg !== 'practice' && response.arg !== 'crew') problems.push('start needs the argument practice or crew.');
+    if (needsPanel && !(response.arg !== undefined && PANEL_ARGS.has(response.arg))) problems.push('open needs a panel word.');
+    if (!needsStart && !needsPanel && response.arg !== undefined) problems.push(`${response.action} takes no argument.`);
   }
 
   return problems.length === 0 ? { ok: true } : { ok: false, problems };
