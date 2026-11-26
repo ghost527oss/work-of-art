@@ -149,3 +149,54 @@ describe('startup and apply', () => {
     for (const bad of ['fetch(', 'mockAssistant', 'aiAssistant', 'useAssistant', 'innerHTML', 'eval(']) expect(t).not.toContain(bad);
   });
 });
+
+describe('guards found by mutation checks', () => {
+  it('a second controller on the same page never starts the restore again (React double effect, even after a quick cancel)', async () => {
+    const storage = withRecord(rec());
+    const p = makePage(storage, network());
+    const page = { started: false };
+    const { createSessionController } = await import('../src/hooks/useSessionRestore');
+    const mk = () => createSessionController({ studio: p.studio, shell: p.shell, session: p.session, ingestion: p.ingestion.actions, preview: p.preview.actions, storage, setTimer: () => 0, clearTimer: () => undefined, now: () => 1, page });
+    const a = mk();
+    a.actions.startup();
+    p.ingestion.actions.cancel();
+    const run = p.studio.getState().ingestion.runId;
+    const b = mk();
+    b.actions.startup();
+    expect(p.studio.getState().ingestion.runId).toBe(run);
+    expect(p.studio.getState().experience).toBe('start');
+    a.dispose(); b.dispose(); p.dispose();
+  });
+  it('a restore that loads a different repository (renamed on GitHub) applies nothing', async () => {
+    const r = rec({ target: { source: 'github', owner: 'octo', repo: 'old-name', ref: 'main' }, screen: { screen: 'skeleton' }, preview: { width: 375, mode: 'auto' } });
+    const net = network();
+    net.repos.set('octo/old-name', githubFixture('octo', 'new-name', 'main', { 'index.html': '<p>x</p>\n' }));
+    const p = makePage(withRecord(r), net);
+    p.sessionCtl.actions.startup();
+    await p.settle(); p.mountSandbox(); await p.settle();
+    expect(p.studio.getState().snapshot?.name).toBe('new-name');
+    expect(p.shell.getState()).toEqual({ screen: 'studio' });
+    expect(p.studio.getState().preview.width).toBe(768);
+    expect(p.session.getState().status).toBe('done');
+    expect(msgs(p).some((m) => m.startsWith('Session restored'))).toBe(false);
+    p.dispose();
+  });
+  it('Retry after the user loaded something else from the failure panel does nothing', async () => {
+    const r = rec({ target: { source: 'github', owner: 'octo', repo: 'shop', ref: 'main' } });
+    const net = network();
+    net.fail = { code: 'not_found', message: 'Repository not found or private.' };
+    const p = makePage(withRecord(r), net);
+    p.sessionCtl.actions.startup();
+    await p.settle();
+    expect(p.session.getState().status).toBe('failed');
+    p.ingestion.actions.startSample('react-frontend');
+    await p.settle();
+    const before = p.studio.getState().ingestion.runId;
+    net.fail = undefined;
+    p.sessionCtl.actions.retry();
+    await p.settle();
+    expect(p.studio.getState().ingestion.runId).toBe(before);
+    expect(p.studio.getState().snapshot?.name).toBe('react-frontend');
+    p.dispose();
+  });
+});
