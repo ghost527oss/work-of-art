@@ -14,7 +14,7 @@ describe('the playbook', () => {
     for (const s of SKILLBOOK.scan) expect(cardsForSkill(s.id).map((c) => c.id), s.id).toEqual([`lesson.${s.id}`]);
     const concepts = ['page', 'stylesheet', 'script', 'import', 'route', 'api-call', 'env-var', 'request-flow', 'validation', 'secret', 'layout', 'label'].map((n) => `concept.${n}`);
     expect(PLAYBOOK.cards.filter((c) => c.kind === 'concept').map((c) => c.id)).toEqual(concepts);
-    expect(cardById('lesson.sorting.needs-review')?.kind).toBe('sorting');
+    expect(cardById('lesson.sorting.unsure')?.kind).toBe('sorting');
     expect(PLAYBOOK.cards).toHaveLength(30);
   });
   it('every card and level follows the writing rules', () => {

@@ -104,7 +104,9 @@ describe('Studio shell (Screen 3)', () => {
     setLayout({ openPanel: 'history', collapsed: false, width: 'narrow' });
     expect(render()).toContain('No changes yet.');
     setLayout({ openPanel: 'journal', collapsed: false, width: 'narrow' });
-    expect(render()).toContain('Arrives in sub-phase 2F.');
+    // 2F: the Journal replaces the placeholder.
+    expect(render()).not.toContain('Arrives in sub-phase 2F.');
+    expect(render()).toContain('Journal');
   });
 
   it('collapsed panel shows Expand and marks the left area as not covered', () => {

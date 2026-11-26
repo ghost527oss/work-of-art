@@ -111,10 +111,22 @@ export function buildJournal(input: JournalInput, level: Level): JournalModel {
   lessons.sort((x, y) => SEV[x.instances[0]!.severity as keyof typeof SEV] - SEV[y.instances[0]!.severity as keyof typeof SEV] || (x.lesson.id < y.lesson.id ? -1 : 1));
   const review = files.filter((f) => f.needsReview);
   if (review.length > 0) {
-    const card = cardById('lesson.sorting.needs-review')!;
+    const card = cardById('lesson.sorting.unsure')!;
     lessons.push({ lesson: card, instances: review.slice(0, L.instancesPerLesson).map((f) => ({ path: clean(f.path), firstLine: 0, lastLine: 0, severity: 'review', certainty: '', fix: '', extra: clean(f.evidence[0]?.description ?? '') })), more: Math.max(0, review.length - L.instancesPerLesson) });
   }
   const notes = [...facts.partialReasons];
   if (hidden > 0) notes.push(`${hidden} values were hidden.`);
   return { level, overview, flows, flowsHidden, lessons, concepts, hidden, notes, status: 'ready' };
+}
+
+/** A one-slot memo: the same input identities and level return the same model object. */
+export function createJournalMemo(build: typeof buildJournal = buildJournal) {
+  let last: { input: JournalInput; level: Level; model: JournalModel } | undefined;
+  const keys: Array<keyof JournalInput> = ['snapshot', 'analysis', 'analysisStatus', 'corrections', 'scan', 'measured', 'mode', 'modeReason', 'entryPath'];
+  return (input: JournalInput, level: Level): JournalModel => {
+    if (last && last.level === level && keys.every((k) => last!.input[k] === input[k])) return last.model;
+    const model = build(input, level);
+    last = { input, level, model };
+    return model;
+  };
 }

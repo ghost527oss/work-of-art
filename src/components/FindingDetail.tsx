@@ -1,6 +1,7 @@
 // @node: F6.10
+// @node: F9.10 (Learn more)
 // One finding with its proof: lines, snippet, explanation, why it matters, plan, certainty in words. Props only.
-import { scanSkillById } from '../skillbook';
+import { cardsForSkill, scanSkillById } from '../skillbook';
 import type { Finding } from '../engine/scanFindingTypes';
 
 const FIX_MEANING = {
@@ -9,7 +10,8 @@ const FIX_MEANING = {
   explanation: 'Explanation only: no fix is offered.',
 } as const;
 
-export function FindingDetail({ finding }: { finding: Finding }) {
+export function FindingDetail({ finding, onLearnMore }: { finding: Finding; onLearnMore?(lessonId: string): void }) {
+  const lesson = cardsForSkill(finding.skillId)[0];
   const skill = scanSkillById(finding.skillId);
   if (!skill) return null;
   return (
@@ -25,6 +27,7 @@ export function FindingDetail({ finding }: { finding: Finding }) {
       <p>{skill.kind === 'measured' ? 'Measured in the preview (not read from the code).' : finding.certainty === 'found' ? 'Found by the check.' : 'Possible: only the loaded files were read, so protection or handling may exist elsewhere.'}</p>
       <p>{FIX_MEANING[finding.fix]}{finding.fixNote ? ` ${finding.fixNote}` : ''}</p>
       <p className="note">Check: {skill.id}</p>
+      {onLearnMore && lesson && <p><button type="button" onClick={() => onLearnMore(lesson.id)}>Learn more</button></p>}
     </section>
   );
 }

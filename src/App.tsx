@@ -6,6 +6,7 @@
 // @node: F6.11 (calls useScan once)
 // @node: F7.10 (calls usePreview once)
 // @node: F8.8 (calls useEditPad once)
+// @node: F9.10 (calls useJournal and useExports once)
 // Switches between the Start, Loading, and Studio screens from the store's experience
 // stage. One ingestion hook instance and one assistant hook instance serve every screen.
 import { LoadingScene } from './components/LoadingScene';
@@ -18,6 +19,8 @@ import { useUnderstanding } from './hooks/useUnderstanding';
 import { useScan } from './hooks/useScan';
 import { usePreview } from './hooks/usePreview';
 import { useEditPad } from './hooks/useEditPad';
+import { useExports, useJournal } from './hooks/useJournal';
+import { useMemo } from 'react';
 import { useLayoutPersistence } from './hooks/useLayout';
 import { useShellReset } from './hooks/useShell';
 import { useStudioStore } from './store/useStudioStore';
@@ -31,6 +34,9 @@ export function App() {
   const scan = useScan();
   const preview = usePreview();
   const editPad = useEditPad();
+  const journalActions = useJournal();
+  const exports = useExports();
+  const journal = useMemo(() => ({ actions: journalActions, exports }), [journalActions, exports]);
   useLayoutPersistence();
   useShellReset();
 
@@ -58,6 +64,7 @@ export function App() {
           scan={scan}
           preview={preview}
           editPad={editPad}
+          journal={journal}
         />
       );
     default:

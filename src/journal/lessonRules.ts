@@ -1,4 +1,4 @@
-// @node: F9.2
+// @node: F9.1
 // The writing rules for each reading level, used by tests (and available to authors).
 import type { Level } from '../skillbook/playbookSchema';
 

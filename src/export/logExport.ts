@@ -1,4 +1,4 @@
-// @node: F9.8
+// @node: F9.7
 // The Log exports (Markdown and JSON). Every string passes through redact(). No snippet, diff body, value, or content.
 import { redact } from '../engine/redact';
 import type { StudioState } from '../store/useStudioStore';

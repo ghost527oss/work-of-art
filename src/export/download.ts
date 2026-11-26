@@ -1,4 +1,4 @@
-// @node: F9.8
+// @node: F9.7
 // The small browser download helper. Never throws and never navigates. Object URLs are released.
 export interface DownloadDeps {
   Blob: typeof Blob;

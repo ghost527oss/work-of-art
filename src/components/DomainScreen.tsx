@@ -1,5 +1,6 @@
 // @node: F3.4
 // @node: F6.11 (live Screen 5 when `live` is given; otherwise the 2A empty page)
+// @node: F9.10 (Learn more passed to the finding detail)
 // Screen 5 (Domain Debugging): one area. No toolbar here.
 import { useState } from 'react';
 import { areaCounts, findingsForArea, mergedFindings } from '../engine/scanView';
@@ -18,6 +19,8 @@ import { RequestTrace } from './RequestTrace';
 export interface LiveDomain {
   harness: HarnessActions;
   onOpened(): void;
+  /** 2F: opens the finding's lesson in the Journal on Screen 3. */
+  onLearnMore?(lessonId: string): void;
 }
 
 export interface DomainScreenProps {
@@ -45,7 +48,7 @@ function LiveScreen5({ area, live }: { area: AreaId; live: LiveDomain }) {
       {result && isScanStale(state) && <p className="partial">Out of date: labels changed. Open Skeleton Crew and press Scan again.</p>}
       {result?.partial && <p className="partial">Partial result: {result.partialReasons.join(' ')}</p>}
       <FindingsTable area={area} findings={findings} selectedId={selected} onDetails={setSelected} />
-      {selectedFinding && <FindingDetail finding={selectedFinding} />}
+      {selectedFinding && <FindingDetail finding={selectedFinding} onLearnMore={live.onLearnMore} />}
       <CrewNarration entries={lines} limit={30} />
       {proposal && proposalArea === area && (
         <ProposalCard proposal={proposal} onApprove={() => live.harness.run('approve')} onReject={() => live.harness.run('reject')} />

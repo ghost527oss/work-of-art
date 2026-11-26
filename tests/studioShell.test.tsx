@@ -6,7 +6,6 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { PanelFrame, type PanelFrameProps } from '../src/components/PanelFrame';
-import { PlaceholderPanel } from '../src/components/PlaceholderPanel';
 import { StudioToolbar, TOOLBAR_PANELS } from '../src/components/StudioToolbar';
 
 const noop = () => undefined;
@@ -101,16 +100,8 @@ describe('PanelFrame', () => {
   });
 });
 
-describe('PlaceholderPanel', () => {
-  it('shows a heading and the sub-phase line', () => {
-    const html = renderToStaticMarkup(createElement(PlaceholderPanel, { title: 'History', phaseLabel: '2B' }));
-    expect(html).toContain('History');
-    expect(html).toContain('Arrives in sub-phase 2B.');
-  });
-});
-
 describe('static checks for the 2A shell files', () => {
-  const files = ['../src/components/StudioToolbar.tsx', '../src/components/PanelFrame.tsx', '../src/components/PlaceholderPanel.tsx'];
+  const files = ['../src/components/StudioToolbar.tsx', '../src/components/PanelFrame.tsx'];
   it('no dangerouslySetInnerHTML, and every file carries @node: F3.3', () => {
     for (const f of files) {
       const text = read(f);

@@ -1,7 +1,8 @@
 // @node: F7.9
 // @node: F8.8 (edit overlay, Preview Only styles, Page selector, scroll restore)
+// @node: F9.10 (Open in viewer target)
 // The Sandbox panel: the locked preview iframe and its controls. The iframe is built from `srcdoc` only.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { applyCorrections } from '../engine/understandingView';
 import { hashText } from '../engine/diffApply';
 import { practiceContent } from '../engine/practiceScript';
@@ -55,8 +56,12 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
   const pages = useMemo(() => [...loaded].filter((p) => /\.html?$/i.test(p)).sort().slice(0, 50), [loaded]);
   const contentKey = useMemo(() => hashText(`${snapshot?.id}|${applied.map((a) => a.id).join(',')}|${pv.entryPath}`), [snapshot?.id, applied, pv.entryPath]);
 
+  // 2F (@node: F9.10): "Open in viewer" switches to the Source viewer at the asked file and line.
+  const viewerTarget = useSyncExternalStore(previewInfoStore.subscribe, () => previewInfoStore.getState().viewerTarget, () => undefined);
+  useEffect(() => { if (viewerTarget) preview.setMode('source'); }, [viewerTarget, preview]);
+
   keyRef.current = contentKey;
-  useEffect(() => { preview.init(); }, [preview, snapshot]);
+  useEffect(() => { preview.init(); previewInfoStore.update((i) => (i.viewerTarget ? { ...i, viewerTarget: undefined } : i)); }, [preview, snapshot]);
   useEffect(() => () => { previewHandle.frame = null; previewHandle.recheck = null; previewHandle.pendingScroll = null; }, []);
 
   const build = useMemo<(PreviewBuild & { components?: Array<import('../preview/workbenchDocument').WorkbenchComponent>; chosen?: string }) | null>(() => {
@@ -78,7 +83,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
     previewInfoStore.setState({
       buildId: prev.buildId + 1, mode: pv.mode, scope, path: page,
       editable: ok && !pv.scripts && (pv.mode === 'static' || pv.mode === 'workbench'),
-      elements: ok ? build!.elements : [], tableHash: page ? hashText(effective(page) ?? '') : '', ready: pv.status === 'ready',
+      elements: ok ? build!.elements : [], tableHash: page ? hashText(effective(page) ?? '') : '', ready: pv.status === 'ready', viewerTarget: prev.viewerTarget,
     });
   }, [build, pv.mode, pv.scripts, pv.entryPath, pv.status, scope, effective]);
 
@@ -179,6 +184,8 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
       {pv.scripts && <ConsolePane lines={pv.console} />}
       {(pv.mode === 'source' || (build && !build.ok)) && (
         <SourceViewer
+          key={viewerTarget ? `t${viewerTarget.n}` : 'v'}
+          highlight={viewerTarget ? { path: viewerTarget.path, first: viewerTarget.first, last: viewerTarget.last } : undefined}
           files={files} loaded={loaded} contentOf={effective}
           notReadReason={(p) => snapshot.inventory.entries.find((e) => e.path === p)?.reason}
         />

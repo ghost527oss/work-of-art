@@ -1,4 +1,4 @@
-// @node: F9.8
+// @node: F9.5
 // The Journal download (Markdown), at the chosen level, cut at a section boundary above 200 KB.
 import { JOURNAL_LIMITS as L } from '../config/journalLimits';
 import { describeStep } from '../journal/flows';

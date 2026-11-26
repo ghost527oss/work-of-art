@@ -1,10 +1,14 @@
 // @node: F4.8
+// @node: F9.10 (Export changes below the list)
 // The History list: applied and undone practice changes, newest first. Props only.
 import type { HistoryEntry } from '../store/workSlice';
+import { ExportChanges, type ExportChangesProps } from './ExportChanges';
 
 export interface HistoryPanelProps {
   applied: readonly HistoryEntry[];
   undone: readonly HistoryEntry[];
+  /** 2F: shown only when History has entries. */
+  exporter?: ExportChangesProps;
 }
 
 interface Row {
@@ -13,7 +17,7 @@ interface Row {
   order: number;
 }
 
-export function HistoryPanel({ applied, undone }: HistoryPanelProps) {
+export function HistoryPanel({ applied, undone, exporter }: HistoryPanelProps) {
   const rows: Row[] = [
     ...applied.map((entry, i) => ({ entry, state: 'applied' as const, order: i })),
     ...undone.map((entry, i) => ({ entry, state: 'undone' as const, order: applied.length + i })),
@@ -38,6 +42,7 @@ export function HistoryPanel({ applied, undone }: HistoryPanelProps) {
         </ol>
       )}
       <p className="note">Type undo or redo in AI Chat.</p>
+      {exporter && rows.length > 0 && <ExportChanges {...exporter} />}
     </section>
   );
 }

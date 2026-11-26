@@ -116,7 +116,7 @@ export const PLAYBOOK: Playbook = {
     },
     {
       id: 'concept.label', kind: 'concept', title: 'File labels', summary: 'The groups PatchBay sorts files into, such as Frontend, Backend, and Settings.',
-      tags: ['sorting'], keywords: ['label', 'sort', 'group', 'area'], related: ['lesson.sorting.needs-review'],
+      tags: ['sorting'], keywords: ['label', 'sort', 'group', 'area'], related: ['lesson.sorting.unsure'],
       levels: {
         simple: 'PatchBay puts each file in a group, such as Frontend or Backend. Each group comes with the clue that put it there.',
         practical: 'Labels come from clues in the skill-book: the file name, the folder, what the file imports, and what it does. A file can have several labels. Each label comes with a confidence and the reason.',
@@ -279,7 +279,7 @@ export const PLAYBOOK: Playbook = {
     },
     // ---------------------------------------------------------------- sorting
     {
-      id: 'lesson.sorting.needs-review', kind: 'sorting', title: 'Why PatchBay was unsure about some files', summary: 'Files with no clear clue go to Needs Review instead of being guessed.',
+      id: 'lesson.sorting.unsure', kind: 'sorting', title: 'Why PatchBay was unsure about some files', summary: 'Files with no clear clue go to Needs Review instead of being guessed.',
       tags: ['sorting'], keywords: ['needs review', 'unsure', 'label', 'sort'], related: ['concept.label'],
       levels: {
         simple: 'PatchBay found no clear clue for some files. It asks you to sort them instead of guessing.',

@@ -1,11 +1,11 @@
-// @node: F9.9
+// @node: F9.8
 // The reading level preference (the only new saved item in 2F) and the small Journal store.
 import { z } from 'zod';
 import type { Level } from '../skillbook/playbookSchema';
 import type { KeyValueStorage } from './layoutStorage';
 import { createStore, type Store } from './useStudioStore';
 
-export const LEVEL_KEY = 'patchbay.journal-level.v1';
+export const LEVEL_KEY = 'patchbay.journal.v1';
 export const LevelRecordSchema = z.strictObject({ version: z.literal(1), level: z.enum(['simple', 'practical', 'deeper']) });
 
 export function loadLevel(storage: KeyValueStorage | undefined): Level {

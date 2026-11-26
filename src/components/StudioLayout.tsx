@@ -1,5 +1,6 @@
 // @node: F3.5
 // @node: F4.9 (Stop bar, History and Edit panels, optional harness prop)
+// @node: F9.10 (Journal panel, Export changes, log downloads, Learn more)
 // The Studio shell (sub-phase 2A). Screen 3 has a left area (Sandbox placeholder and Project
 // info), one right-hand panel, and the vertical toolbar on the far right edge. Screens 4 and 5
 // are empty pages without the toolbar. The screen comes from the screen store and the layout
@@ -23,7 +24,10 @@ import { HistoryPanel } from './HistoryPanel';
 import { StopBar } from './StopBar';
 import { LogPanel } from './LogPanel';
 import { PanelFrame } from './PanelFrame';
-import { PlaceholderPanel } from './PlaceholderPanel';
+import { JournalPanel } from './JournalPanel';
+import { useJournalModel, useJournalState, type ExportActions, type JournalActions } from '../hooks/useJournal';
+import { requestViewer } from '../edit/previewHandle';
+import { useMemo } from 'react';
 import { ProjectInfo } from './ProjectInfo';
 import { SandboxPlaceholder } from './SandboxPlaceholder';
 import { SkeletonCrewScreen } from './SkeletonCrewScreen';
@@ -46,6 +50,8 @@ export interface StudioLayoutProps {
   preview?: PreviewActions;
   /** Sub-phase 2E-2. With `preview` and `harness`, the Edit panel becomes the Edit pad. */
   editPad?: EditActions;
+  /** Sub-phase 2F. When absent the Journal panel shows only a short note. */
+  journal?: { actions: JournalActions; exports: ExportActions };
 }
 
 const PANEL_TITLES: Record<PanelId, string> = {
@@ -72,7 +78,7 @@ function HarnessBar({ harness }: { harness: HarnessActions }) {
   );
 }
 
-export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad }: StudioLayoutProps) {
+export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad, journal }: StudioLayoutProps) {
   const hasSnapshot = useStudioStore((s) => s.snapshot !== undefined);
   if (!hasSnapshot) return null;
   return (
@@ -90,12 +96,13 @@ export function StudioLayout({ onLoadFolders, onCancel, onRetry, onDismissError,
         scan={scan}
         preview={preview}
         editPad={editPad}
+        journal={journal}
       />
     </div>
   );
 }
 
-function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad }: StudioLayoutProps) {
+function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBack, assistant, harness, understanding, scan, preview, editPad, journal }: StudioLayoutProps) {
   const snapshot = useStudioStore((s) => s.snapshot);
   const log = useStudioStore((s) => s.log);
   const work = useStudioStore((s) => s.work);
@@ -121,7 +128,7 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
         <div className="shell-left">
           {preview ? <SandboxPanel preview={preview} /> : <SandboxPlaceholder />}
         </div>
-        <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} live={harness ? { harness, onOpened: shellActions.backToStudio } : undefined} />
+        <DomainScreen area={view.area} onBackToSkeleton={shellActions.backToSkeleton} onBackToStudio={shellActions.backToStudio} live={harness ? { harness, onOpened: shellActions.backToStudio, onLearnMore: journal?.actions.openLesson } : undefined} />
       </main>
     );
   }
@@ -153,10 +160,10 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
         <div hidden={open !== 'ai'}>
           <AIAssistantPanel key={snapshot.id} snapshot={snapshot} assistant={assistant} harness={harness} />
         </div>
-        {open === 'log' && <LogPanel entries={log} />}
+        {open === 'log' && <LogPanel entries={log} onDownload={journal?.exports.exportLog} />}
         {open === 'edit' && <EditPanel mode="self_editing" pad={editPad} preview={preview} harness={harness} />}
-        {open === 'history' && <HistoryPanel applied={work.applied} undone={work.undone} />}
-        {open === 'journal' && <PlaceholderPanel title="Journal" phaseLabel="2F" />}
+        {open === 'history' && <HistoryWithExport work={work} exports={journal?.exports} />}
+        {open === 'journal' && (journal ? <JournalContainer journal={journal} understanding={understanding} /> : <section aria-label="Journal"><h3>Journal</h3><p>The Journal is not connected.</p></section>)}
       </PanelFrame>
       <StudioToolbar
         openPanel={open}
@@ -164,5 +171,38 @@ function StudioScreens({ onLoadFolders, onCancel, onRetry, onDismissError, onBac
         onSkeleton={shellActions.openSkeleton}
       />
     </main>
+  );
+}
+
+function HistoryWithExport({ work, exports }: { work: { applied: import('../store/workSlice').HistoryEntry[]; undone: import('../store/workSlice').HistoryEntry[] }; exports?: ExportActions }) {
+  const snapshot = useStudioStore((s) => s.snapshot);
+  const previewOnly = useStudioStore((s) => s.edit.previewOnly.length);
+  // Rebuilt only when the History, the snapshot, or the Preview Only count changes.
+  const plan = useMemo(() => (exports ? exports.patchPlan() : null), [exports, work.applied, snapshot, previewOnly]);
+  return (
+    <HistoryPanel
+      applied={work.applied}
+      undone={work.undone}
+      exporter={exports && plan ? { plan, fileName: exports.patchName(), onDownload: exports.exportPatch } : undefined}
+    />
+  );
+}
+
+function JournalContainer({ journal, understanding }: { journal: { actions: JournalActions; exports: ExportActions }; understanding?: UnderstandingActions }) {
+  const { level, focusLesson } = useJournalState();
+  const model = useJournalModel(level);
+  const error = useStudioStore((s) => (s.understanding.status === 'failed' ? s.understanding.error : undefined));
+  return (
+    <JournalPanel
+      model={model}
+      onLevel={journal.actions.setLevel}
+      focus={focusLesson}
+      onFocus={(id) => journal.actions.openLesson(id)}
+      onFocusDone={journal.actions.clearFocus}
+      onOpenViewer={(path, line) => requestViewer(path, line)}
+      onDownload={() => journal.exports.exportJournal(model)}
+      analysisError={error}
+      onRetry={understanding?.run}
+    />
   );
 }

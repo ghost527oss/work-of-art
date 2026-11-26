@@ -16,9 +16,16 @@ export interface PreviewInfo {
   /** Hash of the page's effective content the element table was built from. */
   tableHash: string;
   ready: boolean;
+  /** 2F: the file and lines that "Open in viewer" asked the Source viewer to show. `n` changes on every request. */
+  viewerTarget?: { path: string; first: number; last: number; n: number };
 }
 
 export const previewInfoStore: Store<PreviewInfo> = createStore<PreviewInfo>({ buildId: 0, editable: false, mode: 'source', scope: '', elements: [], tableHash: '', ready: false });
+
+/** 2F (@node: F9.10): ask the Sandbox panel to show a file in the Source viewer at a line. */
+export function requestViewer(path: string, first: number, last = first): void {
+  previewInfoStore.update((i) => ({ ...i, viewerTarget: { path, first, last, n: (i.viewerTarget?.n ?? 0) + 1 } }));
+}
 
 export const previewHandle: {
   frame: HTMLIFrameElement | null;

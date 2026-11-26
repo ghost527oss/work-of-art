@@ -1,4 +1,4 @@
-// @node: F9.9
+// @node: F9.7
 // Export Log entries: counts or the level only. Written only after the download succeeded.
 import { withLog, type StudioState } from './useStudioStore';
 
