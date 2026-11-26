@@ -64,6 +64,9 @@ describe('components', () => {
     const ask = ResetSessionView({ confirming: false, onAsk: () => calls.push('ask'), onYes: noop, onCancel: noop }) as unknown as { props: { onClick(): void } };
     ask.props.onClick();
     expect(calls.at(-1)).toBe('ask');
+    // the stateful button only asks first; onReset runs only from "Yes, reset"
+    const src = readFileSync('src/components/ResetSessionButton.tsx', 'utf8');
+    expect(src).toContain('onAsk={() => setConfirming(true)} onYes={() => { setConfirming(false); onReset(); }} onCancel={() => setConfirming(false)}');
   });
   it('RestoreNotice: heading, line, and the kept sentence on failure', () => {
     const h = html(createElement(RestoreNotice, { record: rec, failedLoad: true }));
