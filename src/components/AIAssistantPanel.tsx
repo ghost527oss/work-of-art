@@ -2,10 +2,11 @@
 // @node: F4.9 (optional harness prop: commands, proposal card, replies)
 // Wireframe AI Assistant panel. Lives in the Studio stub.
 // All text rendered as React text, never as HTML.
-// No Apply, Approve, or Reject controls.
+// No Apply, Approve, or Reject controls on AI patch cards (display only). The practice proposal card (2B) is separate.
 // Black and white only, no animation, keyboard and touch accessible.
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { AI_LIMITS } from '../config/budgets-proxy';
+import { parseCommand } from '../engine/commands';
 import type { AssistantActions } from '../hooks/useAssistant';
 import type { HarnessActions } from '../hooks/useHarness';
 import { useStudioStore } from '../store/useStudioStore';
@@ -56,7 +57,8 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
     e.preventDefault();
     // Commands first: typed command words never reach the AI.
     if (harness && harness.submitText(instruction)) {
-      setInstruction('');
+      // A refused command word keeps its text so it can be corrected; a command clears the box.
+      if (parseCommand(instruction).kind === 'command') setInstruction('');
       setInlineError('');
       return;
     }

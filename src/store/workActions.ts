@@ -6,7 +6,7 @@
 // text, file content, secrets, or diff bodies.
 import { ACTIONS, HELP_LINES, PANEL_WORDS, type ActionName, type PanelWord } from '../engine/commands';
 import { hashText, applyUnifiedDiff, reverseUnifiedDiff } from '../engine/diffApply';
-import { PRACTICE_COMMENT, buildPracticeScript, practiceContent } from '../engine/practiceScript';
+import { PRACTICE_COMMENT, buildPracticeDiff, buildPracticeScript, practiceContent } from '../engine/practiceScript';
 import { commentLineFor } from '../engine/unifiedDiff';
 import type { PanelId } from './layoutSlice';
 import { type StudioState, withLog, MAX_LOG_ENTRIES } from './useStudioStore';
@@ -86,10 +86,20 @@ function verifyLine(state: StudioState, path: string): LogEntry {
   const snap = state.snapshot;
   const text = snap ? practiceContent(snap, state.work.applied, path) : undefined;
   const practiceLine = commentLineFor(path, PRACTICE_COMMENT);
-  if (text !== undefined && text.split('\n')[0]?.replace(/\r$/, '') === practiceLine) {
+  // Only a change applied during THIS run counts: look back through the Log to the latest run start.
+  let appliedThisRun = false;
+  for (let i = state.log.length - 1; i >= 0; i--) {
+    const e = state.log[i]!;
+    if (e.action === 'run_started') break;
+    if (e.action === 'change_applied' && e.affectedPaths.includes(path)) {
+      appliedThisRun = true;
+      break;
+    }
+  }
+  if (appliedThisRun && text !== undefined && text.split('\n')[0]?.replace(/\r$/, '') === practiceLine) {
     return { action: 'run_verify', status: 'verified', message: `Verified: the practice copy of ${path} contains the practice line.`, affectedPaths: [path] };
   }
-  return { action: 'run_verify', status: 'info', message: `Nothing to verify for ${path}: no change was applied.`, affectedPaths: [path] };
+  return { action: 'run_verify', status: 'info', message: `Nothing to verify for ${path}: no change was applied in this run.`, affectedPaths: [path] };
 }
 
 /** Runs the step at the run's position and logs it. Caller has checked the guard. */
@@ -326,7 +336,13 @@ export function restoreWork(state: StudioState, record: WorkRecord, ctx: WorkCtx
     undone: record.undone.map((e) => ({ ...e })),
     runSeq: record.run ? Math.max(w.runSeq, 1) : w.runSeq,
   };
+  // The waiting proposal and the run script are always practice data: rebuild them and compare.
+  const scriptNow = buildPracticeScript(snap);
+  const trusted =
+    (record.run === null || (scriptNow !== null && JSON.stringify(record.run.steps) === JSON.stringify(scriptNow))) &&
+    (record.proposal === null || record.proposal.diff === buildPracticeDiff(record.proposal.path));
   const good =
+    trusted &&
     historyMatches(s, record) &&
     (record.proposal === null || (proposalFile !== undefined && proposalFile.loadStatus === 'loaded' && typeof proposalFile.content === 'string')) &&
     workProblems(candidate).length === 0;

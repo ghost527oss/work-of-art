@@ -243,6 +243,30 @@ describe('restoreWork', () => {
   });
 });
 
+describe('tampered saved data and server text (review findings)', () => {
+  it('a hand-edited proposal diff is discarded', () => {
+    let s = cmd(base(), 'start');
+    for (let i = 0; i < 4; i++) s = tick(s);
+    const r = buildRecord(s, 1)!;
+    const evil = { ...r, proposal: { ...r.proposal!, diff: '--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+EVIL\n' } };
+    const out = restoreWork(base(), evil, ctx(), { restoreLog: false });
+    expect(out.work.proposal).toBeNull();
+    expect(out.log.at(-1)!.message).toBe(DISCARD_MESSAGE);
+  });
+  it('a hand-edited run script is discarded', () => {
+    const s = cmd(base(), 'start');
+    const r = buildRecord(s, 1)!;
+    const evil = { ...r, run: { ...r.run!, steps: r.run!.steps.map((x, i) => (i === 0 ? { ...x, title: 'Injected' } : x)) } };
+    const out = restoreWork(base(), evil, ctx(), { restoreLog: false });
+    expect(out.work.run).toBeNull();
+    expect(out.log.at(-1)!.message).toBe(DISCARD_MESSAGE);
+  });
+  it('secret-looking text in a Log message is redacted in the saved record', () => {
+    const s: StudioState = { ...base(), log: [{ id: 'l1', timestamp: 1, action: 'ingest_failed', status: 'failed', affectedPaths: [], message: `bad token ghp_${'a'.repeat(36)}`, redacted: false }] };
+    expect(JSON.stringify(buildRecord(s, 1))).not.toMatch(/ghp_a{36}/);
+  });
+});
+
 describe('imports', () => {
   it('workStorage imports nothing from React or the network', () => {
     const src = readFileSync('src/store/workStorage.ts', 'utf8');

@@ -282,3 +282,18 @@ describe('stays pure', () => {
     for (const name of names) expect(() => runCommand(withSnap(), { name, arg: name === 'open' ? 'log' : undefined }, ctx())).not.toThrow();
   });
 });
+
+describe('verify is honest across runs (review finding)', () => {
+  it('a change applied in run 1 does not make run 2 "verified" after a reject', () => {
+    let s = tick(tick(tick(tick(cmd(withSnap(), 'start').state))));
+    s = cmd(s, 'approve').state;
+    s = cmd(cmd(s, 'stop').state, 'start').state;
+    const before = s.log.length;
+    for (let i = 0; i < 4; i++) s = tick(s);
+    s = cmd(s, 'reject').state;
+    s = tick(s);
+    const lines = s.log.slice(before);
+    expect(lines.some((e) => e.status === 'verified')).toBe(false);
+    expect(lines.at(-1)!.message).toContain('no change was applied in this run');
+  });
+});

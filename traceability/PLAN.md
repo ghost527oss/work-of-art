@@ -275,6 +275,11 @@ Contract: One short list of safe actions (help, status, start, pause, resume, st
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): headless browser run of every item in `requirements.md` section 6, item 11; zero console errors
 
+### F4 as built (2B)
+- F4.1: `reverseUnifiedDiff` swaps the two `@@` range tokens as written, so reversing twice returns the exact original text. It returns `null` for an unreadable diff.
+- F4.6: a restored run script and waiting proposal must equal the rebuilt practice script and practice diff, otherwise the saved work is discarded. Saved Log messages pass through `redact`.
+- F4.9: `StudioLayout` and `AIAssistantPanel` take an optional `harness` prop (no Stop bar without it). Three assertions in `tests/studioLayout.test.tsx` that checked the 2A placeholders (Log note, History, Edit) were updated because 2B replaces those placeholders.
+
 ### F4 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - Sub-phase 2B gate (build-phases.md): every command updates state predictably, survives a refresh (through restore), and handles repeated commands

@@ -5,6 +5,7 @@
 // Nothing here throws. No React, no network.
 import { z } from 'zod';
 import { WORK_LIMITS } from '../config/workLimits';
+import { redact } from '../engine/redact';
 import { SessionLogEntrySchema, type RepoSnapshot } from '../types/contracts';
 import type { KeyValueStorage } from './layoutStorage';
 import type { StudioState } from './useStudioStore';
@@ -113,7 +114,7 @@ export function buildRecord(state: StudioState, now: number): WorkRecord | null 
     undone: w.undone.map(entry),
     log: state.log.slice(-WORK_LIMITS.maxSavedLogEntries).map((e) => ({
       id: e.id, timestamp: e.timestamp, action: e.action, status: e.status, affectedPaths: [...e.affectedPaths],
-      message: e.message, redacted: e.redacted,
+      message: redact(e.message).text, redacted: e.redacted,
     })),
   };
 }

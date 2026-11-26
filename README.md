@@ -73,3 +73,21 @@ Verified by automated tests and by a headless-browser run. **Not yet verified:**
 ## Studio shell (Phase 2, sub-phase 2A)
 
 After a repository or sample loads, the Studio has a left area (a Sandbox placeholder and Project info) and a vertical toolbar on the far right edge with six buttons: Edit, AI Chat, Log, History, Journal, and Skeleton Crew. The first five open a panel on the right (one at a time). A panel can collapse to a thin strip, switch between a narrow and a wide width, and close. Skeleton Crew opens an empty Screen 4, whose four area buttons open an empty Screen 5. The toolbar is hidden on both. The panel layout is saved in browser storage under `patchbay.studio-layout.v1` (four fields, no repository data). After a refresh the app returns to the Start screen; the saved layout is used the next time a repository loads.
+
+## Action harness (Phase 2, sub-phase 2B)
+
+AI Chat now understands a short list of command words. Typing exactly one of them runs it instead of sending a request to the AI. Three or more words always go to the AI.
+
+| Command | What it does |
+|---|---|
+| `help`, `status` | List the commands, or show the mode, the run, and the change counts. |
+| `start` | Start the **practice run (no AI)**: a fixed script of up to 8 steps that reads the loaded repository and proposes one practice comment line per file. |
+| `pause`, `resume`, `step` | Stop the run moving on by itself, let it move again, or run one step while paused. |
+| `stop` | End the run, reject a waiting proposal, and cancel a pending AI request. A Stop button is always visible at the top. |
+| `approve`, `reject` | Decide the waiting proposal (also buttons on the proposal card). Approving changes only an in-memory practice copy, never your repository. |
+| `undo`, `redo` | Take back or re-apply the last practice change (only while paused or idle). |
+| `open edit`, `open chat`, `open log`, `open history`, `open journal` | Open a panel. Opening Edit pauses the run; closing it does not resume. |
+| `reset` | Clear the run, History, Log, and the saved work. |
+
+The work (run, waiting proposal, History, last 200 Log lines) is saved for one repository under `patchbay.work.v1`: diffs of the practice line and short fingerprints only, never file contents, AI text, chat replies, or secrets. After a refresh, loading the same repository restores it (a running run comes back paused). If a file changed, the saved changes are discarded and the Log says so. Loading a different repository leaves the saved work alone until the next change, which replaces it.
+

@@ -75,11 +75,25 @@ export function createHarnessController(
     queue.push(job);
     if (draining) return;
     draining = true;
+    let firstError: unknown;
+    let failed = false;
     try {
-      while (queue.length > 0 && !disposed) queue.shift()!();
+      while (queue.length > 0 && !disposed) {
+        try {
+          queue.shift()!();
+        } catch (error) {
+          if (!failed) {
+            failed = true;
+            firstError = error;
+          }
+        }
+      }
     } finally {
       draining = false;
     }
+    // A failed job must not leave a running run without its timer. The error is not hidden.
+    if (!disposed) syncTimer();
+    if (failed) throw firstError;
   }
 
   const mode = (): Mode => (layout.getState().openPanel === 'edit' ? 'self_editing' : 'automation');
@@ -166,9 +180,15 @@ export function createHarnessController(
     });
   }
 
+  let seenWork: StudioState['work'] | null = null;
+  let seenLog: StudioState['log'] | null = null;
   function maybeSave(): void {
     const s = studio.getState();
     if (!s.snapshot || restoredFor !== s.snapshot) return;
+    // Updates that touch neither the work nor the log (AI state, ingestion progress) need no save check.
+    if (s.work === seenWork && s.log === seenLog) return;
+    seenWork = s.work;
+    seenLog = s.log;
     if (skipSave) {
       skipSave = false;
       return;
@@ -208,6 +228,8 @@ export function createHarnessController(
         restoredFor = undefined;
         pendingReplacedKey = null;
         lastSaved = null;
+        seenWork = null;
+        seenLog = null;
         clearTimer();
         const snap = s.snapshot;
         if (snap) enqueue(() => restoreStep(snap));
