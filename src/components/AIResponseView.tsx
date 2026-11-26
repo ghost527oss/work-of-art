@@ -1,17 +1,36 @@
 // @node: F2.7
+// @node: F11.10 (Phase 3A: provider line, fallback sentence, lighter warning, saved-answer label, action view, patch note)
 // Renders each AIResponse type as plain React text. Never uses innerHTML.
 // No Apply, Approve, or Reject controls exist.
-import type { AIResponse } from '../types/contracts';
+import { LIGHTER_WARNING, SAVED_LABEL, fallbackSentence, providerLine } from '../engine/aiNotes';
+import type { AIMeta, AIResponse } from '../types/contracts';
 
 interface Props {
   response: AIResponse;
   mode: 'mock' | 'live';
+  /** Live answers only: which provider answered, and which earlier ones failed. */
+  meta?: AIMeta | undefined;
+  /** True when this is a saved answer from earlier in the session (no request was sent). */
+  fromCache?: boolean | undefined;
+  onAskAgain?: (() => void) | undefined;
+  /** What happened to a patch the AI proposed (queued, or why not). */
+  proposalNote?: string | undefined;
 }
 
-export function AIResponseView({ response, mode }: Props) {
+export function AIResponseView({ response, mode, meta, fromCache, onAskAgain, proposalNote }: Props) {
+  const fallback = meta ? fallbackSentence(meta) : undefined;
   return (
     <div className="ai-response" aria-label={`AI response: ${response.type}`}>
       <p className="mock-label">Mode: {mode}</p>
+      {meta && <p className="note ai-provider">{providerLine(meta)}</p>}
+      {fallback && <p className="note ai-fallback">{fallback}</p>}
+      {meta?.lighter && <p className="note ai-lighter"><strong>{LIGHTER_WARNING}</strong></p>}
+      {fromCache && (
+        <p className="note ai-saved">
+          {SAVED_LABEL}{' '}
+          {onAskAgain && <button type="button" onClick={onAskAgain}>Ask again</button>}
+        </p>
+      )}
 
       {response.type === 'clarification' && (
         <section aria-labelledby="clarification-heading">
@@ -66,6 +85,15 @@ export function AIResponseView({ response, mode }: Props) {
         </section>
       )}
 
+      {response.type === 'action' && (
+        <section aria-labelledby="action-heading">
+          <h3 id="action-heading">Action</h3>
+          <p>The AI asked PatchBay to run: <code>{response.arg ? `${response.action} ${response.arg}` : response.action}</code></p>
+          <p>{response.summary}</p>
+          <p className="note">The result of the action is shown in the command replies above.</p>
+        </section>
+      )}
+
       {response.type === 'patch_proposal' && (
         <section aria-labelledby="patch-heading">
           <h3 id="patch-heading">Patch proposal</h3>
@@ -78,7 +106,9 @@ export function AIResponseView({ response, mode }: Props) {
           <div className="diff-wrap">
             <pre className="diff">{response.unifiedDiff}</pre>
           </div>
-          <p className="note">This proposal cannot be applied in this build.</p>
+          {mode === 'live'
+            ? <p className="note ai-proposal-note">{proposalNote ?? 'This change is shown only.'}</p>
+            : <p className="note">This proposal cannot be applied in this build.</p>}
           <h4>Tests</h4>
           <ul>
             {response.tests.map((t, i) => <li key={i}>{t}</li>)}
