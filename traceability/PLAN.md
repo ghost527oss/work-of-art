@@ -667,7 +667,7 @@ Contract: In the Edit panel the user selects elements in the look-only preview (
 ### F8 as built (2E-2)
 - The Preview Only / Edit pad link uses a small `previewInfoStore` (plain data) and a `previewHandle` (the iframe, the layout re-check); the overlay reads the frame's current document at event time.
 - Placeholder images are annotated so their start tags can be edited; recorded sizes win over the placeholder's default size.
-- The edit key is `edit:<path>:<hash of the selected keys>` (fixed length). Undo removes the key, so editing after an undo or redo starts a new entry.
+- The edit key is `edit:<path>:<hash of the selected keys>` (fixed length). Undo closes the key (2F: it ends with `#u` instead of being removed), so editing after an undo or redo starts a new entry while the entry stays marked as your edit.
 - Existing styles containing quotes or `!important` are "too complex". Background selects the page's top-level elements (the body is not in the element table).
 - Existing tests edited (named): the 2E-1 workbench test (elements are now annotated, never mappable) and the preview stub in `tests/sandboxUi.test.tsx` (new `setEntry`).
 
@@ -762,6 +762,19 @@ Contract: The Journal panel explains the loaded project at three reading levels 
 - Depends on: F9.9, F3.5, F6.11, F7.10, F8.8
 - verify: `npm run typecheck && npx vitest run && npm run build`
 - manual gate (Unverified until run): the `git apply` check, the browser run, and the Phase 2 regression in `requirements.md` section 6, items 6, 14, and 15
+
+### F9 as built (2F)
+- Test files follow design section 4.1 with these names: `lessons`, `journal` (overview, flows, lessons on the samples), `lessonRules` checks are in `lessons`, `multiHunkDiff` (the existing spec-02 `unifiedDiff.test.ts` is kept unchanged), `patchSelfCheck` (the self-check with a mocked applier), plus `packageFacts`, `flows`, `journalExport` (also the model), `diffLines`, `patchExport`, `logExport` (also file names), `download`, `exportActions`, `journalPrefs`, `journalUi`, `phase2Flow`.
+- A second, general test-side applier `tests/helpers/applyHunks.ts` is used, because the spec-02 helper only handles one line inserted at the top.
+- The saved key is `patchbay.journal.v1` (R11.1). The sorting card id is `lesson.sorting.unsure`.
+- **Open in viewer** did not exist after 2E-1, so 2F adds `requestViewer(path, line)` and `viewerTarget` to `src/edit/previewHandle.ts`; `SandboxPanel` switches to Source mode and passes `highlight` to the existing `SourceViewer` (the isolation files are unchanged). The line is marked with `>>`; the viewer does not scroll to it.
+- Undo now closes the Edit pad key (`#u`) instead of removing it (`src/store/workSlice.ts`), so an undone and redone edit is still exported as **Your edits**. The 2E-2 test that asserted the key was removed now asserts the closed key and that a new edit does not merge.
+- **Learn more** is on the Screen 5 finding detail (Screen 4 has no finding detail). `DomainScreen` passes it through.
+- Request flow titles use the matched route target ("Request: PUT /api/profile/1" is the call; the route step names "PUT /api/profile/:id").
+- The Journal download includes a "Related concepts" section for concepts linked from the lessons (R9.1) and the export time (R9.2).
+- Flow strings (paths, titles, stop sentences, notes) are redacted in the model like every other fact. Patch and Journal size caps count UTF-8 bytes; the patch stops at the first file that does not fit and excludes every later one.
+- The Myers trace keeps only the band of diagonals it needs per step (memory about D squared).
+- No UI path can put a likely secret into History (2D and 2E-2 refuse such changes), so the patch secret exclusion is defence in depth and is proved by unit tests only.
 
 ### F9 gate
 - verify: `npm run typecheck && npx vitest run && npm run build`

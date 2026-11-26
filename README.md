@@ -130,3 +130,14 @@ The **Edit** panel (Screen 3) is now an edit pad for the page in the Sandbox. Op
 - On a plain HTML page, a change to an element whose start tag can be rewritten safely is **written to the practice copy at once** as a `style` change and recorded in History (no Approve step). A burst of changes to the same elements merges into one entry; one Undo reverses the burst. Everything else (component pictures, complex styles, SVG, a page that changed) is **Preview Only**, listed with the reason, and never saved.
 - After each change the layout is checked again; **Try a fix** proposes one of three fixed suggestions you can Keep or Discard. Undo and Redo buttons do exactly what the typed commands do.
 
+## Journal and exports (Phase 2, sub-phase 2F)
+
+The **Journal** toolbar button opens the Learning Journal. It explains how the loaded project works and what PatchBay found, at three reading levels (**Simple**, **Practical**, **Deeper**; the choice is saved). The Log still shows what PatchBay did.
+
+- **Application overview**, **How things flow** (page, request, route, and setting traces that stop with a plain reason when PatchBay cannot see further), **Lessons from your project** (one lesson per check that found something, with the files and lines), and **Concepts** (12 short explanations). **Open in viewer** shows a file in the Sandbox's Source viewer with the line marked. **Learn more** on a finding (Screen 5) jumps to its lesson.
+- All teaching text lives in one structured file, `src/skillbook/playbook.ts` (cards with tags, keywords, and three levels, checked by tests). Lookups (`cardById`, `cardsForSkill`, `cardsByTag`, `searchCards`) are ready for the Phase 3 AI. No AI is used now.
+- Nothing in the Journal or the downloads comes from file contents: only paths, names, counts, and fixed text. Every fact goes through the secret redaction first.
+- **Export changes** (History panel) downloads a `.patch` of your applied changes, one combined diff per file, made against the files as PatchBay loaded them. Apply it in your own project with `git apply <file>`. Files with practice-run changes are unchecked by default; files that were only partly read, have unusual path characters, contain a likely secret, or cannot be verified are left out with the reason. Preview Only changes are never exported.
+- The **Log** panel downloads the log as Markdown or JSON (redacted, no file contents). The Journal downloads as Markdown at the current level.
+- Downloads are made in the browser only. Nothing is uploaded.
+
