@@ -23,7 +23,7 @@ describe('code checks through the scan', () => {
     expect(f).toMatchObject({ primary: 'frontend', areas: ['frontend', 'backend'], severity: 'high', certainty: 'found' });
     expect(f.extra).toBe('A symbol was found where JavaScript did not expect one. (line 2, column 11)');
     expect(f.snippet.join('\n')).toContain('if (a > 0 {');
-    expect(f.fix).toBe('guided'); // no automatic fix yet (V5)
+    expect(f.fix).toBe('auto'); // exactly one repair makes the file read cleanly
   });
   it('HTML, CSS, and inline script findings are found in one page', async () => {
     setCssProbe(dropsRulesWith('BAD'));
