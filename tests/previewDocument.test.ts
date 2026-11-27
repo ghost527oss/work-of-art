@@ -26,8 +26,8 @@ describe('flags', () => {
     expect(IFRAME_ATTRS).toMatchObject({ referrerPolicy: 'no-referrer', allow: '' });
   });
   it('the policies are exact', () => {
-    // 3B-1 (V6): only font-src and style-src gained the allowed outside hosts; every other directive is as before.
-    expect(POLICY_LOOK).toBe("default-src 'none'; img-src data:; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; media-src data:; style-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com; connect-src 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'");
+    // 3B-1 (V6, V9): font-src and style-src gained the allowed outside hosts and img-src gained https:; every other directive is as before.
+    expect(POLICY_LOOK).toBe("default-src 'none'; img-src data: https:; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; media-src data:; style-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com; connect-src 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'");
     expect(POLICY_SCRIPTS).toContain("script-src 'unsafe-inline'");
     expect(POLICY_LOOK).not.toContain('script-src');
     expect(cspFor(true)).toBe(POLICY_SCRIPTS);

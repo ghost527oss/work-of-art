@@ -3,7 +3,7 @@
 import { describeBlocked, type BlockedEntry } from '../preview/blockedReport';
 
 export const OUTSIDE_HOSTS_NOTE =
-  'Styles and fonts may load from: cdnjs.cloudflare.com, cdn.jsdelivr.net, unpkg.com, fonts.googleapis.com, fonts.gstatic.com. That host can see your IP address. No referrer is sent.';
+  'Styles and fonts may load from: cdnjs.cloudflare.com, cdn.jsdelivr.net, unpkg.com, fonts.googleapis.com, fonts.gstatic.com. Pictures may load from their own https addresses. Any of these hosts can see your IP address. No referrer is sent.';
 
 export function BlockedList({ blocked, outsideStyles = [], outsideScripts = [] }: { blocked: readonly BlockedEntry[]; outsideStyles?: readonly string[]; outsideScripts?: readonly string[] }) {
   const d = describeBlocked(blocked);

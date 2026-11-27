@@ -74,7 +74,7 @@ describe('hostile pages (look-only)', () => {
 describe('references that are not loaded files', () => {
   it('external and missing stylesheets, scripts, and images are dropped and counted', () => {
     const r = buildStaticPreview({
-      entryPath: 'i.html', effective: () => '<link rel="stylesheet" href="https://evil.test/a.css"><link rel="stylesheet" href="missing.css"><img src="https://evil.test/a.png"><script src="https://evil.test/a.js"></script><a href="//evil.test">x</a>',
+      entryPath: 'i.html', effective: () => '<link rel="stylesheet" href="https://evil.test/a.css"><link rel="stylesheet" href="missing.css"><img src="http://evil.test/a.png"><script src="https://evil.test/a.js"></script><a href="//evil.test">x</a>',
       loaded: new Set(['i.html']), scripts: false, nonce: NONCE, origin: 'http://a',
     });
     if (!r.ok) throw new Error('x');

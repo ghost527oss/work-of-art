@@ -4,7 +4,8 @@ import { PREVIEW_LIMITS as L } from '../config/previewLimits';
 
 export type BlockedReason =
   | 'not_on_list' | 'not_https' | 'scripts_off' | 'module_script' | 'too_many_outside' | 'image_not_loaded'
-  | 'event_handler' | 'removed_tag' | 'too_long' | 'local_missing';
+  | 'event_handler' | 'removed_tag' | 'too_long' | 'local_missing'
+  | 'picture_too_large' | 'picture_budget' | 'picture_failed' | 'picture_outside_rejected' | 'picture_embed_limit';
 
 export interface BlockedEntry { what: string; reason: BlockedReason }
 
@@ -19,6 +20,11 @@ export const BLOCKED_TEXT: Record<BlockedReason, string> = {
   removed_tag: 'this kind of tag is removed for safety',
   too_long: 'its address is too long',
   local_missing: 'the file was not loaded from the repository',
+  picture_too_large: 'the picture is larger than the picture limit, so a placeholder is shown',
+  picture_budget: 'the picture budget was used up, so a placeholder is shown',
+  picture_failed: 'the picture could not be loaded or is not a real picture, so a placeholder is shown',
+  picture_outside_rejected: 'its address is not an allowed picture address (https only, no IP address, port, or local name)',
+  picture_embed_limit: 'too many pictures for one preview, so a placeholder is shown',
 };
 
 const clean = (s: string): string => s.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 80);

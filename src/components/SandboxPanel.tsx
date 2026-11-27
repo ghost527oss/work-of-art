@@ -55,6 +55,19 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
   const choices: PreviewMode[] = detection ? modeChoices(detection) : ['source'];
   const scope = pv.mode === 'workbench' ? (pv.component ?? 'workbench') : (pv.entryPath ?? '');
   const previewStyles = useMemo(() => [...edit.previewOnly, ...edit.suggestions].filter((c) => c.scope === scope).map((c) => ({ elementKey: c.elementKey, property: c.property, value: c.value })), [edit.previewOnly, edit.suggestions, scope]);
+  const mediaMap = useMemo(() => new Map((snapshot?.media ?? []).map((m) => [m.path, m] as const)), [snapshot]);
+  const mediaOf = useMemo(() => (p: string) => mediaMap.get(p), [mediaMap]);
+  const mediaNote = useMemo(() => {
+    const byPath = new Map((snapshot?.inventory.entries ?? []).filter((e) => e.reasonCode?.startsWith('media_') || e.reasonCode === 'excluded_media').map((e) => [e.path, e] as const));
+    return (p: string) => {
+      const e = byPath.get(p);
+      if (!e) return undefined;
+      if (e.reasonCode === 'media_too_large') return { text: `too large${e.sizeBytes ? `, ${Math.round(e.sizeBytes / 1024)} KB` : ''}`, reason: 'picture_too_large' as const };
+      if (e.reasonCode === 'media_budget_reached') return { text: 'over the picture budget', reason: 'picture_budget' as const };
+      if (e.reasonCode === 'media_failed') return { text: 'could not be loaded or not a real picture', reason: 'picture_failed' as const };
+      return { text: 'not loaded', reason: 'image_not_loaded' as const };
+    };
+  }, [snapshot]);
   const pages = useMemo(() => [...loaded].filter((p) => /\.html?$/i.test(p)).sort().slice(0, 50), [loaded]);
   const contentKey = useMemo(() => hashText(`${snapshot?.id}|${applied.map((a) => a.id).join(',')}|${pv.entryPath}`), [snapshot?.id, applied, pv.entryPath]);
 
@@ -69,13 +82,13 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
   const build = useMemo<(PreviewBuild & { components?: Array<import('../preview/workbenchDocument').WorkbenchComponent>; chosen?: string }) | null>(() => {
     try {
       if (!snapshot) return null;
-      if (pv.mode === 'static' && pv.entryPath) return buildStaticPreview({ entryPath: pv.entryPath, effective, loaded, scripts: pv.scripts, nonce, origin, previewStyles });
+      if (pv.mode === 'static' && pv.entryPath) return buildStaticPreview({ entryPath: pv.entryPath, effective, loaded, scripts: pv.scripts, nonce, origin, previewStyles, media: mediaOf, mediaNote });
       if (pv.mode === 'workbench') return buildWorkbench({ paths: [...loaded], effective, analysis, componentKey: pv.component, nonce, origin, previewStyles });
       return null;
     } catch {
       return { ok: false, reason: 'The preview could not be built.' };
     }
-  }, [snapshot, pv.mode, pv.entryPath, pv.scripts, pv.component, effective, loaded, nonce, origin, analysis, previewStyles]);
+  }, [snapshot, pv.mode, pv.entryPath, pv.scripts, pv.component, effective, loaded, nonce, origin, analysis, previewStyles, mediaOf, mediaNote]);
 
   // Publish what the Edit pad needs (plain data) and the iframe handle.
   useEffect(() => {
