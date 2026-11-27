@@ -980,3 +980,79 @@ Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (
 - Existing tests changed (design 4.3): `assistantApi`, `aiContracts`, `aiValidate`, `mockAssistant`, `aiAssistant`, `aiState`, `useAssistant`, `aiResponseView`, `harnessUi` (appended blocks, plus the 405 and 501 assertions in `assistantApi`).
 - Static test: provider host names appear only in `src/config/aiProviders.ts`; key variable names also appear in `liveAssistant.ts` and `aiNotes.ts` (setup text).
 - After the first real-key run (a Gemini answer was refused with "gave an answer PatchBay could not use"): output caps raised to 1,500 (light) and 3,000 (heavy) because reasoning models count thinking tokens; a cut-off answer (`MAX_TOKENS` or `length`) is reported as such; every refusal now carries a fixed code word (for example `wrong_shape`), shown in plain words in the error and as `trace=` in the server log; unknown extra fields in a model answer are ignored (never copied); the one selected file may be written `./x`, `/x`, or `a/x`; a null `new_text` means delete the lines.
+
+---
+
+> plan_id: `P3B-LIVE-JOURNAL-CREW` — Live AI in the Journal and Skeleton Crew (spec `.kiro/specs/12-live-ai-journal-crew/`). Active product phase: Phase 3, Sub-phase 3B. Status: draft for approval; no node is approved for modification. Black-and-white wireframe, no animation, `AI_MODE=mock` stays the default, no new runtime dependency, free tiers only. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+
+## F12 — Live AI in the Journal and Skeleton Crew
+Contract: Next to the fixed Journal and crew text, buttons ask the live AI (3A router and Context Engine) to explain a lesson or flow in your project, review a finding, and (one opt-in request) narrate up to 8 findings. The AI text is shown in labelled blocks, kept in memory only, never in the Log, storage, or any download. A hand-off button opens AI Chat prefilled for a fix and sends nothing. Nothing here can change a file.
+
+### F12.1 — Contracts, validators, limits, mock `narrate`
+- Inputs: an AI request or result
+- Outputs: the extended schemas (`level`, `findings`, task `narrate`, answer `narration`, 6 facts) and limits
+- Invariants: `findings` only for `narrate` and each path is selected; a narration answer has exactly one line per finding; chat requests are unchanged; mock output for every earlier input is byte-identical
+- Files: `src/types/contracts.ts`, `src/config/aiLive.ts`, `src/engine/aiValidate.ts`, `src/engine/mockAssistant.ts`, `tests/aiContracts.test.ts`, `tests/aiValidate.test.ts`, `tests/mockAssistant.test.ts`, `tests/aiLiveConfig.test.ts`
+- Depends on: F11.1
+- verify: `npm run typecheck && npx vitest run tests/aiContracts.test.ts tests/aiValidate.test.ts tests/mockAssistant.test.ts tests/aiLiveConfig.test.ts`
+
+### F12.2 — Server: prompt, narration answer, cards rule, cache key
+- Inputs: a request with a level or findings
+- Outputs: a prompt with LEVEL and FINDINGS data blocks; a mapped `narration` answer
+- Invariants: findings text and paths sit inside data blocks; a wrong line count, patch, action, or plan for `narrate` is refused; no cards for `narrate`; the cache key holds the level and the ordered findings
+- Files: `src/engine/live/promptBuilder.ts`, `src/engine/live/answerParser.ts`, `src/engine/live/liveAssistant.ts`, `src/engine/aiCache.ts`, `tests/promptBuilder.test.ts`, `tests/answerParser.test.ts`, `tests/liveAssistant.test.ts`, `tests/aiCache.test.ts`
+- Depends on: F12.1, F11.2, F11.3, F11.4, F11.7
+- verify: `npm run typecheck && npx vitest run tests/promptBuilder.test.ts tests/answerParser.test.ts tests/liveAssistant.test.ts tests/aiCache.test.ts`
+
+### F12.3 — Context Engine additions, request builders, level note
+- Inputs: a lesson, a flow, a finding, or a findings list, the level, the switch
+- Outputs: a validated `AIRequest`; a soft note
+- Invariants: code lines only with the switch and never for narration; up to 6 facts for a flow, 3 for a finding; at most 8 findings; fixed instruction texts; the note never causes a retry
+- Files: `src/engine/contextEngine.ts`, `src/engine/explainRequests.ts`, `src/engine/levelNote.ts`, `tests/contextEngine.test.ts`, `tests/explainRequests.test.ts`, `tests/levelNote.test.ts`
+- Depends on: F12.1, F11.6, F9.1
+- verify: `npm run typecheck && npx vitest run tests/contextEngine.test.ts tests/explainRequests.test.ts tests/levelNote.test.ts`
+
+### F12.4 — Controller `sendBuilt`, origin, explain store, `heldOrigin`
+- Inputs: a built request and its origin
+- Outputs: AI slice and explain store changes, Log lines
+- Invariants: one request at a time across chat and 3B; a held request never fires late; the explain store is memory only with at most 12 entries; answers end on a snapshot change, a practice change, reset, and a mode change; AI Chat shows only chat results
+- Files: `src/store/explainStore.ts`, `src/store/aiSlice.ts`, `src/store/aiActions.ts`, `src/hooks/useAssistant.ts`, `src/components/AIAssistantPanel.tsx`, `tests/explainStore.test.ts`, `tests/useAssistant.test.ts`, `tests/aiState.test.ts`, `tests/aiPanelLive.test.tsx`
+- Depends on: F12.1, F12.3, F11.8
+- verify: `npm run typecheck && npx vitest run tests/explainStore.test.ts tests/useAssistant.test.ts tests/aiState.test.ts tests/aiPanelLive.test.tsx`
+
+### F12.5 — The explainer, availability, and the chat prefill
+- Inputs: button presses and the current state
+- Outputs: requests sent through `sendBuilt`; a prefill for AI Chat
+- Invariants: the hand-off sends nothing and carries the finding id; the prefill is taken once; availability texts are fixed; narration is one request
+- Files: `src/hooks/useExplainer.ts`, `src/store/chatPrefill.ts`, `src/engine/aiNotes.ts`, `tests/explainer.test.ts`, `tests/chatPrefill.test.ts`, `tests/aiNotes.test.ts`
+- Depends on: F12.3, F12.4
+- verify: `npm run typecheck && npx vitest run tests/explainer.test.ts tests/chatPrefill.test.ts tests/aiNotes.test.ts`
+
+### F12.6 — The components
+- Inputs: an explainer binding and its state
+- Outputs: the block, switch, notice, and narration bar
+- Invariants: props only; all AI text is React text; the heading says the AI text is not part of the lesson; no color or motion; buttons at least 44 px
+- Files: `src/components/AIExplainBlock.tsx`, `src/components/ExplainSwitch.tsx`, `src/components/ExplainNotice.tsx`, `src/components/AINarrationBar.tsx`, `tests/explainUi.test.tsx`
+- Depends on: F12.5, F11.10
+- verify: `npm run typecheck && npx vitest run tests/explainUi.test.tsx`
+
+### F12.7 — Wiring Journal, Screens 4 and 5, App, and the prefill
+- Inputs: the explainer
+- Outputs: buttons and blocks on the Journal and the crew screens; AI Chat prefilled by the hand-off
+- Invariants: the `explain` prop is optional and screens without it render as before; the fixed text is untouched and first; the notice appears in one place; leaving a screen drops a held request
+- Files: `src/components/LessonsSection.tsx`, `src/components/FlowsSection.tsx`, `src/components/JournalPanel.tsx`, `src/components/FindingDetail.tsx`, `src/components/DomainScreen.tsx`, `src/components/SkeletonCrewScreen.tsx`, `src/components/CrewNarration.tsx`, `src/components/StudioLayout.tsx`, `src/components/AIAssistantPanel.tsx`, `src/App.tsx`, `src/styles.css`, `tests/explainUi.test.tsx`, `tests/journalUi.test.tsx`, `tests/crewUi.test.tsx`
+- Depends on: F12.6, F9.9, F6.10
+- verify: `npm run typecheck && npx vitest run && npm run build`
+
+### F12.8 — Privacy, injection, static, and exit-gate tests
+- Inputs: the whole app at store level with fakes
+- Outputs: the proofs
+- Invariants: no AI text in the Log, storage, errors, or any download (downloads byte-identical); injection changes nothing; the 3B and 3A gates pass with fake providers
+- Files: `tests/phase3bPrivacy.test.ts`, `tests/phase3bInjection.test.ts`, `tests/phase3bStatic.test.ts`, `tests/phase3bGate.test.ts`, `tests/helpers/aiHarness.ts`
+- Depends on: F12.1 to F12.7
+- verify: `npm run typecheck && npx vitest run tests/phase3bPrivacy.test.ts tests/phase3bInjection.test.ts tests/phase3bStatic.test.ts tests/phase3bGate.test.ts`
+
+### F12 gate
+- verify: `npm run typecheck && npx vitest run && npm run build`
+- 3B gate (build-phases.md): all 3A gates pass again; the same privacy rules hold; no AI text in any download
+- manual gate (Unverified until run): the browser run with a fake provider server, and your own real-key check (design section 13)
