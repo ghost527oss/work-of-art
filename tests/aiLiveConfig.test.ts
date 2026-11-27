@@ -9,11 +9,11 @@ describe('AI_LIVE limits', () => {
   it('are marked provisional', () => {
     expect(AI_LIVE.provisional).toBe(true);
   });
-  it('uses the user-approved timeouts: 7 s per attempt, 14 s total', () => {
-    expect(AI_LIVE.attemptTimeoutMs).toBe(7000);
-    expect(AI_LIVE.totalBudgetMs).toBe(14000);
+  it('uses the user-approved timeouts: 15 s per attempt, 25 s total', () => {
+    expect(AI_LIVE.attemptTimeoutMs).toBe(15000);
+    expect(AI_LIVE.totalBudgetMs).toBe(25000);
   });
-  it('fits inside the 15 s browser timeout and leaves a usable minimum attempt', () => {
+  it('fits inside the 28 s browser timeout and leaves a usable minimum attempt', () => {
     expect(AI_LIVE.totalBudgetMs).toBeLessThan(AI_LIMITS.clientTimeoutMs);
     expect(AI_LIVE.attemptTimeoutMs).toBeLessThanOrEqual(AI_LIVE.totalBudgetMs);
     expect(AI_LIVE.minAttemptMs).toBe(1500);
@@ -29,8 +29,8 @@ describe('AI_LIVE limits', () => {
       cacheMaxEntries: 30, cacheMaxBytes: 262144, maxAttemptsPerFinding: 3, maxFindingsListed: 50,
     });
   });
-  it('keeps the Phase 2 limits unchanged', () => {
-    expect(AI_LIMITS).toMatchObject({ clientTimeoutMs: 15000, maxContextFiles: 5, maxContextTotalBytes: 60 * 1024, maxContextFileBytes: 20 * 1024, maxInstructionChars: 2000 });
+  it('keeps the other Phase 2 limits unchanged (the browser timeout was raised from 15 s to 28 s for live mode)', () => {
+    expect(AI_LIMITS).toMatchObject({ clientTimeoutMs: 28000, maxContextFiles: 5, maxContextTotalBytes: 60 * 1024, maxContextFileBytes: 20 * 1024, maxInstructionChars: 2000 });
   });
   it('is re-exported for browser code', () => {
     expect(FROM_PROXY).toBe(AI_LIVE);

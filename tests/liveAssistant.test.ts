@@ -133,15 +133,24 @@ describe('answerLive: failure', () => {
 });
 
 describe('answerLive: time and abort (fake timers)', () => {
-  it('two hanging providers use the whole 14 s budget, OpenRouter is not tried', async () => {
+  it('two hanging providers use the whole 25 s budget (15 s, then the 10 s that remain), OpenRouter is not tried', async () => {
     vi.useFakeTimers();
     const f = makeFakeFetch(() => ({ hang: true }));
     const p = answerLive(explain(), ALL, { fetchImpl: f.fetch });
-    await vi.advanceTimersByTimeAsync(14_000);
+    await vi.advanceTimersByTimeAsync(25_000);
     const out = await p;
     expect(out).toMatchObject({ ok: false, status: 502, code: 'upstream_failure' });
     expect(f.calls.map((c) => c.provider)).toEqual(['gemini', 'groq']);
     expect(out.ok === false && 'message' in out && out.message).toBe('Gemini took too long. Groq took too long. OpenRouter was not tried because time ran out.');
+  });
+  it('a slow real-world answer (14 s, the kind that failed at 7 s) now succeeds on the first attempt', async () => {
+    vi.useFakeTimers();
+    const f = makeFakeFetch((c) => ({ delayMs: 14_000, json: okBody(c.provider, good) }));
+    const p = answerLive(explain(), ALL, { fetchImpl: f.fetch });
+    await vi.advanceTimersByTimeAsync(14_001);
+    const out = await p;
+    expect(out.ok && !out.aborted && out.result.meta).toMatchObject({ provider: 'gemini', attempts: [] });
+    expect(f.calls).toHaveLength(1);
   });
   it('an abort stops the run and starts no further attempt', async () => {
     const ac = new AbortController();

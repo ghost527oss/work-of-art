@@ -133,29 +133,35 @@ describe('runAttempts', () => {
 
 describe('runAttempts: time', () => {
   const light = () => buildAttemptPlan('light', ALL);
-  it('gives each attempt at most 7 s', async () => {
+  it('gives each attempt at most 15 s', async () => {
     const { p, seen } = runner(light(), () => ok());
     await p;
     expect(seen[0]!.timeoutMs).toBe(AI_LIVE.attemptTimeoutMs);
+    expect(AI_LIVE.attemptTimeoutMs).toBe(15000);
   });
-  it('stops starting attempts below 1.5 s and records out_of_time, never exceeding 14 s of attempts', async () => {
-    const r = await runner(light(), () => ({ spend: 7000, result: fail('timeout') })).p;
-    // Gemini (7 s) + Groq (7 s) use all 14 s; OpenRouter is not started.
+  it('the second attempt gets only the time that remains of the 25 s', async () => {
+    const { p, seen } = runner(light(), (_e, _t, n) => (n === 0 ? { spend: 15000, result: fail('timeout') } : ok()));
+    await p;
+    expect(seen.map((s) => s.timeoutMs)).toEqual([15000, 10000]);
+  });
+  it('stops starting attempts below 1.5 s and records out_of_time, never exceeding 25 s of attempts', async () => {
+    const r = await runner(light(), (_e, t) => ({ spend: t, result: fail('timeout') })).p;
+    // Gemini (15 s) + Groq (the 10 s that remain) use all 25 s; OpenRouter is not started.
     expect(r).toMatchObject({ kind: 'failed', code: 'upstream_failure' });
     expect(r.kind === 'failed' && r.attempts.map((a) => a.outcome)).toEqual(['timeout', 'timeout', 'out_of_time']);
     expect(r.kind === 'failed' && r.attempts[2]!.provider).toBe('openrouter');
   });
   it('an attempt that leaves 2 s is still given those 2 s', async () => {
-    const { p, seen } = runner(light(), (_e, _t, n) => (n < 2 ? { spend: 6000, result: fail('timeout') } : ok()));
+    const { p, seen } = runner(light(), (_e, _t, n) => (n === 0 ? { spend: 15000, result: fail('timeout') } : n === 1 ? { spend: 8000, result: fail('timeout') } : ok()));
     await p;
-    expect(seen.map((s) => s.timeoutMs)).toEqual([7000, 7000, 2000]);
+    expect(seen.map((s) => s.timeoutMs)).toEqual([15000, 10000, 2000]);
   });
   it('1.4 s remaining starts nothing; exactly 1.5 s starts an attempt', async () => {
-    const a = await runner(light(), (_e, _t, n) => (n < 2 ? { spend: n === 0 ? 7000 : 5600, result: fail('timeout') } : ok())).p;
+    const a = await runner(light(), (_e, _t, n) => (n < 2 ? { spend: n === 0 ? 15000 : 8600, result: fail('timeout') } : ok())).p;
     expect(a.kind).toBe('failed');
-    const b = runner(light(), (_e, _t, n) => (n < 2 ? { spend: n === 0 ? 7000 : 5500, result: fail('timeout') } : ok()));
+    const b = runner(light(), (_e, _t, n) => (n < 2 ? { spend: n === 0 ? 15000 : 8500, result: fail('timeout') } : ok()));
     expect((await b.p).kind).toBe('ok');
-    expect(b.seen.map((s) => s.timeoutMs)).toEqual([7000, 7000, 1500]);
+    expect(b.seen.map((s) => s.timeoutMs)).toEqual([15000, 10000, 1500]);
   });
 });
 

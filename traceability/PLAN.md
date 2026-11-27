@@ -905,7 +905,7 @@ Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (
 ### F11.4 — Model Router and live assistant
 - Inputs: a request, the providers' settings, a clock, a signal
 - Outputs: an `AIResult` with `meta`, or a coded failure
-- Invariants: fixed order; 429 skips the provider for the request; no same-model retry; 7 s per attempt and 14 s total; heavy falls to light only after all heavy fail and sets `lighter`
+- Invariants: fixed order; 429 skips the provider for the request; no same-model retry; 15 s per attempt and 25 s total; heavy falls to light only after all heavy fail and sets `lighter`
 - Files: `src/engine/live/modelRouter.ts`, `src/engine/live/liveAssistant.ts`, `tests/modelRouter.test.ts`, `tests/liveAssistant.test.ts`
 - Depends on: F11.1, F11.2, F11.3
 - verify: `npm run typecheck && npx vitest run tests/modelRouter.test.ts tests/liveAssistant.test.ts`
@@ -972,7 +972,7 @@ Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (
 - manual gate (Unverified until run): the browser run with a fake provider server, and your own real-key check (design section 14)
 
 ### F11 as built (3A)
-- Defaults are Gemini `gemini-3.1-flash-lite` and `gemini-3.6-flash`, Groq `openai/gpt-oss-20b` and `openai/gpt-oss-120b`, OpenRouter `openrouter/free` for both tiers (verified against the providers' pages on 2026-11-26; real-key use is **Unverified**). Per attempt 7 s, whole request 14 s.
+- Defaults are Gemini `gemini-3.1-flash-lite` and `gemini-3.6-flash`, Groq `openai/gpt-oss-20b` and `openai/gpt-oss-120b`, OpenRouter `openrouter/free` for both tiers (verified against the providers' pages on 2026-11-26; real-key use is **Unverified**). Per attempt 15 s, whole request 25 s, browser wait 28 s (raised from 7 / 14 / 15 after a real heavy Gemini request timed out).
 - A `plan` answer with no selected file becomes a `clarification` (design 9.2 said "fewer than 2 files"; a plan for one file is accepted).
 - Stop rejects a waiting AI change even with no run (R9.7), but an AI-requested `stop` is refused while any change waits (review fix). `undo` and `redo` were removed from the AI's action list after review (user decision): only the user can change History.
 - The AI proposal's History title is the fixed text "AI-proposed change to <path>" so no AI text is saved. The byline and the model's summary are shown only.

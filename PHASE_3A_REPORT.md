@@ -75,7 +75,7 @@ Existing tests changed on purpose (design 4.3): `assistantApi` (GET now returns 
 3. Stop rejects a waiting AI change even with no run (as the spec says), but an AI-requested stop is refused while a change waits (review fix).
 4. The review fixes in section 2 go beyond the spec text.
 5. No change was needed in `vite.config.ts` (its dev route already passes any method through).
-6. Timeouts are your values: 7 s per attempt and 14 s total (about 1 s to spare inside the 15 s browser limit).
+6. Timeouts: 15 s per attempt, 25 s total, and a 28 s browser limit (first 7 s / 14 s / 15 s, raised after your real Gemini run timed out; see the follow-up notes).
 
 ## 5. Known limits
 
@@ -90,7 +90,7 @@ Existing tests changed on purpose (design 4.3): `assistantApi` (GET now returns 
 
 ## 6. Unverified (not run here)
 
-- **Everything about real providers:** whether your keys work, whether the default free models are on your free plan (Gemini's official page lists the model ids but not which are free), real answer quality, real speed against the 7 s and 14 s limits, real 429 shapes, and whether the output caps (700 and 1,200 tokens) are enough for the reasoning models (they count thinking tokens too).
+- **Everything about real providers:** whether your keys work, whether the default free models are on your free plan (Gemini's official page lists the model ids but not which are free), real answer quality, real speed against the 15 s and 25 s limits, real 429 shapes, and whether the output caps (700 and 1,200 tokens) are enough for the reasoning models (they count thinking tokens too).
 - The custom `verification-agent` step (the independent review was done by a different reviewer).
 - Touch use on a real phone.
 
@@ -119,3 +119,7 @@ Step 10 gave "Gemini gave an answer PatchBay could not use." That means Gemini a
 - Most likely cause: the Gemini 3 models "think" before they answer and the thinking counts against the output cap, so the JSON was cut off. Caps raised from 700 / 1,200 to 1,500 / 3,000 tokens, and a cut-off answer is now reported as cut off.
 - Models often add extra fields or write the file as `./index.html`. Extra fields are now ignored (never copied) and `./x`, `/x`, `a/x` are accepted for the one selected file. A missing or null `new_text` deletes the lines.
 - Still refused: a wrong kind of answer, a file you did not select, edits outside the lines shown, anything that looks like a secret, and any action not on the list.
+
+## 9. Follow-up: timeouts raised after a real Gemini run
+
+Your real heavy Gemini request ("Suggest a change") failed with "Gemini took too long." The 7 s per-attempt limit was too short for a reasoning model on the free tier. New limits: **15 s per attempt, 25 s for the whole request, 28 s browser wait** (about 3 s to spare). `vercel.json` also sets `maxDuration: 30` for the functions so a deployed copy is not cut off first. A 14 s answer, which failed before, now succeeds in the fake-provider tests. **Unverified:** how long your real Gemini answers actually take, and whether your Vercel plan allows a 30 s function (some plans cap lower).

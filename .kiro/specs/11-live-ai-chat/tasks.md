@@ -56,7 +56,7 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
   - `meta` is optional, strict, and bounded; a result without `meta` still parses.
   - `AI_LIVE` values equal design 7.3 and are marked provisional; the browser-safe subset is re-exported by `budgets-proxy.ts`.
   - Provider table: fixed endpoints, no key values, model-name validation rejects `../x`, spaces, 81 characters, and `/` or `:` for Gemini. Defaults are Gemini `gemini-3.1-flash-lite` and `gemini-3.6-flash`, Groq `openai/gpt-oss-20b` and `openai/gpt-oss-120b`, OpenRouter `openrouter/free` for both tiers; an empty variable uses the default and a set variable overrides it; duplicate model names (OpenRouter light and heavy) are dropped from a plan.
-  - `AI_LIVE.attemptTimeoutMs` is 7,000 and `totalBudgetMs` is 14,000.
+  - `AI_LIVE.attemptTimeoutMs` is 15,000 and `totalBudgetMs` is 25,000.
 - **verify:** `npm run typecheck && npx vitest run tests/aiContracts.test.ts tests/aiValidate.test.ts tests/mockAssistant.test.ts tests/aiLiveConfig.test.ts tests/aiProviderConfig.test.ts`
 
 ## L2. Card picker and prompt builder
@@ -88,7 +88,7 @@ Spec on `spec/11-live-ai-chat`. Code on `feat/live-ai-chat` from the spec branch
 - **goal:** Build design section 8 and the `answerLive` orchestration.
 - **acceptance:**
   - **Plan:** tier by task; light and heavy orders exactly as design 8.1; skip rules; duplicate model names dropped; no usable entry gives an explicit "not set up" result.
-  - **Run:** 429 marks the provider busy and skips its other entries; timeout, 5xx, and network failure go to the next entry; 401 and 403 skip the provider; a bad answer goes on; no same-model retry; each attempt at most 7 s and the whole run at most 14 s (fake clock; the third attempt gets only the time that remains); below 1.5 s remaining no new attempt starts and `out_of_time` is recorded; an aborted request stops at once.
+  - **Run:** 429 marks the provider busy and skips its other entries; timeout, 5xx, and network failure go to the next entry; 401 and 403 skip the provider; a bad answer goes on; no same-model retry; each attempt at most 15 s and the whole run at most 25 s (fake clock; the second and third attempts get only the time that remains); below 1.5 s remaining no new attempt starts and `out_of_time` is recorded; an aborted request stops at once.
   - **Result:** the winner's provider, model, tier, `lighter`, and failed `attempts` appear in `meta`; heavy falls to light only after every heavy entry fails and then `lighter` is true; all-429 gives `rate_limited`, anything else `upstream_failure`; the message names providers and outcomes only.
   - **`answerLive`:** picks cards, builds the prompt, runs the router, parses, validates with `validateAIResult`, and rejects a result that contains a secret as a bad answer. A fixed seeded sequence of 500 random provider behaviours never ends with an invalid result, a missing `meta`, or more than one attempt per model.
 - **verify:** `npm run typecheck && npx vitest run tests/modelRouter.test.ts tests/liveAssistant.test.ts`

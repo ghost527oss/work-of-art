@@ -3,10 +3,10 @@
 // Plain numbers only: this file is safe to import from browser code.
 export const AI_LIVE = {
   provisional: true,
-  /** Per attempt (raised from 5,000 at the user's request so free reasoning models do not time out falsely). */
-  attemptTimeoutMs: 7000,
-  /** Whole request. Fits inside the 15 s browser timeout (`AI_LIMITS.clientTimeoutMs`) with about 1 s to spare. */
-  totalBudgetMs: 14000,
+  /** Per attempt. Raised to 15 s (from 7 s) after a real heavy Gemini request timed out at 7 s. */
+  attemptTimeoutMs: 15000,
+  /** Whole request. Fits inside the 28 s browser timeout (`AI_LIMITS.clientTimeoutMs`) with about 3 s to spare. */
+  totalBudgetMs: 25000,
   /** No new attempt starts when less than this remains. */
   minAttemptMs: 1500,
   maxPromptChars: 12000,

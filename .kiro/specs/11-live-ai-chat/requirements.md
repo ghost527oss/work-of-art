@@ -72,7 +72,7 @@ In simple words: you type a question in AI Chat. PatchBay picks the few lines th
 5. WHEN an attempt times out, gets a 5xx, or fails to connect, THE SYSTEM SHALL go to the next attempt. WHEN a provider rejects its key (HTTP 401 or 403), THE SYSTEM SHALL skip that provider for this request.
 6. WHEN a model answer fails validation (not JSON, wrong shape, a path outside the selected files, or a likely secret in the text), THE SYSTEM SHALL count it as `bad_answer` and go to the next attempt.
 7. THE SYSTEM SHALL make at most one attempt per model per request, and SHALL NOT retry the same model. Going to the next model is the retry.
-8. THE SYSTEM SHALL give each attempt at most 7 s and the whole request at most 14 s (provisional). WHEN less than 1.5 s remains, THE SYSTEM SHALL stop starting attempts.
+8. THE SYSTEM SHALL give each attempt at most 15 s and the whole request at most 25 s (provisional; raised from 7 s and 14 s after a real heavy Gemini request timed out). WHEN less than 1.5 s remains, THE SYSTEM SHALL stop starting attempts.
 9. WHEN every attempt fails, THE SYSTEM SHALL respond `rate_limited` (HTTP 429) if every failure was a 429, otherwise `upstream_failure` (HTTP 502). The message SHALL name each provider and its plain outcome and nothing else.
 10. THE SYSTEM SHALL put `meta` in a live result: `tier`, `provider`, `model`, `lighter`, and the list of failed `attempts` (provider and outcome only).
 11. THE SYSTEM SHALL keep every model name, endpoint, and limit in `src/config/aiProviders.ts` and `src/config/aiLive.ts`, with environment overrides for model names, so a retired free model is a settings change.
@@ -154,7 +154,7 @@ In simple words: you type a question in AI Chat. PatchBay picks the few lines th
 8. A prompt-injection text in the question, a file, or a card-like line SHALL NOT change the response type, the paths, the chosen action, or the tier.
 
 ### R12. Limits and timing
-1. THE SYSTEM SHALL keep the Phase 2 limits (15 s browser timeout, 5 files, 60 KB total, 20 KB per file, 2,000-character question), all still provisional. The live server budget of 14 s fits inside the 15 s browser timeout, with about 1 s to spare for the network.
+1. THE SYSTEM SHALL keep the Phase 2 limits (15 s browser timeout, 5 files, 60 KB total, 20 KB per file, 2,000-character question), all still provisional. The live server budget of 25 s fits inside the 28 s browser timeout (raised from 15 s), with about 3 s to spare for the network.
 2. THE SYSTEM SHALL cap model output (700 tokens light, 1,200 heavy; provisional) and read at most 64 KB from a provider.
 3. THE SYSTEM SHALL keep the new limits in `src/config/aiLive.ts`, marked provisional.
 
@@ -178,7 +178,7 @@ In simple words: you type a question in AI Chat. PatchBay picks the few lines th
 
 1. **Mock unchanged:** every Phase 2 test that is not on the changed list (design 4.3) passes without edits. Mock answers are byte-identical for the same input.
 2. **Contracts:** new schemas accept valid and reject invalid (extra fields, bad skill id, bad action, an `action` with snippets).
-3. **Router tests:** order, skipping, 429 skips the provider, timeout, 5xx, 401, bad answer, the 7 s and 14 s limits, heavy falls to light and sets `lighter`, all-failed codes, abort stops further attempts.
+3. **Router tests:** order, skipping, 429 skips the provider, timeout, 5xx, 401, bad answer, the 15 s and 25 s limits, heavy falls to light and sets `lighter`, all-failed codes, abort stops further attempts.
 4. **Provider adapter tests:** each adapter's request has the key only in a header, the fixed address, no redirect, an output cap, and it maps statuses correctly. No body appears in any error.
 5. **Answer tests:** every answer kind maps to a valid `AIResponse`; edits become a diff that applies to the snippet with an independent applier; overlapping, out-of-range, and over-limit edits are bad answers.
 6. **Context Engine tests:** window size, whole-file rule, no snippet when the box is off, no truncated files, connection facts, cut order under the prompt cap, redaction.
@@ -203,7 +203,7 @@ In simple words: you type a question in AI Chat. PatchBay picks the few lines th
 These go slightly beyond or differ from what we agreed in the brief. Each has my recommendation.
 
 1. **No retry on the same model.** The brief said "at most one retry per provider". A retry would not fit your 15 s limit and would waste free quota. Recommendation: no same-model retry; the next model is the retry (R2.7).
-2. **Server time budget of 14 s (7 s per attempt)** (your adjustment, so free reasoning models do not time out falsely). It still fits inside the 15 s browser timeout, but with only about 1 s to spare, and two full-length attempts use the whole budget (R2.8).
+2. **Server time budget of 25 s (15 s per attempt) and a 28 s browser timeout** (raised twice at your request: first 7 s / 14 s, then after a real heavy Gemini request timed out at 7 s). Two full-length attempts nearly use the whole budget (R2.8).
 3. **A new task type `act` and a new `action` answer** so a sentence like "start the crew" can run a safe action. `approve`, `reject`, and `reset` are never allowed, and it never works when file text was sent (R8).
 4. **AI patches queue by themselves** (when allowed) so you make one decision (Approve or Reject), not two (R9.3).
 5. **Only live-mode patches are approvable.** Mock patch cards stay display-only. This lifts the 2B rule "AI Chat patches are display-only" for live mode only (R9.9).

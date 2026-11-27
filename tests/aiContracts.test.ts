@@ -246,7 +246,7 @@ describe('AI_LIMITS', () => {
     expect(AI_LIMITS.maxContextFileBytes).toBe(20 * 1024);
     expect(AI_LIMITS.maxContextTotalBytes).toBe(60 * 1024);
     expect(AI_LIMITS.maxResponseBytes).toBe(256 * 1024);
-    expect(AI_LIMITS.clientTimeoutMs).toBe(15_000);
+    expect(AI_LIMITS.clientTimeoutMs).toBe(28_000);
     expect(AI_LIMITS.maxPickerRows).toBe(200);
   });
 });

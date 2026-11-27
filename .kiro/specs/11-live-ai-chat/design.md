@@ -113,7 +113,7 @@ AIAssistantPanel
           redact again
           answerLive():
             pickCards -> buildPrompt -> Model Router:
-               attempt 1 ... attempt n (fixed order, 7 s each, 14 s total)
+               attempt 1 ... attempt n (fixed order, 15 s each, 25 s total)
                parseAnswer -> validateAIResult -> secret check
                first good answer wins; each failure is recorded
           200 { requestId, mode:'live', response, meta }
@@ -202,8 +202,8 @@ Consequences: a few heavy requests can use a day's Gemini allowance, so the ligh
 ```ts
 export const AI_LIVE = {
   provisional: true,
-  attemptTimeoutMs: 7000,        // per attempt (raised from 5000 at your request)
-  totalBudgetMs: 14000,          // whole request, inside the 15 s browser timeout (about 1 s to spare)
+  attemptTimeoutMs: 15000,       // per attempt (7 s failed on a real heavy Gemini request)
+  totalBudgetMs: 25000,          // whole request, inside the 28 s browser timeout (about 3 s to spare)
   minAttemptMs: 1500,            // stop starting attempts below this
   maxPromptChars: 12000,
   maxOutputTokensLight: 1500,   // raised from 700 after the first real-key run: reasoning models spend part of the cap thinking
