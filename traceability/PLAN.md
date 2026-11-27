@@ -987,7 +987,7 @@ Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (
 > Planned, not yet specified: `P3B2-LIBRARY-MAP` (spec 13, nodes F13.x: Knowledge Library, Repo Map, 10 visual templates) and `P3B3-AUTONOMOUS-RUN` (spec 14, nodes F14.x: Crew Run v2, Review and Autopilot, wait-and-resume, Undo this whole run). The old draft `P3B-LIVE-JOURNAL-CREW` (AI explanations in the Journal and narration) is replaced and not part of 3B.
 
 ## F12 — Code checks, Visual Linter, and sandbox compatibility
-Contract: PatchBay reads JavaScript (with `acorn`), HTML, and CSS and reports real mistakes with the exact place, offers a narrow candidate-and-verify fix, measures the rendered preview at 375, 768, and 1024 px with a confidence on every result, fixes objective visual problems with fixed zero-AI recipes that are re-measured and undone automatically when they don't help, and lets real pages look styled (CDN styles and fonts in Look-only mode; CDN scripts, a storage stand-in, and scripts after content in Run-scripts mode). It never runs imported code in PatchBay's page and makes no AI request. Nothing changes without the existing Approve or an explicit recipe button, and only the practice copy changes.
+Contract: PatchBay reads JavaScript (with `acorn`), HTML, and CSS and reports real mistakes with the exact place, offers a narrow candidate-and-verify fix, measures the rendered preview at 375, 768, and 1024 px with a confidence on every result, fixes objective visual problems with fixed zero-AI recipes that are re-measured and undone automatically when they don't help, and lets real pages look styled (CDN styles and fonts, small local pictures, and outside `https:` pictures in Look-only mode; CDN scripts, a storage stand-in, and scripts after content in Run-scripts mode). Image bytes are shown only in the Sandbox and never reach an AI. It never runs imported code in PatchBay's page and makes no AI request. Nothing changes without the existing Approve or an explicit recipe button, and only the practice copy changes.
 
 ### F12.1 — Dependency, limits, host lists, skills, lesson cards, `Finding` fields
 - Inputs: the vision, requirements R1 to R13
@@ -1032,7 +1032,7 @@ Contract: PatchBay reads JavaScript (with `acorn`), HTML, and CSS and reports re
 ### F12.6 — Look-only sandbox: host matching, CSP, outside styles, blocked list
 - Inputs: the page source, the host lists
 - Outputs: the preview document with allowed outside style links; the CSP; the blocked-resources list
-- Invariants: exact `https:` host match only; `img-src` stays `data:`; no script in Look-only mode; sandbox flags and `referrerPolicy` unchanged; `@import` and non-data `url()` in the page's own CSS stay removed
+- Invariants: exact `https:` host match only; `img-src` stays `data:` until F12.9; no script in Look-only mode; sandbox flags and `referrerPolicy` unchanged; `@import` and non-data `url()` in the page's own CSS stay removed
 - Files: `src/preview/hostMatch.ts`, `src/preview/blockedReport.ts`, `src/preview/previewFlags.ts`, `src/preview/previewDocument.ts`, `src/components/BlockedList.tsx`, `tests/hostMatch.test.ts`, `tests/previewHosts.test.ts`, `tests/blockedReport.test.ts`, `tests/previewDocument.test.ts`, `tests/previewHostile.test.ts`, `tests/sandboxUi.test.tsx`
 - Depends on: F12.1, F7.3
 - verify: `npm run typecheck && npx vitest run tests/hostMatch.test.ts tests/previewHosts.test.ts tests/blockedReport.test.ts tests/previewDocument.test.ts tests/previewHostile.test.ts tests/sandboxUi.test.tsx`
@@ -1045,7 +1045,23 @@ Contract: PatchBay reads JavaScript (with `acorn`), HTML, and CSS and reports re
 - Depends on: F12.6, F7.3, F7.6
 - verify: `npm run typecheck && npx vitest run tests/storageShim.test.ts tests/scriptOrder.test.ts tests/previewDocument.test.ts tests/previewHostile.test.ts tests/previewHosts.test.ts`
 
-### F12.8 — Colours, the pure Visual Linter, picture-size check, findings
+### F12.8 — Image loader: contracts, caps, signature check, reference finder, loading pass, coverage
+- Inputs: loaded HTML and CSS text, the tree sizes, the raw host
+- Outputs: an optional `media` list in the snapshot; four policy reason codes; coverage numbers for pictures
+- Invariants: types are png, jpg, jpeg, webp, gif, ico only; at most 150 KB per image, 1 MB in all, 30 images; an over-size image is never downloaded; the signature must match the type; only referenced, in-scope images load; bytes live only in `media` and never reach files, scan, Journal, AI, exports, Log, storage, or errors; snapshots without `media` still validate
+- Files: `src/types/contracts.ts`, `src/config/budgets.ts`, `src/engine/imageSniff.ts`, `src/engine/mediaRefs.ts`, `src/engine/mediaLoader.ts`, `src/engine/githubSource.ts`, `src/engine/ingestPipeline.ts`, `src/engine/fileSelector.ts`, `src/components/CoveragePanel.tsx`, `tests/imageSniff.test.ts`, `tests/mediaRefs.test.ts`, `tests/mediaLoader.test.ts`, `tests/contracts.test.ts`, `tests/githubSource.test.ts`, `tests/ingestPipeline.test.ts`, `tests/repoApi.test.ts`, `tests/helpers/tinyImages.ts`
+- Depends on: F12.1, F1.1, F1.3, F1.4
+- verify: `npm run typecheck && npx vitest run tests/imageSniff.test.ts tests/mediaRefs.test.ts tests/mediaLoader.test.ts tests/contracts.test.ts tests/githubSource.test.ts tests/ingestPipeline.test.ts tests/repoApi.test.ts`
+
+### F12.9 — Images in the preview: local embed, outside `https:` images, `img-src`, document limits
+- Inputs: the snapshot `media` list, the page source
+- Outputs: pictures shown in the Sandbox; labelled placeholders for the rest
+- Invariants: local pictures only as `data:` addresses after a signature re-check; outside pictures only for `https:` addresses with no user name, port, IP address, local-looking name, or `srcset`; `img-src` is exactly `data: https:`; no other CSP directive changes; embedded pictures at most 2 MB per document counting repeats; document limit 3 MB; sandbox flags and `referrerPolicy` unchanged
+- Files: `src/preview/previewDocument.ts`, `src/preview/previewFlags.ts`, `src/preview/hostMatch.ts`, `src/preview/blockedReport.ts`, `src/components/SandboxPanel.tsx`, `src/components/BlockedList.tsx`, `tests/previewImages.test.ts`, `tests/imageHost.test.ts`, `tests/previewDocument.test.ts`, `tests/previewHostile.test.ts`, `tests/previewHosts.test.ts`, `tests/sandboxUi.test.tsx`
+- Depends on: F12.6, F12.7, F12.8, F7.3
+- verify: `npm run typecheck && npx vitest run tests/previewImages.test.ts tests/imageHost.test.ts tests/previewDocument.test.ts tests/previewHostile.test.ts tests/previewHosts.test.ts tests/sandboxUi.test.tsx`
+
+### F12.10 — Colours, the pure Visual Linter, real picture measuring, picture-size check, findings
 - Inputs: plain-data measurements, page elements, source text
 - Outputs: measured findings with confidence and number; "can't measure" counts
 - Invariants: overlap never `high` and skips hidden, `fixed`, `sticky`, `absolute`, and parent-child pairs; contrast only on solid backgrounds; tap and small-text checks only up to 768 px; findings hold fixed words and numbers only; caps 25 per kind and 100 in all
@@ -1053,29 +1069,29 @@ Contract: PatchBay reads JavaScript (with `acorn`), HTML, and CSS and reports re
 - Depends on: F12.1, F7.7
 - verify: `npm run typecheck && npx vitest run tests/colors.test.ts tests/linter.test.ts tests/linterOverlap.test.ts tests/linterFindings.test.ts tests/mediaSize.test.ts tests/previewModules.test.ts`
 
-### F12.9 — Browser measurement reader, Full check, store, summary UI
+### F12.11 — Browser measurement reader, Full check, store, summary UI
 - Inputs: the live preview frame
 - Outputs: the extended measurements; the three-width Full check; the summary, blocked list, and labels in the panels
 - Invariants: the reader returns plain data and holds no thresholds; waits for fonts at most 1,500 ms; restores the frame width in `finally`; findings are never saved; "static render (scripts off)" is always shown with measured results; no "no problems" line for an unfinished check
 - Files: `src/preview/previewDom.ts`, `src/hooks/usePreview.ts`, `src/store/previewSlice.ts`, `src/store/previewActions.ts`, `src/components/LintSummary.tsx`, `src/components/SandboxPanel.tsx`, `src/components/EditPanel.tsx`, `src/components/FindingDetail.tsx`, `src/components/FindingsTable.tsx`, `src/styles.css`, `tests/previewController.test.ts`, `tests/lintSummaryUi.test.tsx`, `tests/sandboxUi.test.tsx`
-- Depends on: F12.6, F12.8, F7.9
+- Depends on: F12.6, F12.9, F12.10, F7.9
 - verify: `npm run typecheck && npx vitest run tests/previewController.test.ts tests/lintSummaryUi.test.tsx tests/sandboxUi.test.tsx tests/editController.test.ts && npm run build`
 
-### F12.10 — Recipes with re-measure and automatic undo
+### F12.12 — Recipes with re-measure and automatic undo
 - Inputs: a measured finding, the element table, the practice copy
 - Outputs: a History change kept only when verified, or undone with a plain reason
 - Invariants: only mapped plain `.html` elements; fixed validated declarations; kept only if the target is gone at all three widths and nothing new appeared; undone on regression, timeout, stop, or changed page; never undoes another History entry; Log lines hold numbers only; nothing applies until the button is pressed
 - Files: `src/preview/recipes.ts`, `src/edit/styleModel.ts`, `src/hooks/useRecipe.ts`, `src/store/previewSlice.ts`, `src/store/previewActions.ts`, `src/components/EditPanel.tsx`, `src/components/SandboxPanel.tsx`, `tests/recipes.test.ts`, `tests/recipeController.test.ts`, `tests/styleModel.test.ts`, `tests/editPad.test.ts`
-- Depends on: F12.8, F12.9, F8.1, F8.2, F4.4
+- Depends on: F12.10, F12.11, F8.1, F8.2, F4.4
 - verify: `npm run typecheck && npx vitest run tests/recipes.test.ts tests/recipeController.test.ts tests/styleModel.test.ts tests/editPad.test.ts tests/workState.test.ts`
 
-### F12.11 — Privacy, static, hostile-input, and exit-gate tests
+### F12.13 — Privacy, static, hostile-input, and exit-gate tests
 - Inputs: the whole 3B-1 feature at store level with fakes
 - Outputs: the proofs
-- Invariants: sentinels never reach the Log, storage, errors, findings, or the blocked list; no `eval`, network call, or `engine/live` import in checks or preview code; hostile inputs finish within limits; the three gate scenarios pass
-- Files: `tests/checksPrivacy.test.ts`, `tests/checksStatic.test.ts`, `tests/checksHostile.test.ts`, `tests/phase3b1Gate.test.ts`, `tests/helpers/lintHarness.ts`
-- Depends on: F12.1 to F12.10
-- verify: `npm run typecheck && npx vitest run tests/checksPrivacy.test.ts tests/checksStatic.test.ts tests/checksHostile.test.ts tests/phase3b1Gate.test.ts`
+- Invariants: sentinels (including bytes inside images) never reach the Log, storage, errors, findings, the blocked list, or any AI request; no `eval`, network call, or `engine/live` import in checks or preview code; hostile inputs finish within limits; the three gate scenarios pass
+- Files: `tests/checksPrivacy.test.ts`, `tests/checksStatic.test.ts`, `tests/checksHostile.test.ts`, `tests/imagePrivacy.test.ts`, `tests/phase3b1Gate.test.ts`, `tests/helpers/lintHarness.ts`
+- Depends on: F12.1 to F12.12
+- verify: `npm run typecheck && npx vitest run tests/checksPrivacy.test.ts tests/checksStatic.test.ts tests/checksHostile.test.ts tests/imagePrivacy.test.ts tests/phase3b1Gate.test.ts`
 
 ### F12 gate
 - verify: `npm run typecheck && npx vitest run && npm run build && npm audit`

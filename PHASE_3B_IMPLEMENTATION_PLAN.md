@@ -33,10 +33,11 @@ Rules for all three:
 - **Full 3A rigor** for each sub-phase: unit and integration tests, static security checks, mutation checks, a browser run, an independent review, and a report.
 - Free tiers only. No paid service. No key typed into the browser.
 - Dependencies: exactly one new runtime package in all of 3B, `acorn` (approved), added in 3B-1.
+- Picture bytes are shown only in the Sandbox. They never reach an AI, the Journal, an export, the Log, or browser storage.
 
 ## 3. What each sub-phase builds
 
-### 3B-1 (spec 12, written, 12 tasks V1 to V12)
+### 3B-1 (spec 12, written, 14 tasks V1 to V14)
 
 | Part | What you get |
 |---|---|
@@ -48,6 +49,7 @@ Rules for all three:
 | Visual Linter | Measures the rendered preview at 375, 768, and 1024 px: overflow (already built), overlap, tap targets, small text, contrast, pictures with no size limit. Each result has a number, an element, a confidence, and a place in the code. "Can't measure" when it cannot. Labelled "static render (scripts off)". |
 | Recipes and auto-undo | Fixed, zero-AI CSS fixes for objective problems on plain HTML elements. After each fix the page is measured again at all three widths. It is kept only if the problem is gone and nothing new appeared. Otherwise it is undone automatically. |
 | Sandbox: Look-only | Styles and fonts from a short list of CDN hosts load, so real pages look styled. Scripts stay blocked. |
+| Pictures (Option C, you approved) | Small local images (`.png .jpg .jpeg .webp .gif .ico`, only those a page or stylesheet uses; at most **150 KB each, 1 MB in all, 30 images**) and outside `https:` pictures show in the Sandbox. Anything bigger stays a labelled placeholder. The Visual Linter measures real picture sizes. **Picture bytes never go to an AI.** |
 | Sandbox: Run scripts | Your scripts plus a short list of CDN script hosts. A stand-in for `localStorage` and `sessionStorage`. Scripts now run after the page content, not before it (this fixes a real problem found in the code). |
 | Blocked-resources report | A plain list of what the preview did not load and why. |
 
@@ -77,7 +79,7 @@ Rules for all three:
 
 Today is Friday 2026-11-27. You want 3B frozen on **Tuesday 2026-12-01**, leaving 2026-12-02 to 12-04 for Phase 4 and the demo video.
 
-That is about 4.5 working days. 3A was 12 tasks with about 4,000 lines of new tests. 3B-1 alone is about the same size as 3A. All of 3B at full rigor is roughly three times 3A.
+That is about 4.5 working days. 3A was 12 tasks with about 4,000 lines of new tests. 3B-1 alone is now a little bigger than 3A (14 tasks, with the pictures). All of 3B at full rigor is roughly three times 3A.
 
 **I can't promise all three sub-phases at full rigor by Dec 1.** I would rather say that now than discover it on Dec 1. Proposed way to handle it:
 
@@ -120,6 +122,8 @@ Other real limits (also in each spec):
 | Diff size (`maxDiffChars`) | 2,000 | `workLimits.ts`, `scanFix.ts` | unchanged in 3B-1 (all new fixes are tiny); proposal 4,000 for AI patches in 3B-3 | 3B-3 |
 | History entries | 50 | `workLimits.ts` | proposal: 120 | 3B-3 |
 | Layout check time | 3 s | `previewLimits.ts` | 6 s (three widths, more checks) | 3B-1 |
+| Preview document size (`maxDocBytes`) | 1 MB | `previewLimits.ts` | 3 MB (room for embedded pictures; pictures in one document at most 2 MB encoded) | 3B-1 |
+| Pictures loaded per session | 0 (all media skipped) | `budgets.ts` | 150 KB each, 1 MB total, 30 images, referenced ones only | 3B-1 |
 | Runtime dependencies | 3 | `aiStatic.test.ts` | 4 (`acorn`) | 3B-1 |
 
 Each number is provisional and lives in one config file, like every other limit.
@@ -130,11 +134,11 @@ The old draft (from PR #6) was "AI explanations in the Journal and review/narrat
 - "Explain in my project" buttons in the Journal.
 - "Review this finding" and batch narration in Skeleton Crew.
 
-They can come back later if you want them. I removed them rather than carry two plans. The old spec files were renamed and rewritten in place (git history keeps them).
+You confirmed on 2026-11-27 that they are dropped from 3B. They can come back later if you ask. I removed them rather than carry two plans. The old spec files were renamed and rewritten in place (git history keeps them).
 
 ## 8. Steering change
 
-`.kiro/steering/build-phases.md` gets a rewritten 3B block with the three sub-phases (authorised by you). I did **not** change the `Current Active Phase:` line (it already says `Phase 3 (Sub-phase 3B)`). When you approve this plan, tell me if you want it to say `Sub-phase 3B-1`.
+`.kiro/steering/build-phases.md` has the rewritten 3B block with the three sub-phases, and `Current Active Phase:` now says `Phase 3 (Sub-phase 3B-1)` (you approved both).
 
 ## 9. Files and numbering
 
@@ -142,15 +146,14 @@ They can come back later if you want them. I removed them rather than carry two 
 |---|---|---|---|
 | Spec folder | `.kiro/specs/12-code-checks-visual-linter/` | `.kiro/specs/13-knowledge-library-repo-map/` | `.kiro/specs/14-autonomous-crew-run/` |
 | `plan_id` | `P3B1-CHECKS-LINTER` | `P3B2-LIBRARY-MAP` | `P3B3-AUTONOMOUS-RUN` |
-| PLAN nodes | F12.1 to F12.11, F12 gate | F13.x | F14.x |
-| Task ids | V1 to V12 | R1 to R7 | A1 to A11 |
+| PLAN nodes | F12.1 to F12.13, F12 gate | F13.x | F14.x |
+| Task ids | V1 to V14 | R1 to R7 | A1 to A11 |
 | Branch | `feat/3b-1-checks-linter` | `feat/3b-2-library-map` | `feat/3b-3-autonomous-run` |
 
 Task ids V, R, and A are not used by earlier specs (those use T, M, S, B, C, D, E, P, J, K, L).
 
-## 10. What I need from you next
+## 10. Next step
 
-1. Review this plan and spec 12 (`requirements.md`, `design.md`, `tasks.md`) and `traceability/PLAN.md` (F12 section).
-2. Answer the decisions listed at the end of spec 12 `requirements.md` (section 7).
-3. Say whether the order should be 3B-1, 3B-3, 3B-2 (my recommendation) or 3B-1, 3B-2, 3B-3.
-4. Say "Go V1" (or another task) when you want code to start. Nothing is built until then.
+1. Answer the open questions at the end of spec 12 `requirements.md` (section 7). Each has a default.
+2. Review `.kiro/specs/12-code-checks-visual-linter/content-draft.md` (the 12 skill texts and 12 lesson cards). V1 copies it without changes.
+3. Give a batch "Go" for all of 3B-1 (V1 to V14). The stop rules are in spec 12 `tasks.md`. Nothing is built before that.

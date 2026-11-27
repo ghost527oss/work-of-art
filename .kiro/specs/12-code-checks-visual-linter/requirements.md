@@ -1,7 +1,7 @@
 # Requirements: 12 Code checks, Visual Linter, and sandbox compatibility (Phase 3, Sub-phase 3B-1)
 
 Sources: `PHASE_3B_IMPLEMENTATION_PLAN.md`; your `Skeleton_Crew_Autonomous_Vision.md` (sections 2, 7); your discussion answers of 2026-11-27; steering `build-phases.md` (3B block); specs 06 (scanner), 07 (sandbox preview), 08 (Edit pad), 11 (live AI, only the shared rules); the real code (`scanProject.ts`, `scanFix.ts`, `previewDocument.ts`, `previewFlags.ts`, `layoutCheck.ts`, `previewDom.ts`, `elementMap.ts`, `workActions.ts`).
-Active product phase: **Phase 3, Sub-phase 3B-1**. PatchBay's own screens stay black-and-white wireframe with no animation. `AI_MODE=mock` stays the default. **3B-1 makes no AI request at all.** Free tiers only. **One new runtime dependency: `acorn` (approved).**
+Active product phase: **Phase 3, Sub-phase 3B-1**. PatchBay's own screens stay black-and-white wireframe with no animation. `AI_MODE=mock` stays the default. **3B-1 makes no AI request at all.** Free tiers only. **One new runtime dependency: `acorn` (approved).** **Images (Option C, approved 2026-11-27):** the preview shows small local repository images and outside `https:` images, under tight memory caps, and image bytes never go to an AI.
 
 ## 1. Purpose
 
@@ -11,7 +11,7 @@ Active product phase: **Phase 3, Sub-phase 3B-1**. PatchBay's own screens stay b
 2. **Narrow automatic fixes:** for a few kinds of mistake, PatchBay tries tiny repairs, re-checks each one, and offers a fix only when exactly one works.
 3. **Visual Linter (Category 3):** PatchBay measures the rendered preview at three screen widths and reports objective visual problems, each with a number, a confidence, and a place in the code. When it can't measure, it says so.
 4. **Recipes:** fixed, zero-AI CSS fixes for objective visual problems. Each fix is re-measured and **undone automatically** if it did not help or caused a new problem.
-5. **Sandbox compatibility:** real pages look styled in Look-only mode (styles and fonts from a short CDN list), and "Run scripts" works better on real sites (CDN script hosts, a `localStorage` stand-in, scripts that run after the page content).
+5. **Sandbox compatibility and pictures:** real pages look styled in Look-only mode (styles and fonts from a short CDN list), and "Run scripts" works better on real sites (CDN script hosts, a `localStorage` stand-in, scripts that run after the page content), and real pictures show in the preview (small local images and outside `https:` images), so the Visual Linter can measure their real sizes.
 
 In simple words: PatchBay gets much better at finding and fixing the easy problems by itself, for free, before any AI is needed. 3B-2 and 3B-3 then build on this.
 
@@ -27,6 +27,7 @@ In simple words: PatchBay gets much better at finding and fixing the easy proble
 - Visual Linter: overflow (extends the built check), overlap (with a false-alarm filter), tap targets, small text, contrast, pictures with no size limit. Confidence on every result. A "can't measure" count. Label "static render (scripts off)". Widths 375, 768, 1024 px.
 - Five new measured scan skills with plain-English text and one lesson card each.
 - Recipes for overflow, tap targets, small text, contrast on solid backgrounds, and picture size, with the re-measure and automatic undo.
+- **Images (Option C):** the repo loader fetches small referenced local images (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.ico`; at most 150 KB each, 1 MB in all, 30 images); the preview shows them and outside `https:` images; the Visual Linter measures real picture sizes. Image bytes never go to an AI.
 - Look-only CDN styles and fonts. Run-scripts CDN scripts and the `localStorage` and `sessionStorage` stand-in. Scripts placed after the page content. A blocked-resources list.
 - Updated 2E-1 tests (listed in design 4.3), fake and hostile tests, a real-browser run, mutation checks, an independent review, `traceability/PLAN.md` nodes, README notes.
 
@@ -35,7 +36,7 @@ In simple words: PatchBay gets much better at finding and fixing the easy proble
 - The Knowledge Library, the Repo Map, and the visual templates (3B-2).
 - The autonomous queue, Autopilot, wait-and-resume, "Undo this whole run" (3B-3).
 - The font-count check (you chose to skip it), templates 11 to 20, and the CSP nonce bridge (you chose to drop it; Look-only mode runs no scripts, so it is not needed).
-- Loading real PNG, JPG, or other binary images into the preview (PatchBay does not fetch binaries).
+- Images other than the six types above (`.svg`, `.avif`, `.bmp`, `.tiff`, `.psd` stay as today), pictures inside JavaScript or React components, `srcset` and `<picture>` sources, outside pictures written inside the page's own CSS, video and audio, and any image bytes sent to an AI or put in an export.
 - Running imported code in PatchBay's own page. Any new `eval` or `new Function`.
 - Type checking TypeScript, or understanding JSX, Vue, or Svelte syntax.
 - Changing the saved-session format (2G). No new saved data.
@@ -83,10 +84,10 @@ In simple words: PatchBay gets much better at finding and fixing the easy proble
 
 ### R5. New text skills (data)
 Seven new scan skills, each with plain English text a beginner can read and exactly one lesson card (`lesson.<skillId>`, three reading levels obeying the existing playbook writing rules):
-`scan.code.js-syntax`, `scan.code.balance`, `scan.code.html-structure`, `scan.code.html-id-duplicate`, `scan.code.html-attr-missing`, `scan.code.css-possible-invalid`, `scan.code.css-braces`. Design 5 has the full table.
+`scan.frontend.js-syntax`, `scan.frontend.balance`, `scan.frontend.html-structure`, `scan.frontend.html-id-duplicate`, `scan.frontend.html-attr-missing`, `scan.frontend.css-possible-invalid`, `scan.frontend.css-braces`. Design 5 has the full table.
 
 ### R6. Automatic syntax fix (candidate and verify)
-1. Offered only for `scan.code.js-syntax` and `scan.code.html-structure`, and only when the fix is a single insertion of at most 8 characters at the error spot.
+1. Offered only for `scan.frontend.js-syntax` and `scan.frontend.html-structure`, and only when the fix is a single insertion of at most 8 characters at the error spot.
 2. PatchBay builds a small fixed list of candidates at the error spot, applies each to a temporary copy, and re-runs the same check. **Exactly one** candidate must make that error go away. If none or several pass, no automatic fix is offered (the finding stays `guided`, with a plain note).
 3. An error at the very end of the file (for example a missing closing `}`) never gets an automatic fix, because the right place can't be known.
 4. The accepted fix goes through the **existing Approve and History flow** as a normal practice-copy change, with a normal diff, secret check, hash round trip, Undo, and Redo.
@@ -102,7 +103,8 @@ Seven new scan skills, each with plain English text a beginner can read and exac
    - **Small text:** text smaller than **12 px**, checked at widths up to 768 px.
    - **Contrast:** text colour against a solid background below **4.5:1** (3:1 for large text, as WCAG defines large: 24 px, or 18.66 px and bold). Disabled controls are skipped.
    - **Overlap:** see R8.
-   - **Picture with no size limit:** an `img`, `video`, `canvas`, or `picture` with no width and height written in the page, and no width or `max-width` from any style. This one is read from the page source and style text, not from the browser, because pictures are placeholders in the preview. It is always low confidence.
+   - **Picture wider than its box:** a real, loaded `img`, `video`, or `canvas` whose drawn width is wider than its container, measured with its real size (natural width and height). Confidence `high` for a local picture, `medium` for an outside picture (its size can differ at another time).
+   - **Picture with no size limit (source reading):** only for a picture that could not be measured (a placeholder, or one that did not load in time): no width and height written in the page, and no width or `max-width` from any style. Always low confidence.
 4. Every result carries: the number measured, the element and its place in the code, the widths where it happened, and a **confidence**.
 5. A measured finding appears in the same lists as text findings (Screen 3 Edit panel, Screen 5, the Journal), is never saved, and holds no page text beyond the redacted snippet.
 6. At most 100 measured findings in all and 25 per check, with a plain "limit reached" note.
@@ -115,8 +117,8 @@ Seven new scan skills, each with plain English text a beginner can read and exac
 5. At most 60 children per parent and 20,000 pairs per check. A page over the limit reports a partial result.
 
 ### R9. Confidence and "can't measure"
-1. Confidence values: overflow `high`; tap target `high` (a real link, button, or control) or `medium` (`role="button"`); small text `high` (`medium` for `small`, `sub`, `sup`); contrast `high` when both colours are solid, `medium` when a see-through colour was blended; overlap as R8; picture size `low`.
-2. **Can't measure** (counted, never a finding): contrast over a gradient or a background picture, with a see-through layer in between, or with a colour the reader can't parse; pictures whose real size is unknown because the preview shows a placeholder.
+1. Confidence values: overflow `high`; tap target `high` (a real link, button, or control) or `medium` (`role="button"`); small text `high` (`medium` for `small`, `sub`, `sup`); contrast `high` when both colours are solid, `medium` when a see-through colour was blended; overlap as R8; picture wider than its box `high` (local) or `medium` (outside); picture with no size limit (source reading) `low`.
+2. **Can't measure** (counted, never a finding): contrast over a gradient or a background picture, with a see-through layer in between, or with a colour the reader can't parse; a picture whose real size is unknown because it is a placeholder, did not load, or was still loading when the 3-second picture wait ended.
 3. The panel shows a plain line: how many elements could not be measured and why (grouped by reason).
 4. A measurement that fails or times out stops the check with a plain message. It never reports "no problems" for a check that did not finish.
 
@@ -138,14 +140,14 @@ Seven new scan skills, each with plain English text a beginner can read and exac
 ### R11. Look-only sandbox: CDN styles and fonts
 1. In Look-only mode, a stylesheet link whose address is `https:` and whose host **exactly** matches the style list (`cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, `unpkg.com`, `fonts.googleapis.com`) is written into the preview as a `link` with only `rel="stylesheet"` and `href`. Fonts may load from `fonts.gstatic.com` and the same three CDN hosts.
 2. Everything else stays blocked as today: other hosts, `http:`, protocol-relative addresses, addresses with a user name, password, or port, odd characters, over 300 characters, and more than 10 outside styles. `@import` and non-data `url()` inside **your own** CSS stay removed.
-3. The preview CSP gets the matching `style-src` and `font-src` hosts and nothing else. `img-src` stays `data:`. `connect-src`, `frame-src`, `object-src`, `worker-src`, `form-action`, `base-uri` stay `'none'`. No script is allowed in Look-only mode.
-4. The sandbox flags and `referrerPolicy: no-referrer` stay as built. A plain note tells the user that Look-only mode now contacts these hosts for styles and fonts.
+3. The preview CSP gets the matching `style-src` and `font-src` hosts and nothing else. `img-src` becomes `data: https:` (R16). `connect-src`, `frame-src`, `object-src`, `worker-src`, `form-action`, `base-uri` stay `'none'`. No script is allowed in Look-only mode.
+4. The sandbox flags and `referrerPolicy: no-referrer` stay as built. A plain note tells the user that Look-only mode now contacts these hosts for styles and fonts, and any `https:` address used by a picture (R16.11).
 5. `cdn.tailwindcss.com` is a script, so it is allowed only in Run-scripts mode (R12). In Look-only mode, a page that depends on it shows unstyled, and the blocked list says why.
 6. If an outside style fails to load, the preview still measures, and the result says "an outside style could not be loaded, so measurements may differ".
 
 ### R12. Run-scripts sandbox: CDN scripts, storage stand-in, script order
 1. In Run-scripts mode, a script `src` with an `https:` address whose host exactly matches the script list (`cdn.jsdelivr.net`, `cdnjs.cloudflare.com`, `unpkg.com`, `code.jquery.com`, `cdn.tailwindcss.com`) is written as a script tag, in page order. The CSP `script-src` gets those hosts. The style and font hosts of R11 also apply.
-2. The frame keeps an opaque origin (no `allow-same-origin`), `connect-src 'none'`, and every other flag as built. Only public repositories are loaded.
+2. The frame keeps an opaque origin (no `allow-same-origin`), `connect-src 'none'`, and every other flag as built. Only public repositories are loaded. `img-src` is `data: https:` as in Look-only mode; the Run-scripts warning says that scripts on the page can ask any `https:` picture address (so that address's host can see the user's IP address).
 3. **Storage stand-in:** before any project script runs, a fixed script replaces `localStorage` and `sessionStorage` with in-memory copies (`getItem`, `setItem`, `removeItem`, `clear`, `key`, `length`; at most 200 keys and 100 KB; strings only). Page scripts that use storage no longer crash.
 4. **Script order:** PatchBay's own inspector and the storage stand-in come first. Project scripts are written **after the page content** (at the end of the body), in their original order, so `document.getElementById(...)` finds its elements. (Today they run before the content; this is a real problem found in the code.)
 5. A script that still can't run (a module with `import`, an outside API call) is listed in the blocked-resources list. It is never silently dropped.
@@ -160,6 +162,7 @@ Seven new scan skills, each with plain English text a beginner can read and exac
 - No page text, snippet, or address is saved to browser storage. Findings are never saved.
 - Wireframe only: new CSS uses `#000` and `#fff`, no `transition`, no `animation`.
 - Every limit lives in one config file and is marked provisional.
+- Image bytes are never sent to an AI and never leave the `media` list except into the Sandbox preview document (R16.5).
 - Secrets: a snippet that contains a likely secret is redacted (existing rules). The syntax fix refuses any line with a likely secret.
 
 ### R15. Testing and honesty
@@ -168,9 +171,23 @@ Seven new scan skills, each with plain English text a beginner can read and exac
 - Real-browser run, mutation checks, static checks, privacy and hostile-input tests, and an independent review, as in 3A.
 - Anything not run is reported as **Unverified** with the reason.
 
+### R16. Images in the preview (loader and display)
+1. **Types:** `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.ico`. Nothing else is added.
+2. **Which images:** only images **referenced** by a loaded `.html` or `.htm` file (`<img src>`, `<style>` blocks, inline `style` attributes) or `.css` file (`url(...)`), resolved against the referencing file, and inside the chosen scope. Unreferenced images stay excluded as today. Images used only inside JavaScript or React components are not loaded.
+3. **Caps (provisional, one config place):** **150 KB per image, 1 MB in all per session (bytes before encoding), at most 30 images.** Sizes from the tree are checked first, so an over-size image is never downloaded; while downloading, reading stops at the cap. First referenced, first loaded (the entry page first) until a cap is reached. Anything over a cap stays a **labelled placeholder** with its reason and size.
+4. **Real pictures only:** the first bytes must match the type (PNG, JPEG, GIF, WebP, ICO). A mismatch, an empty file, or a text file with a picture name is not loaded and is labelled "not a real picture".
+5. **Stored apart, shown only in the Sandbox:** loaded bytes sit in a separate `media` list of the snapshot, never in `files`. They are never used by the scan, the Journal, the Context Engine, any AI request, any export, the Log, browser storage, or an error. **Binary image bytes are never sent to an AI.**
+6. **Inventory and coverage:** each image gets a plain label (`media_loaded`: "Loaded for the preview only"; `media_too_large`; `media_budget_reached`; `media_failed`). These are policy labels and never make source analysis "incomplete". Coverage gains the number and size of loaded pictures, and the Coverage panel shows it.
+7. **Local pictures in the preview:** a loaded picture is shown as a real `<img>` using a `data:` address. In loaded local stylesheets, `url(local-picture)` becomes a `data:` address too. A picture that was not loaded stays a labelled placeholder.
+8. **Outside pictures:** an `<img src>` with an `https:` address is shown when the address passes strict rules: no user name or password, no port other than the default, no IP address, no `localhost`, no name without a dot, no `.local`, `.localhost`, `.internal`, `.home.arpa`, or `.lan` name, at most 500 characters, safe characters only, no `srcset`. Anything else is a placeholder with a plain reason. `http:` is never shown. Outside pictures inside the page's **own CSS** stay blocked in 3B-1.
+9. **CSP:** `img-src` is `data: https:` in both modes. No other directive changes.
+10. **Document size:** the preview document limit rises from 1 MB to 3 MB, and pictures embedded in one document total at most 2 MB of encoded text, counting repeats; more become placeholders ("too many pictures for one preview").
+11. **Privacy note:** the Sandbox panel (and the Run-scripts warning) say that pictures may load from outside addresses, that the picture's host can see the user's IP address, and that no referrer is sent.
+12. **Measuring:** the Full check waits up to 3 seconds for pictures to finish loading; pictures still loading are counted as "can't measure" and the panel says so.
+
 ## 5. Non-functional requirements
 
-- **Memory (4 GB laptop):** `acorn` loads lazily (its own chunk), only when a scan needs it. Parsing is one file at a time. No full-page copies are kept after a measurement. The headless measuring frame is removed at the end of every run.
+- **Memory (4 GB laptop):** images are capped at 150 KB each and 1 MB in all (stored as about 1.4 MB of text), and at most 2 MB of encoded pictures go into one preview document; the document limit is 3 MB. `acorn` loads lazily (its own chunk), only when a scan needs it. Parsing is one file at a time. No full-page copies are kept after a measurement. The headless measuring frame is removed at the end of every run.
 - **Time:** the existing scan limits (2,000 files, 8 s) still apply. Layout check limit rises from 3 s to 6 s (three widths, more checks).
 - **Bundle:** reported at the gate. Expected: the main bundle grows by the checker code only; `acorn` is a separate chunk.
 - **Accessibility of PatchBay's own UI:** new buttons at least 44 px, plain labels, `role="status"` and `role="alert"` for progress and errors as today.
@@ -190,19 +207,34 @@ Seven new scan skills, each with plain English text a beginner can read and exac
 9. **Samples:** no unexplained new finding on the three bundled samples.
 10. **Static checks:** no `eval`, `new Function`, or `innerHTML` in `src/`; the host lists appear only in `src/config/previewHosts.ts`; no `src/engine/live/` import from browser code; no colour but `#000` and `#fff`; no `transition` or `animation` in new CSS.
 11. **Full suite:** `npm run typecheck && npx vitest run && npm run build` passes. Test counts and build size are reported against the 3A baseline (113 files, 2,105 tests, `index-CyYt-s28.js` 708.33 kB, 219.59 kB gzip).
-12. **Browser run** (headless Chromium, built app): Look-only page with a CDN style and font (a local stand-in server for the allowed hosts in the test harness only); the CSS probe makes no request; three-width full check with every new finding kind on a fixture page; each recipe kept and one forced to undo; overlay and hidden cases not flagged; Run-scripts with a CDN script stand-in and a page that uses `localStorage`; 375 px with no sideways scroll; zero unexpected console errors.
-13. **Mutation checks** (each must be killed by a test): see design 12.
-14. **Independent review** by a separate reviewer of the whole diff.
+12. **Image tests:** type and signature checks (a text file named `.png`, a mismatch, an empty file); per-image, total, and count caps (exactly at, one byte over); an over-size image never downloaded; the reference finder (HTML, CSS, `<style>`, inline style; `..` cannot leave the repository; query and fragment parts; `data:`, `http:`, `//`); the loader honours abort, rate limit, and deadline; snapshots without `media` still validate; outside-address rules (each rule in R16.8 as its own hostile case); the 2 MB per-document embed cap; no image bytes in any AI, Journal, export, Log, storage, or error path (sentinel in the bytes).
+13. **Browser run** (headless Chromium, built app): Look-only page with a CDN style and font (a local stand-in server for the allowed hosts in the test harness only); the CSS probe makes no request; three-width full check with every new finding kind on a fixture page; each recipe kept and one forced to undo; overlay and hidden cases not flagged; Run-scripts with a CDN script stand-in and a page that uses `localStorage`; 375 px with no sideways scroll; a local image and an outside image (stand-in host with a test certificate) both display; a too-wide real picture is measured and its recipe is kept; a 200 KB image shows a labelled placeholder; zero unexpected console errors.
+14. **Mutation checks** (each must be killed by a test): see design 12.
+15. **Independent review** by a separate reviewer of the whole diff.
 
-## 7. Decisions for your approval
+## 7. Decisions (answered 2026-11-27)
 
-1. **Contrast threshold for large text is 3:1**, as WCAG defines, while normal text uses your 4.5:1. (R7.3)
-2. **Tap-target and small-text checks run at 375 and 768 px**, not only 375. (R7.3)
-3. **Overlap confidence is never `high`**, because PatchBay can't know the designer's intent. (R8.4)
-4. **Syntax auto-fix will be rare.** The parser reports where it got confused, not where the mistake is, so "exactly one candidate works" will hold only for simple cases such as a missing `)` or `,` before a token, or a nested HTML tag closed too late. Everything else stays `guided` (and becomes AI work in 3B-3). I think this is the honest design; the alternative (guessing a place) can silently change what the code means. (R6)
-5. **Recipes are offered through a button in the Edit panel, one at a time.** The crew does not use them until 3B-3. (R10.3)
-6. **Scripts after content in Run-scripts mode** changes a 2E-1 behaviour (today scripts run before the page content and can't find their elements). I recommend the change. (R12.4)
-7. **Outside images stay blocked** in Look-only mode (your list said "styles, fonts, and images"; I limited it to styles and fonts). Real images are not fetched by PatchBay anyway, and allowing image hosts adds an outbound path with no measuring benefit. (R11.3)
-8. **Look-only mode now contacts the CDN hosts** (your IP address reaches them; no referrer is sent). I add a plain note. (R11.4)
-9. **Syntax and CSS findings use area Frontend (also Backend)**, since a `.js` file can be either. The area filter on Screen 5 therefore lists them under both. (design 5)
-10. **`replaceSync` support:** all current browsers (Chrome 73+, Firefox 101+, Safari 16.4+). In others the CSS check says "not checked". (R4.2)
+| # | Decision | Answer |
+|---|---|---|
+| 1 | Large text uses 3:1 contrast, normal text 4.5:1 | Approved |
+| 2 | Tap-target and small-text checks at 375 and 768 px | Approved |
+| 3 | Overlap confidence is never `high` | Approved |
+| 4 | Automatic syntax fixes are narrow; the rest is `guided` | Approved |
+| 5 | Recipes are an Edit panel button, one at a time, until 3B-3 | Approved |
+| 6 | Run-scripts mode puts project scripts after the page content | Approved |
+| 7 | Images | **Option C**: small local images and outside `https:` images are shown; caps 150 KB each and 1 MB total; no image bytes to an AI; the Visual Linter measures real sizes (R16) |
+| 8 | Look-only mode contacts the CDN hosts, with a plain note | Approved (note extended for pictures, R16.11) |
+| 9 | Code findings show under Frontend and Backend | Approved |
+| 10 | `replaceSync` support (Chrome 73+, Firefox 101+, Safari 16.4+); otherwise "not checked" | Approved |
+| 11 | Build order 3B-1, 3B-3, 3B-2 | Approved |
+| 12 | `Current Active Phase` becomes `Phase 3 (Sub-phase 3B-1)` | Approved (done) |
+| 13 | The old Journal "Explain in my project" buttons are dropped from 3B | Approved |
+
+### Open questions (to answer before the batch Go)
+These came up while writing Option C. Each has a default, which I build unless you say otherwise.
+
+1. **Run-scripts and outside pictures.** With `img-src https:` in Run-scripts mode, a script on the page can also ask any `https:` address (a picture request), so that host sees the user's IP address, and the page can probe whether a private `https:` address answers. The page cannot read PatchBay's data. **Default: allow it** (as you asked, "show both"), with the stronger warning text. The alternative is `img-src data:` only in Run-scripts mode.
+2. **SVG.** `.svg` is a text picture that is very common and safe inside an `<img>` (scripts in it do not run). It is excluded today as media. **Default: leave it as is** (not in your list). Adding it is one extra file type in the same caps.
+3. **Image count cap of 30.** You gave per-image and total caps only. I added a count cap so many tiny images can't flood the preview. **Default: 30.**
+4. **Pictures used only in JavaScript or React components** are not loaded (the component picture is approximate anyway). **Default: not loaded.**
+5. **Lesson and skill wording** is in `content-draft.md` for your review. **Default: used exactly as written.**
