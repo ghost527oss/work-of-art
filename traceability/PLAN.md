@@ -1097,3 +1097,16 @@ Contract: PatchBay reads JavaScript (with `acorn`), HTML, and CSS and reports re
 - verify: `npm run typecheck && npx vitest run && npm run build && npm audit`
 - 3B-1 gate (build-phases.md, 3B block): all Phase 2 and 3A tests pass again; the same privacy rules hold; the three bundled samples show no unexplained new finding; every recipe is kept only when re-measured clean
 - manual gate (Unverified until run): the headless-browser run (design 11), the mutation checks (design 12), and the independent review; real CDN hosts are **Unverified** (the browser run uses stand-ins)
+
+### F12 as built (3B-1)
+Deviations from the spec text (details in `PHASE_3B1_REPORT.md`):
+- Baseline was 113 files / 2,119 tests (follow-up tests were added after the 3A report said 2,105).
+- Skipped code checks are reported in a new optional `coverage.codeNotChecked` (by reason), not in `couldNotCheck`, so existing coverage tests and `partial` are unchanged. Reasons include `jsx` (React code in a `.js` file).
+- JavaScript auto-fix is stricter than "first error gone": a candidate must make the WHOLE file parse cleanly; end-of-file errors are never auto-fixed.
+- Skill ids use `scan.frontend.*`. 29 skills, 42 cards.
+- Findings carry `measure.info.{tag,col}`; recipes pick the element by tag and column (several elements can start on one line). Overflow findings gained `confidence: 'high'`.
+- "Check at all widths" label kept (existing test); `blockedExternal` kept; extra block reasons `local_missing` and `picture_*`.
+- One decision point for "another change was made" in the recipe controller (`undo()` refuses with a plain message).
+- The referrer wording is exact: "PatchBay's address is not sent as a referrer"; a font requested by an allowed style sheet carries that style sheet's host.
+- Two layers (IPv4 rule, last-label letters rule) both reject numeric hosts; mutation checks remove both together.
+- Independent review fixes: JSX in `.js` is "not checked", `}` no longer starts a regex guess, linked pictures measure the nearest boxed ancestor, CSS line numbers after a cut-short string.
