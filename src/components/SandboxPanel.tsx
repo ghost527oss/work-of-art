@@ -143,7 +143,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
         onCheck={() => check([pv.width === 0 ? 1024 : pv.width])} onCheckAll={() => check([375, 768, 1024])}
       />
       <PreviewNotes reason={pv.reason} mode={pv.mode} notes={pv.notes} invalid={pv.invalidMessages} />
-      {build && build.ok && pv.mode === 'static' && <BlockedList blocked={build.report.blocked} outsideStyles={build.report.outsideStyles} />}
+      {build && build.ok && pv.mode === 'static' && <BlockedList blocked={build.report.blocked} outsideStyles={build.report.outsideStyles} outsideScripts={build.report.outsideScripts} />}
       {pv.layout.status === 'running' && <p role="status">Checking layout...</p>}
       {pv.layout.status === 'done' && <p>Layout check: {pv.layout.findings.length} findings at {pv.layout.widths.join(', ')} px.{pv.layout.partialReasons.length > 0 ? ` Partial result: ${pv.layout.partialReasons.join(' ')}` : ''}</p>}
       {pv.layout.status === 'stopped' && <p role="alert">{pv.layout.message}</p>}

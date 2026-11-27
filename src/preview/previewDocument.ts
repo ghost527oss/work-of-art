@@ -9,7 +9,8 @@ import { sanitizeCss, styleBody } from './cssSanitize';
 import { cspFor } from './previewFlags';
 import { INSPECTOR_SOURCE } from './previewBridge';
 import { isSafeDeclaration } from '../edit/styleModel';
-import { STYLE_HOSTS } from '../config/previewHosts';
+import { SCRIPT_HOSTS, STYLE_HOSTS } from '../config/previewHosts';
+import { STORAGE_SHIM_SOURCE } from './storageShim';
 import { addBlocked, type BlockedEntry } from './blockedReport';
 import { matchOutsideUrl } from './hostMatch';
 
@@ -28,6 +29,8 @@ export interface PreviewReport {
   blocked: BlockedEntry[];
   /** 3B-1: outside stylesheet hosts written into the preview. */
   outsideStyles: string[];
+  /** 3B-1: outside script hosts written into a Run-scripts preview. */
+  outsideScripts: string[];
 }
 export type PreviewBuild = { ok: true; html: string; elements: ElementEntry[]; report: PreviewReport; notes: string[] } | { ok: false; reason: string };
 
@@ -75,7 +78,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (!isSafeDeclaration({ prop: ps.property, value: ps.value })) continue;
       styleFor.set(ps.elementKey, `${styleFor.get(ps.elementKey) ?? ''};${ps.property}:${ps.value}`);
     }
-    const report: PreviewReport = { removed: {}, blockedExternal: [], placeholders: [], inlinedFiles: 0, unknownTags: 0, truncated: false, blocked: [], outsideStyles: [] };
+    const report: PreviewReport = { removed: {}, blockedExternal: [], placeholders: [], inlinedFiles: 0, unknownTags: 0, truncated: false, blocked: [], outsideStyles: [], outsideScripts: [] };
     const elements: ElementEntry[] = [];
     const styles: string[] = [];
     const body: string[] = [];
@@ -86,7 +89,8 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
     let skipDepth: string | null = null;
     let inSvg = 0;
     let bodyAttrs = '';
-    let scriptBodies: string[] = [];
+    const scriptList: Array<{ src: string } | { body: string }> = [];
+    const isModuleWithImports = (type: string | undefined, code: string): boolean => (type ?? '').trim().toLowerCase() === 'module' && /^\s*(?:import|export)\b/m.test(code);
     const inline = (path: string) => { report.inlinedFiles++; return input.effective(path) ?? ''; };
 
     const writeAttrs = (attrs: HtmlAttr[], tag: string): string => {
@@ -161,12 +165,28 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
         if (!input.scripts) { count(report, 'script'); addBlocked(report, attrs.find((a) => a.name === 'src')?.value ?? 'inline script', 'scripts_off'); if (rawNext) skipText = rawNext.start; continue; }
         if (rawNext) skipText = rawNext.start;
         const src = attrs.find((a) => a.name === 'src')?.value;
+        const stype = attrs.find((a) => a.name === 'type')?.value;
         if (src) {
           const p = resolve(input.entryPath, src, input.loaded);
-          if (p && report.inlinedFiles < L.maxInlinedFiles) scriptBodies.push(inline(p));
-          else { report.blockedExternal.push(src.slice(0, 80)); count(report, 'script'); addBlocked(report, src, /^https:/i.test(src) ? 'not_on_list' : /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src) ? 'not_https' : 'local_missing'); }
-        } else {
-          if (rawNext) scriptBodies.push(rawNext.text ?? '');
+          const absolute = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src);
+          if (p && report.inlinedFiles < L.maxInlinedFiles) {
+            const code = inline(p);
+            if (isModuleWithImports(stype, code)) { count(report, 'script'); addBlocked(report, src, 'module_script'); }
+            else scriptList.push({ body: code });
+          } else {
+            const outside = absolute ? matchOutsideUrl(src, SCRIPT_HOSTS) : null;
+            if (outside) {
+              if (isModuleWithImports(stype, 'import x')) { count(report, 'script'); addBlocked(report, src, 'module_script'); }
+              else { scriptList.push({ src: outside }); report.outsideScripts.push(new URL(outside).hostname); }
+            } else {
+              report.blockedExternal.push(src.slice(0, 80)); count(report, 'script');
+              addBlocked(report, src, !absolute ? 'local_missing' : src.length > L.maxOutsideUrlChars ? 'too_long' : /^https:/i.test(src) ? 'not_on_list' : 'not_https');
+            }
+          }
+        } else if (rawNext) {
+          const code = rawNext.text ?? '';
+          if (isModuleWithImports(stype, code)) { count(report, 'script'); addBlocked(report, 'inline module script', 'module_script'); }
+          else scriptList.push({ body: code });
         }
         continue;
       }
@@ -235,12 +255,14 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (!(tok.selfClosing || VOID.has(tag))) open.push({ tag }); else if (isSvg && tag === 'svg') inSvg = Math.max(0, inSvg - 1);
     }
     while (open.length) { const t = open.pop()!.tag; body.push(`</${SVG_CASE[t] ?? t}>`); }
-    scriptBodies = scriptBodies.map((s) => s.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--'));
-    const scriptTags = input.scripts ? `<script>${INSPECTOR_SOURCE(input.nonce, input.origin)}</script>${scriptBodies.map((s) => `<script>${s}</script>`).join('')}` : '';
+    // Run-scripts: the inspector and the storage stand-in first, then the page content, then the project scripts in page order.
+    const escapeScript = (s: string): string => s.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
+    const headScripts = input.scripts ? `<script>${INSPECTOR_SOURCE(input.nonce, input.origin)}</script><script>${STORAGE_SHIM_SOURCE}</script>` : '';
+    const tailScripts = input.scripts ? scriptList.map((s) => ('src' in s ? `<script src="${escapeAttr(s.src)}"></script>` : `<script>${escapeScript(s.body)}</script>`)).join('') : '';
     const html =
       `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${escapeAttr(cspFor(input.scripts))}"><meta charset="utf-8">` +
       `<style>${BASE_STYLE}</style><title>${escapeText(title)}</title>${styles.join('')}</head>` +
-      `<body${bodyAttrs}>${input.scripts ? scriptTags : ''}${body.join('')}</body></html>`;
+      `<body${bodyAttrs}>${headScripts}${body.join('')}${tailScripts}</body></html>`;
     if (html.length > L.maxDocBytes) return { ok: false, reason: 'The page is too large to preview.' };
     if (report.inlinedFiles > L.maxInlinedFiles) return { ok: false, reason: 'The page loads too many files to preview.' };
     return { ok: true, html, elements, report, notes: notesFrom(report) };

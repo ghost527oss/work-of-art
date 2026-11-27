@@ -5,12 +5,13 @@ import { describeBlocked, type BlockedEntry } from '../preview/blockedReport';
 export const OUTSIDE_HOSTS_NOTE =
   'Styles and fonts may load from: cdnjs.cloudflare.com, cdn.jsdelivr.net, unpkg.com, fonts.googleapis.com, fonts.gstatic.com. That host can see your IP address. No referrer is sent.';
 
-export function BlockedList({ blocked, outsideStyles = [] }: { blocked: readonly BlockedEntry[]; outsideStyles?: readonly string[] }) {
+export function BlockedList({ blocked, outsideStyles = [], outsideScripts = [] }: { blocked: readonly BlockedEntry[]; outsideStyles?: readonly string[]; outsideScripts?: readonly string[] }) {
   const d = describeBlocked(blocked);
   return (
     <div className="blocked-list">
       <p className="note">{OUTSIDE_HOSTS_NOTE}</p>
       {outsideStyles.length > 0 && <p className="note">Loaded from outside: {[...new Set(outsideStyles)].join(', ')} (styles).</p>}
+      {outsideScripts.length > 0 && <p className="note">Loaded from outside: {[...new Set(outsideScripts)].join(', ')} (scripts).</p>}
       {d.total === 0 ? (
         <p className="note">Nothing was blocked.</p>
       ) : (
