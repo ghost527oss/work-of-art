@@ -20,7 +20,13 @@ export interface PreviewState {
   notes: string[];
   console: Array<{ level: string; text: string }>;
   invalidMessages: number;
-  layout: { status: 'idle' | 'running' | 'done' | 'stopped'; widths: number[]; findings: Finding[]; contentKey: string; partialReasons: string[]; message?: string };
+  layout: {
+    status: 'idle' | 'running' | 'done' | 'stopped'; widths: number[]; findings: Finding[]; contentKey: string; partialReasons: string[]; message?: string;
+    /** 3B-1: elements that could not be measured, by plain reason (set when a check is done). Never saved. */
+    cantMeasure?: Record<string, number>;
+    /** 3B-1: outside style links that did not load (set when a check is done). */
+    outsideStyleFailed?: number;
+  };
 }
 
 export function idlePreview(): PreviewState {
@@ -81,9 +87,9 @@ export function pvLayoutBegin(s: PreviewState, widths: number[]): PreviewState {
   return { ...s, layout: { status: 'running', widths, findings: [], contentKey: s.layout.contentKey, partialReasons: [] } };
 }
 
-export function pvLayoutDone(s: PreviewState, findings: Finding[], contentKey: string, partialReasons: string[]): PreviewState {
+export function pvLayoutDone(s: PreviewState, findings: Finding[], contentKey: string, partialReasons: string[], extra?: { cantMeasure?: Record<string, number>; outsideStyleFailed?: number }): PreviewState {
   if (s.layout.status !== 'running') return s;
-  return { ...s, layout: { status: 'done', widths: s.layout.widths, findings, contentKey, partialReasons } };
+  return { ...s, layout: { status: 'done', widths: s.layout.widths, findings, contentKey, partialReasons, ...(extra?.cantMeasure ? { cantMeasure: extra.cantMeasure } : {}), ...(extra?.outsideStyleFailed ? { outsideStyleFailed: extra.outsideStyleFailed } : {}) } };
 }
 
 export function pvLayoutStop(s: PreviewState, message: string): PreviewState {

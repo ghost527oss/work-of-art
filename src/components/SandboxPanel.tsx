@@ -1,5 +1,6 @@
 // @node: F7.9
 // @node: F12.6 (blocked list and outside-host note)
+// @node: F12.11 (picture and font wait, lint summary)
 // @node: F8.8 (edit overlay, Preview Only styles, Page selector, scroll restore)
 // @node: F9.10 (Open in viewer target)
 // The Sandbox panel: the locked preview iframe and its controls. The iframe is built from `srcdoc` only.
@@ -10,7 +11,7 @@ import { practiceContent } from '../engine/practiceScript';
 import type { PreviewActions, LayoutRunner } from '../hooks/usePreview';
 import { buildWorkbench } from '../preview/workbenchDocument';
 import { buildStaticPreview, type PreviewBuild } from '../preview/previewDocument';
-import { gatherMeasurements } from '../preview/previewDom';
+import { gatherMeasurements, waitForAssets } from '../preview/previewDom';
 import { cspFor, IFRAME_ATTRS, sandboxFlags } from '../preview/previewFlags';
 import { detectPreviewMode, modeChoices, type PreviewMode } from '../preview/previewMode';
 import { useStudioStore } from '../store/useStudioStore';
@@ -21,6 +22,7 @@ import type { EditActions } from '../hooks/useEditPad';
 import { useLayout } from '../hooks/useLayout';
 import { EditOverlay } from './EditOverlay';
 import { BlockedList } from './BlockedList';
+import { LintSummary } from './LintSummary';
 import { findEntryPage } from '../preview/previewMode';
 
 import { studioStore } from '../store/useStudioStore';
@@ -128,6 +130,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
         if (!d || !f.contentWindow || d.readyState !== 'complete' || !d.documentElement || d.URL !== 'about:srcdoc') return null;
         return gatherMeasurements(d, f.contentWindow);
       },
+      ready: async () => { const d = f.contentDocument; if (d) return waitForAssets(d); },
       elements: build.elements,
       contentKey,
     };
@@ -161,6 +164,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
       {pv.layout.status === 'done' && <p>Layout check: {pv.layout.findings.length} findings at {pv.layout.widths.join(', ')} px.{pv.layout.partialReasons.length > 0 ? ` Partial result: ${pv.layout.partialReasons.join(' ')}` : ''}</p>}
       {pv.layout.status === 'stopped' && <p role="alert">{pv.layout.message}</p>}
       {pv.layout.status === 'idle' && pv.layout.message && <p className="note">{pv.layout.message}</p>}
+      {pv.mode === 'static' && !pv.scripts && <LintSummary layout={pv.layout} />}
       {pv.mode === 'static' && pages.length > 1 && (
         <p><label>Page <select value={pv.entryPath ?? ''} onChange={(e) => { previewHandle.pendingScroll = null; pad?.clear(); preview.setEntry(e.target.value); }}>
           {[findEntryPage(pages) ?? pages[0]!, ...pages.filter((x) => x !== (findEntryPage(pages) ?? pages[0]))].map((p) => <option key={p} value={p}>{p}</option>)}

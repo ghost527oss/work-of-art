@@ -55,8 +55,8 @@ export function beginLayout(state: StudioState, widths: number[]): StudioState {
   return put(state, pvLayoutBegin(state.preview, widths));
 }
 
-export function finishLayout(state: StudioState, findings: Finding[], contentKey: string, partialReasons: string[], now: number): StudioState {
-  const next = put(state, pvLayoutDone(state.preview, findings, contentKey, partialReasons));
+export function finishLayout(state: StudioState, findings: Finding[], contentKey: string, partialReasons: string[], now: number, extra?: { cantMeasure?: Record<string, number>; outsideStyleFailed?: number }): StudioState {
+  const next = put(state, pvLayoutDone(state.preview, findings, contentKey, partialReasons, extra));
   if (next === state) return state;
   return { ...next, ...withLog(next, now, { action: 'layout_check_done', status: 'info', message: `Layout check: ${findings.length} findings at ${state.preview.layout.widths.join(', ')} px.` }) };
 }
