@@ -15,7 +15,8 @@ const KIND_TITLE: Record<string, string> = {
 };
 
 function kindOf(f: PreviewState['layout']['findings'][number]): string {
-  return f.measure?.kind ?? 'overflow';
+  const k = f.measure?.kind ?? 'overflow';
+  return k.startsWith('overflow') ? 'overflow' : k;
 }
 
 export function LintSummary({ layout }: { layout: PreviewState['layout'] }) {

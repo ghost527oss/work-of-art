@@ -72,6 +72,7 @@ export function layoutFindings(
       severity: 'medium', certainty: 'found', fix: 'guided', path: el.path, firstLine: el.line, lastLine: el.endLine,
       snippet: snippetFor(lines, el.line, el.endLine),
       extra: `${WORDS[first.kind]}: content ${first.content} px in a box ${first.box} px wide, measured at ${widths.join(', ')} px wide preview${widths.length > 1 ? 's' : ''}`,
+      confidence: 'high', measure: { kind: `overflow-${first.kind}`, value: first.content, limit: first.box, info: { tag: el.tag, col: String(el.col) } },
     });
   }
   return { findings, partialReasons: dropped > 0 ? [`Layout check limit (${L.maxLayoutFindings}) reached: later findings are missing.`] : [] };

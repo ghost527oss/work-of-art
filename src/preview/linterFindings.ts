@@ -109,7 +109,7 @@ export function buildMeasuredFindings(input: BuildInput): BuildOutput {
         id: makeFindingId(`${SKILL[kind]}:${kind}`, el.path, lineText, k), skillId: skill.id, primary: 'frontend', areas: ['frontend'],
         severity: skill.severity, certainty: skill.certainty, fix: 'guided', path: el.path, firstLine: el.line, lastLine: el.endLine,
         snippet: snippetFor(lines, el.line, el.endLine), extra, confidence: g.confidence,
-        measure: { kind, value: g.worst.value, limit: g.worst.limit, ...(g.worst.info ? { info: g.worst.info } : {}) },
+        measure: { kind, value: g.worst.value, limit: g.worst.limit, info: { ...(g.worst.info ?? {}), tag: el.tag, col: String(el.col) } },
       });
       made++;
     }

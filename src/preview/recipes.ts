@@ -18,7 +18,7 @@ const NO_COLOUR = 'No safe text colour was found for this background.';
 
 /** The kind of a measured finding: the linter kind, or the overflow kind read from its fixed words. */
 export function findingKind(f: Pick<Finding, 'measure' | 'extra' | 'skillId'>): string {
-  if (f.measure) return f.measure.kind;
+  if (f.measure) return f.measure.kind.replace(/^overflow-(text-wider|text-cut-bottom|page-wider)$/, (_m, k: string) => `overflow-${k === 'text-cut-bottom' ? 'text-cut' : k}`);
   const t = f.extra ?? '';
   if (t.startsWith('Text is wider than its box')) return 'overflow-text-wider';
   if (t.startsWith('Text is cut off at the bottom')) return 'overflow-text-cut';
@@ -65,8 +65,13 @@ function hexToRgb(hex: string | undefined): string {
 }
 
 /** The element a finding is about: same file, same first line. */
-export function entryForFinding(elements: readonly ElementEntry[], f: Pick<Finding, 'path' | 'firstLine' | 'lastLine'>): ElementEntry | undefined {
-  return elements.find((e) => e.path === f.path && e.line === f.firstLine && e.endLine === f.lastLine) ?? elements.find((e) => e.path === f.path && e.line === f.firstLine);
+export function entryForFinding(elements: readonly ElementEntry[], f: Pick<Finding, 'path' | 'firstLine' | 'lastLine' | 'measure'>): ElementEntry | undefined {
+  const onLine = elements.filter((e) => e.path === f.path && e.line === f.firstLine);
+  const tag = f.measure?.info?.tag;
+  const col = f.measure?.info?.col;
+  // Several elements can start on one line: the finding remembers which one by tag and column.
+  if (tag !== undefined && col !== undefined) return onLine.find((e) => e.tag === tag && String(e.col) === col);
+  return onLine.find((e) => e.endLine === f.lastLine) ?? onLine[0];
 }
 
 /**

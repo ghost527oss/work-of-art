@@ -1,6 +1,7 @@
 // @node: F12.6
 // The blocked-resources list: what the preview did not load, and why, in plain words. Never page text.
 import { PREVIEW_LIMITS as L } from '../config/previewLimits';
+import { redact } from '../engine/redact';
 
 export type BlockedReason =
   | 'not_on_list' | 'not_https' | 'scripts_off' | 'module_script' | 'too_many_outside' | 'image_not_loaded'
@@ -27,7 +28,8 @@ export const BLOCKED_TEXT: Record<BlockedReason, string> = {
   picture_embed_limit: 'too many pictures for one preview, so a placeholder is shown',
 };
 
-const clean = (s: string): string => s.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 80);
+/** Control characters out, the query part dropped (it can hold tokens), secrets redacted, at most 80 characters. */
+const clean = (s: string): string => redact(s.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().replace(/\?.*$/s, '?...')).text.slice(0, 80);
 
 /** Adds an entry (at most 200 are kept). `what` is cut to 80 characters and stripped of control characters. */
 export function addBlocked(report: { blocked: BlockedEntry[] }, what: string, reason: BlockedReason): void {

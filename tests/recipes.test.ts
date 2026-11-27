@@ -92,6 +92,25 @@ describe('recipeFor', () => {
   });
 });
 
+describe('several elements on one line', () => {
+  it('the recipe goes to the element the finding is about (tag and column), not the first one on the line', () => {
+    const html = '<div id="box"><img src="a.png" alt=""></div>\n';
+    const els = elementsOf(html);
+    const img = els.find((e) => e.tag === 'img')!;
+    const f = finding('media-wide', { firstLine: 1, lastLine: 1 }, { tag: 'img', col: String(img.col) });
+    const r = recipeFor(f, els, html, hashText(html), 'k');
+    expect(r.ok && r.edit.newContent).toBe('<div id="box"><img src="a.png" alt="" style="height: auto; max-width: 100%"></div>\n');
+    const div = els.find((e) => e.tag === 'div')!;
+    const g = finding('media-wide', { firstLine: 1, lastLine: 1 }, { tag: 'div', col: String(div.col) });
+    const r2 = recipeFor(g, els, html, hashText(html), 'k');
+    expect(r2.ok && r2.edit.newContent).toContain('<div id="box" style=');
+  });
+  it('a finding whose element is gone from the page gets the "page changed" reason', () => {
+    const html = '<p>x</p>\n';
+    expect(recipeFor(finding('text-small', { firstLine: 1, lastLine: 1 }, { tag: 'button', col: '1' }), elementsOf(html), html, hashText(html), 'k')).toMatchObject({ ok: false });
+  });
+});
+
 describe('keys', () => {
   it('a problem key is the check, the place, and the kind (stable when a style is added on the same line)', () => {
     const a = finding('tap-target', { firstLine: 3 });

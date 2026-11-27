@@ -1,9 +1,9 @@
 // @node: F12.6
 // What the preview did not load and why, plus the plain note about outside hosts. Props only; all text is React text.
+import { FONT_HOSTS, STYLE_HOSTS } from '../config/previewHosts';
 import { describeBlocked, type BlockedEntry } from '../preview/blockedReport';
 
-export const OUTSIDE_HOSTS_NOTE =
-  'Styles and fonts may load from: cdnjs.cloudflare.com, cdn.jsdelivr.net, unpkg.com, fonts.googleapis.com, fonts.gstatic.com. Pictures may load from their own https addresses. Any of these hosts can see your IP address. No referrer is sent.';
+export const OUTSIDE_HOSTS_NOTE = `Styles and fonts may load from: ${[...new Set([...STYLE_HOSTS, ...FONT_HOSTS])].join(', ')}. Pictures may load from their own https addresses. Any of these hosts can see your IP address. No referrer is sent.`;
 
 export function BlockedList({ blocked, outsideStyles = [], outsideScripts = [] }: { blocked: readonly BlockedEntry[]; outsideStyles?: readonly string[]; outsideScripts?: readonly string[] }) {
   const d = describeBlocked(blocked);
