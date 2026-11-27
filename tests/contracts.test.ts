@@ -263,3 +263,28 @@ describe('BUDGETS', () => {
     expect(typeof FALLBACK_ENABLED).toBe('boolean');
   });
 });
+
+// @node: F12.8 (3B-1 pictures)
+describe('picture contracts and caps', () => {
+  it('the working caps are the approved ones and never above the hard ceilings', async () => {
+    const c = await import('../src/types/contracts');
+    expect([BUDGETS.maxImageBytes, BUDGETS.maxTotalImageBytes, BUDGETS.maxImages]).toEqual([150 * 1024, 1024 * 1024, 30]);
+    expect(BUDGETS.maxImageBytes).toBeLessThanOrEqual(c.MEDIA_HARD_MAX_BYTES);
+    expect(BUDGETS.maxTotalImageBytes).toBeLessThanOrEqual(c.MEDIA_HARD_MAX_TOTAL_BYTES);
+    expect(BUDGETS.maxImages).toBeLessThanOrEqual(c.MEDIA_HARD_MAX_COUNT);
+  });
+  it('the four picture reasons are valid and are policy labels (they never make analysis incomplete)', async () => {
+    const c = await import('../src/types/contracts');
+    for (const code of ['media_loaded', 'media_too_large', 'media_budget_reached', 'media_failed']) {
+      expect(c.ReasonCodeSchema.safeParse(code).success, code).toBe(true);
+      expect(c.POLICY_SKIP_REASONS).toContain(code);
+      expect(c.INCOMPLETE_SKIP_REASONS).not.toContain(code);
+    }
+  });
+  it('a picture item is strict', async () => {
+    const c = await import('../src/types/contracts');
+    const ok = { path: 'a.png', mime: 'image/png', base64: 'AAAA', bytes: 3 };
+    expect(c.RepoMediaSchema.safeParse(ok).success).toBe(true);
+    for (const bad of [{ ...ok, mime: 'image/svg+xml' }, { ...ok, base64: 'AA AA' }, { ...ok, bytes: 0 }, { ...ok, bytes: 150 * 1024 + 1 }, { ...ok, extra: 1 }, { ...ok, path: '' }]) expect(c.RepoMediaSchema.safeParse(bad).success).toBe(false);
+  });
+});

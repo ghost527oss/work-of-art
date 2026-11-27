@@ -54,6 +54,11 @@ export const ReasonCodeSchema = z.enum([
   'deadline_reached',
   'rate_limited',
   'fetch_failed',
+  // 3B-1: pictures kept for the Sandbox only (policy labels, never "incomplete")
+  'media_loaded',
+  'media_too_large',
+  'media_budget_reached',
+  'media_failed',
 ]);
 export type ReasonCode = z.infer<typeof ReasonCodeSchema>;
 
@@ -70,6 +75,10 @@ export const POLICY_SKIP_REASONS: readonly ReasonCode[] = [
   'excluded_media',
   'unsupported_type',
   'symlink',
+  'media_loaded',
+  'media_too_large',
+  'media_budget_reached',
+  'media_failed',
 ];
 
 /**
@@ -148,6 +157,21 @@ export const RepoInventorySchema = z.object({
 });
 export type RepoInventory = z.infer<typeof RepoInventorySchema>;
 
+/** 3B-1: hard ceilings for pictures kept for the Sandbox. The working caps live in budgets.ts and may not exceed these. */
+export const MEDIA_HARD_MAX_BYTES = 150 * 1024;
+export const MEDIA_HARD_MAX_TOTAL_BYTES = 1024 * 1024;
+export const MEDIA_HARD_MAX_COUNT = 30;
+export const MEDIA_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/x-icon'] as const;
+
+/** A small picture, stored apart from the text files and shown only in the Sandbox. Never sent to an AI. */
+export const RepoMediaSchema = z.strictObject({
+  path: z.string().min(1).max(500),
+  mime: z.enum(MEDIA_MIMES),
+  base64: z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/).max(Math.ceil((MEDIA_HARD_MAX_BYTES * 4) / 3) + 8),
+  bytes: z.number().int().positive().max(MEDIA_HARD_MAX_BYTES),
+});
+export type RepoMedia = z.infer<typeof RepoMediaSchema>;
+
 export const RepoCoverageSchema = z.object({
   indexedPaths: z.number().int().nonnegative(),
   loadedSourceFiles: z.number().int().nonnegative(),
@@ -158,6 +182,9 @@ export const RepoCoverageSchema = z.object({
   totalLoadedBytes: z.number().int().nonnegative(),
   skippedReasons: z.array(z.object({ path: z.string(), reason: z.string() })),
   warnings: z.array(z.string()),
+  /** 3B-1: pictures loaded for the Sandbox (absent when none). */
+  loadedMediaFiles: z.number().int().nonnegative().optional(),
+  loadedMediaBytes: z.number().int().nonnegative().optional(),
   treeComplete: z.boolean(),
   sourceAnalysisComplete: z.boolean(),
 });
@@ -172,6 +199,8 @@ export const RepoSnapshotSchema = z.object({
   repoUrl: z.string().optional(),
   inventory: RepoInventorySchema,
   files: z.array(RepoFileSchema),
+  /** 3B-1: pictures for the Sandbox only (absent when none). Never read by the scan, Journal, AI, exports, Log, or storage. */
+  media: z.array(RepoMediaSchema).optional(),
   coverage: RepoCoverageSchema,
   loadedAt: z.number(),
 });
@@ -336,6 +365,26 @@ export function assertCoverageConsistent(snapshot: RepoSnapshot): void {
     problems.push(`files has ${files.length} items but ${counts.loaded + counts.truncated} entries are loaded or truncated`);
   }
   expect('totalLoadedBytes', coverage.totalLoadedBytes, bytes);
+
+  // 3B-1 pictures: `media` matches the media_loaded entries one for one, and the caps hold.
+  const media = snapshot.media ?? [];
+  const loadedMedia = [...fileEntries.values()].filter((e) => e.reasonCode === 'media_loaded');
+  if (media.length !== loadedMedia.length) problems.push(`media has ${media.length} pictures but ${loadedMedia.length} entries are marked media_loaded`);
+  const mediaPaths = new Set<string>();
+  let mediaBytes = 0;
+  for (const m of media) {
+    if (mediaPaths.has(m.path)) problems.push(`duplicate picture "${m.path}" in media`);
+    mediaPaths.add(m.path);
+    const e = fileEntries.get(m.path);
+    if (!e || e.reasonCode !== 'media_loaded') problems.push(`picture "${m.path}" is not marked media_loaded in the inventory`);
+    const decoded = Math.floor((m.base64.length * 3) / 4) - (m.base64.endsWith('==') ? 2 : m.base64.endsWith('=') ? 1 : 0);
+    if (decoded !== m.bytes) problems.push(`picture "${m.path}" says ${m.bytes} bytes but holds ${decoded}`);
+    mediaBytes += m.bytes;
+  }
+  if (media.length > MEDIA_HARD_MAX_COUNT) problems.push(`media has ${media.length} pictures, above ${MEDIA_HARD_MAX_COUNT}`);
+  if (mediaBytes > MEDIA_HARD_MAX_TOTAL_BYTES) problems.push(`media holds ${mediaBytes} bytes, above ${MEDIA_HARD_MAX_TOTAL_BYTES}`);
+  expect('loadedMediaFiles', coverage.loadedMediaFiles ?? 0, media.length);
+  expect('loadedMediaBytes', coverage.loadedMediaBytes ?? 0, mediaBytes);
 
   // sourceAnalysisComplete rule (design section 6, revised in T16).
   const hasUnanalysedSkip = skipped.some((s) => s.reasonCode !== undefined && INCOMPLETE_SKIP_REASONS.includes(s.reasonCode));

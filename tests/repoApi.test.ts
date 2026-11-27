@@ -606,3 +606,29 @@ describe('ndjson', () => {
     expect(isAbortError(err)).toBe(true);
   });
 });
+
+// @node: F12.8 (3B-1: a referenced picture travels in the stream result, apart from the text files)
+describe('handleRepoRequest: pictures', () => {
+  it('a small referenced picture comes back in snapshot.media and the text files stay text', async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+    files['index.html'] = '<img src="dot.png">';
+    files['dot.png'] = 'x'.repeat(png.length);
+    try {
+      const { fn } = fakeGithub({ raw: (p) => (p === 'dot.png' ? new Response(png) : undefined) });
+      const res = await handleRepoRequest(post(valid), {}, { fetch: fn });
+      const events = await collect(res);
+      const last = events.at(-1)!;
+      expect(last.type).toBe('result');
+      if (last.type !== 'result') return;
+      const snap = last.response.snapshot;
+      expect(RepoSnapshotSchema.safeParse(snap).success).toBe(true);
+      expect(snap.media).toHaveLength(1);
+      expect(snap.media![0]).toMatchObject({ path: 'dot.png', mime: 'image/png', bytes: png.length });
+      expect(snap.files.map((f) => f.path)).not.toContain('dot.png');
+      expect(() => assertCoverageConsistent(snap)).not.toThrow();
+    } finally {
+      delete files['index.html'];
+      delete files['dot.png'];
+    }
+  });
+});

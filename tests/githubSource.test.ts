@@ -4,6 +4,7 @@ import {
   API_HOST,
   IngestError,
   RAW_HOST,
+  fetchBytesCapped,
   fetchFileCapped,
   fetchTree,
   getRepoInfo,
@@ -616,5 +617,38 @@ describe('getRepoInfo: privacy flag', () => {
   it('resolveDefaultBranch still returns just the branch name', async () => {
     const { fn } = mockFetch(() => jsonResponse({ default_branch: 'trunk', private: false }));
     await expect(resolveDefaultBranch('o', 'r', deps(fn))).resolves.toBe('trunk');
+  });
+});
+
+// @node: F12.8 (3B-1 picture bytes)
+describe('fetchBytesCapped', () => {
+  it('reads raw bytes from the raw host only, never sends the token, and keeps a file of exactly the cap whole', async () => {
+    const bytes = new Uint8Array(100).fill(9);
+    const { fn, calls } = mockFetch(() => new Response(bytes));
+    const r = await fetchBytesCapped('o', 'r', 'main', 'img/a.png', 100, deps(fn, { token: 'secret-token' }));
+    expect(r.truncated).toBe(false);
+    expect(r.bytes).toEqual(bytes);
+    expect(calls[0]!.url).toBe(`https://${RAW_HOST}/o/r/main/img/a.png`);
+    expect(calls[0]!.init?.headers).toBeUndefined();
+  });
+  it('stops one byte past the cap and keeps only the cap', async () => {
+    const onCancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(c) { c.enqueue(new Uint8Array(60).fill(1)); },
+      cancel: onCancel,
+    });
+    const { fn } = mockFetch(() => new Response(stream));
+    const r = await fetchBytesCapped('o', 'r', 'main', 'a.png', 100, deps(fn));
+    expect(r.truncated).toBe(true);
+    expect(r.bytes).toHaveLength(100);
+    await new Promise((res) => setTimeout(res, 0));
+    expect(onCancel).toHaveBeenCalled();
+  });
+  it('refuses traversal in the path, maps a 404, and an empty body gives zero bytes', async () => {
+    const { fn } = mockFetch(() => new Response('', { status: 404 }));
+    await expect(fetchBytesCapped('o', 'r', 'main', '../a.png', 100, deps(fn))).rejects.toBeInstanceOf(IngestError);
+    await expect(fetchBytesCapped('o', 'r', 'main', 'a.png', 100, deps(fn))).rejects.toMatchObject({ code: 'not_found' });
+    const empty = mockFetch(() => new Response(null, { status: 200 }));
+    expect((await fetchBytesCapped('o', 'r', 'main', 'a.png', 100, deps(empty.fn))).bytes).toHaveLength(0);
   });
 });
