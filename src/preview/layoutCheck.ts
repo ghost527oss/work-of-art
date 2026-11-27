@@ -9,6 +9,16 @@ import type { ElementEntry } from './previewDocument';
 export interface Measurement {
   id: number; tag: string; clientWidth: number; scrollWidth: number; clientHeight: number; scrollHeight: number;
   overflowX: string; overflowY: string; hasText: boolean;
+  // @node: F12.10 (3B-1: values for the other Visual Linter checks; all optional so older data still works)
+  parentKey?: number; left?: number; top?: number; width?: number; height?: number;
+  display?: string; position?: string; visibility?: string; opacity?: number;
+  hasTransform?: boolean; hasNegativeMargin?: boolean; overlay?: boolean; disabled?: boolean;
+  roleButton?: boolean; hasHref?: boolean; inputType?: string; inlineInText?: boolean;
+  fontSize?: number; bold?: boolean; color?: string;
+  /** The first solid background found walking up, or why none could be trusted. */
+  bg?: { color?: string; unknown?: 'picture' | 'see_through' | 'unparsed' };
+  /** For a real picture: its real size, whether it finished loading, whether it is a data address, and its container's width. */
+  img?: { naturalWidth: number; naturalHeight: number; complete: boolean; local: boolean; parentClientWidth: number };
 }
 
 export type OverflowKind = 'text-wider' | 'text-cut-bottom' | 'page-wider';
