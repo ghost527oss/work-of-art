@@ -122,6 +122,8 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
   const runner = (): LayoutRunner | null => {
     const f = frame.current;
     if (!f || !build || !build.ok) return null;
+    // The full wait happens once per check: pictures still loading after it would only make every later width wait again.
+    let waited = false;
     return {
       setWidth: (px) => { f.style.width = `${px}px`; },
       restore: () => { f.style.width = pv.width === 0 ? '100%' : `${pv.width}px`; },
@@ -131,7 +133,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
         if (!d || !f.contentWindow || d.readyState !== 'complete' || !d.documentElement || d.URL !== 'about:srcdoc') return null;
         return gatherMeasurements(d, f.contentWindow);
       },
-      ready: async () => { const d = f.contentDocument; if (d) return waitForAssets(d); },
+      ready: async () => { const d = f.contentDocument; if (!d) return undefined; const first = !waited; waited = true; return first ? waitForAssets(d) : waitForAssets(d, 0, 0); },
       elements: build.elements,
       contentKey,
     };

@@ -111,7 +111,7 @@ export function gatherMeasurements(doc: Document, win: Window): Gathered {
  * Waits (at most `fontsMs`) for the page's fonts and (at most `assetsMs` in all) for every picture to finish loading.
  * Returns how many pictures were still loading when the wait ended. Never throws.
  */
-export async function waitForAssets(doc: Document, fontsMs = L.fontsWaitMs, assetsMs = L.assetsWaitMs): Promise<{ pendingImages: number }> {
+export async function waitForAssets(doc: Document, fontsMs: number = L.fontsWaitMs, assetsMs: number = L.assetsWaitMs): Promise<{ pendingImages: number }> {
   const start = Date.now();
   const capped = (p: Promise<unknown>, ms: number) => Promise.race([p.catch(() => undefined), new Promise<void>((r) => setTimeout(r, ms))]);
   try {

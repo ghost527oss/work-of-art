@@ -51,6 +51,11 @@ describe('3B-1 static checks', () => {
       expect(stripComments(read(p)), p).not.toMatch(/CSSStyleSheet|replaceSync/);
     }
   });
+  it('the browser CSS probe uses a sheet that is never attached to the page and never touches the network', () => {
+    const code = stripComments(read('src/engine/checks/cssProbeBrowser.ts'));
+    expect(code).toContain('replaceSync');
+    expect(code).not.toMatch(/adoptedStyleSheets|document\b|appendChild|insertRule|@import|\bfetch\b|<style|\bhead\b/);
+  });
   it('acorn is imported only through acornLoader.ts and only with a dynamic import()', () => {
     for (const p of SRC) {
       const code = stripComments(read(p));

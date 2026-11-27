@@ -103,7 +103,7 @@ describe('blocked-resources list', () => {
   it('always shows the plain note about outside hosts and the IP address', () => {
     const m = html(createElement(BlockedList, { blocked: [] }));
     expect(m).toContain('Styles and fonts may load from: cdnjs.cloudflare.com, cdn.jsdelivr.net, unpkg.com, fonts.googleapis.com, fonts.gstatic.com.');
-    expect(m).toContain('Any of these hosts can see your IP address. No referrer is sent.');
+    expect(m).toContain("Any of these hosts can see your IP address. PatchBay&#x27;s address is not sent as a referrer.");
     expect(m).toContain('Pictures may load from their own https addresses.');
     expect(m).toContain('Nothing was blocked.');
   });
@@ -128,7 +128,7 @@ describe('Run scripts warning', () => {
   it('says scripts can ask any https address for a picture and which script hosts may load', () => {
     const src = readFileSync('src/components/PreviewParts.tsx', 'utf8');
     expect(src).toContain('Scripts on the page can ask any https address for a picture');
-    expect(src).toContain('that address&apos;s host can see your IP address (no referrer is sent)');
+    expect(src).toContain('that address&apos;s host can see your IP address (PatchBay&apos;s address is not sent as a referrer)');
     expect(src).toContain('cannot send data to a server');
     expect(src).not.toContain('or the internet.');
   });
