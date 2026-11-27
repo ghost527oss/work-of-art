@@ -7,6 +7,7 @@ import { proposeSyntaxFix } from '../src/engine/checks/syntaxFix';
 import { buildFixProposal } from '../src/engine/scanFix';
 import { scanFile } from '../src/engine/scanProject';
 import { snapshotOf } from './helpers/analyzeFixture';
+import type { Finding } from '../src/engine/scanFindingTypes';
 
 beforeAll(async () => { await loadAcorn(); });
 
@@ -105,6 +106,24 @@ describe('syntax fix: more than one mistake in a file', () => {
     expect(f.firstLine).toBe(2);
     expect(r.ok).toBe(true);
     if (r.ok) expect(applyUnifiedDiff(text, r.diff)).toMatchObject({ text: '<div>\n<b>\na\n</b></div>\n<div>\n<i>\nb\n</div>\n' });
+  });
+});
+
+describe('syntax fix: the recheck rule itself (stubbed recheck)', () => {
+  const text = 'const a = 1;\nif (a > 0 {\n  go();\n}\n';
+  const finding = (over: Partial<Finding> = {}): Finding => ({ id: 'f', skillId: 'scan.frontend.js-syntax', primary: 'frontend', areas: ['frontend'], severity: 'high', certainty: 'found', fix: 'auto', path: 'a.js', firstLine: 2, lastLine: 2, snippet: [], ...over });
+  const found = (skillId: string, firstLine: number): Finding => finding({ skillId, firstLine, lastLine: firstLine });
+  it('a later finding of the same skill after the fix is progress, not damage', () => {
+    const recheck = (_p: string, t: string) => (t === text ? [found('scan.frontend.js-syntax', 2)] : [found('scan.frontend.js-syntax', 4)]);
+    expect(buildFixProposal(finding(), text, recheck).ok).toBe(true);
+  });
+  it('a new finding of another skill after the fix refuses it', () => {
+    const recheck = (_p: string, t: string) => (t === text ? [found('scan.frontend.js-syntax', 2)] : [found('scan.frontend.balance', 4)]);
+    expect(buildFixProposal(finding(), text, recheck)).toEqual({ ok: false, reason: 'The change would cause a new finding.' });
+  });
+  it('the same mistake still reported at the same line refuses it', () => {
+    const recheck = () => [found('scan.frontend.js-syntax', 2)];
+    expect(buildFixProposal(finding(), text, recheck)).toEqual({ ok: false, reason: 'The check would still report this spot.' });
   });
 });
 

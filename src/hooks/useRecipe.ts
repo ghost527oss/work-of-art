@@ -83,7 +83,6 @@ export function createRecipeController(studio: Store<StudioState> = studioStore,
     if (disposed || !active) return;
     const s = studio.getState();
     const a = active;
-    if (s.work.applied.at(-1)?.id !== a.id) { stop(); studio.update((x) => setRecipeState(x, { status: 'refused', message: 'Another change was made while the page was measured, so the recipe was not checked.' })); return; }
     const l = s.preview.layout;
     if (l.status === 'stopped') { undo(l.message?.includes('changed') ? WHY.changed : WHY.unfinished); return; }
     if (l.status !== 'done' || l.contentKey === a.oldKey) return; // still the old result, or running

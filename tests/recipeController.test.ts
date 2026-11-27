@@ -133,7 +133,25 @@ describe('recipe: the wrong History entry is never undone', () => {
     const now = practiceContent(s.store.getState().snapshot!, s.store.getState().work.applied, 'index.html')!;
     s.store.update((st) => applyUserEdit(st, { path: 'index.html', baseHash: hashText(now), newContent: now + '<!-- x -->\n', editKey: 'edit:other', title: 'Other change' }, { now: 1, mode: 'self_editing', newId: () => 'z' }).state);
     expect(s.store.getState().work.applied).toHaveLength(2);
-    expect(s.store.getState().preview.recipe).toMatchObject({ status: 'refused', message: expect.stringContaining('Another change was made') });
+    // The page changed, so the check stops; the recipe would be undone, but its entry is no longer the latest, so nothing is.
+    s.store.update((st) => discardLayout(st)); s.store.update((st) => beginLayout(st, FULL_WIDTHS)); s.store.update((st) => stopLayout(st, 'The page changed while it was measured, so the result was dropped.'));
+    expect(s.store.getState().work.applied).toHaveLength(2);
+    expect(s.store.getState().preview.recipe).toMatchObject({ status: 'refused', message: expect.stringContaining('not undone because another change was made after it') });
+  });
+  it('the same holds when the timer runs out and when the panel closes', () => {
+    const a = setup();
+    a.c.actions.start('tap1');
+    const now = practiceContent(a.store.getState().snapshot!, a.store.getState().work.applied, 'index.html')!;
+    a.store.update((st) => applyUserEdit(st, { path: 'index.html', baseHash: hashText(now), newContent: now + '<!-- x -->\n', editKey: 'edit:other', title: 'Other change' }, { now: 1, mode: 'self_editing', newId: () => 'z' }).state);
+    a.timers[0]!();
+    expect(a.store.getState().work.applied).toHaveLength(2);
+    expect(a.store.getState().preview.recipe).toMatchObject({ status: 'refused', message: expect.stringContaining('the check ran out of time') });
+    const b = setup();
+    b.c.actions.start('tap1');
+    const now2 = practiceContent(b.store.getState().snapshot!, b.store.getState().work.applied, 'index.html')!;
+    b.store.update((st) => applyUserEdit(st, { path: 'index.html', baseHash: hashText(now2), newContent: now2 + '<!-- x -->\n', editKey: 'edit:other', title: 'Other change' }, { now: 1, mode: 'self_editing', newId: () => 'z' }).state);
+    b.c.dispose();
+    expect(b.store.getState().work.applied).toHaveLength(2);
   });
 });
 

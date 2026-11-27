@@ -71,6 +71,23 @@ describe('the picture pass of ingestion', () => {
     expect(snapshot.media!.reduce((n, m) => n + m.bytes, 0)).toBeLessThanOrEqual(1024 * KB);
     expect(snapshot.coverage.warnings.join(' ')).toMatch(/1 picture not loaded because the picture budget was reached/);
   });
+  it('the planned total cap stops the extra pictures before they are downloaded', async () => {
+    const names = Array.from({ length: 8 }, (_, i) => `p${i}.png`);
+    const files: Record<string, string | Uint8Array<ArrayBuffer>> = { 'index.html': PAGE(names) };
+    for (const n of names) files[n] = image('png', 140 * KB);
+    const { rawCalls } = await ingest(files);
+    expect(rawCalls.filter((p) => p.endsWith('.png'))).toHaveLength(7);
+  });
+  it('the download-time total cap still holds when the tree sizes are wrong', async () => {
+    const names = Array.from({ length: 8 }, (_, i) => `p${i}.png`);
+    const files: Record<string, string | Uint8Array<ArrayBuffer>> = { 'index.html': PAGE(names) };
+    const sizes: Record<string, number> = {};
+    for (const n of names) { files[n] = image('png', 140 * KB); sizes[n] = 100; }
+    const { snapshot } = await ingest(files, { sizes });
+    expect(snapshot.media).toHaveLength(7);
+    expect(snapshot.media!.reduce((n, m) => n + m.bytes, 0)).toBeLessThanOrEqual(1024 * KB);
+    expect(snapshot.inventory.entries.filter((e) => e.reasonCode === 'media_budget_reached')).toHaveLength(1);
+  });
   it('the 30-picture cap: 31 tiny pictures give 30 loaded and one over budget', async () => {
     const names = Array.from({ length: 31 }, (_, i) => `q${String(i).padStart(2, '0')}.gif`);
     const files: Record<string, string | Uint8Array<ArrayBuffer>> = { 'index.html': PAGE(names) };
