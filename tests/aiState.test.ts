@@ -323,3 +323,45 @@ describe('no import cycle', () => {
     expect(typeof mod.initialState).toBe('function');
   });
 });
+
+// ---------------------------------------------------------------------------
+// @node: F11.8 Phase 3A: fromCache and the attempt counts
+// ---------------------------------------------------------------------------
+
+import { aiBegin, aiCancel, aiClear, aiComplete, aiCountAttempt, aiFail, aiReuse } from '../src/store/aiSlice';
+
+describe('Phase 3A slice additions', () => {
+  const summary = { taskType: 'explain', selectedCount: 1, includesContent: false };
+  const result: AIResult = { requestId: 'r1', mode: 'live', response: { type: 'clarification', questions: ['q'] } };
+
+  it('aiReuse shows a saved answer with fromCache and starts no request', () => {
+    const s = aiReuse(idleAI(), 'r1', summary, result);
+    expect(s).toEqual({ status: 'done', requestId: 'r1', summary, result, fromCache: true });
+  });
+  it('aiReuse is refused while a request is pending', () => {
+    const pending = aiBegin(idleAI(), 'r0', summary);
+    expect(aiReuse(pending, 'r1', summary, result)).toBe(pending);
+  });
+  it('a normal completion is not marked fromCache', () => {
+    const s = aiComplete(aiBegin(idleAI(), 'r1', summary), 'r1', result);
+    expect('fromCache' in s).toBe(false);
+  });
+  it('attempt counts increase per finding and survive begin, complete, fail, and cancel', () => {
+    let s = aiCountAttempt(idleAI(), 'f1');
+    s = aiCountAttempt(s, 'f1');
+    s = aiCountAttempt(s, 'f2');
+    expect(s.attempts).toEqual({ f1: 2, f2: 1 });
+    const p = aiBegin(s, 'r1', summary);
+    expect(p.attempts).toEqual({ f1: 2, f2: 1 });
+    expect(aiComplete(p, 'r1', result).attempts).toEqual({ f1: 2, f2: 1 });
+    expect(aiFail(p, 'r1', { code: 'timeout', message: 'm' }).attempts).toEqual({ f1: 2, f2: 1 });
+    expect(aiCancel(p)).toEqual({ status: 'idle', attempts: { f1: 2, f2: 1 } });
+    expect(aiReuse(s, 'r2', summary, result).attempts).toEqual({ f1: 2, f2: 1 });
+  });
+  it('clearing the slice (a new snapshot) forgets the counts, and idle has no attempts field', () => {
+    const s = aiCountAttempt(idleAI(), 'f1');
+    expect(aiClear()).toEqual({ status: 'idle' });
+    expect(s.attempts).toEqual({ f1: 1 });
+    expect(aiCancel(aiBegin(idleAI(), 'r', summary))).toEqual({ status: 'idle' });
+  });
+});

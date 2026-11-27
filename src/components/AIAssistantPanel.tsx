@@ -1,23 +1,28 @@
 // @node: F2.7
+// @node: F11.10 (Phase 3A: banner, notice, finding list, Do something, saved answers)
 // @node: F4.9 (optional harness prop: commands, proposal card, replies)
 // Wireframe AI Assistant panel. Lives in the Studio stub.
 // All text rendered as React text, never as HTML.
 // No Apply, Approve, or Reject controls on AI patch cards (display only). The practice proposal card (2B) is separate.
 // Black and white only, no animation, keyboard and touch accessible.
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { AI_LIMITS } from '../config/budgets-proxy';
 import { parseCommand } from '../engine/commands';
-import type { AssistantActions } from '../hooks/useAssistant';
+import { useAssistantUi, type AssistantActions, type SendInput } from '../hooks/useAssistant';
 import type { HarnessActions } from '../hooks/useHarness';
 import { useStudioStore } from '../store/useStudioStore';
 import type { AITaskType, RepoSnapshot } from '../types/contracts';
 import { AIResponseView } from './AIResponseView';
+import { AINotice } from './AINotice';
+import { AIStatusBanner } from './AIStatusBanner';
+import { FindingFocus } from './FindingFocus';
 import { ProposalCard } from './ProposalCard';
 
 const TASK_TYPES: Array<{ value: AITaskType; label: string }> = [
   { value: 'explain', label: 'Explain' },
   { value: 'suggest_change', label: 'Suggest a change' },
   { value: 'review_finding', label: 'Review a finding' },
+  { value: 'act', label: 'Do something (safe actions)' },
 ];
 
 interface Props {
@@ -37,6 +42,17 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
   const [includeContent, setIncludeContent] = useState(false);
   const [filter, setFilter] = useState('');
   const [inlineError, setInlineError] = useState('');
+  const [findingId, setFindingId] = useState('');
+  const lastInput = useRef<Omit<SendInput, 'bypassCache'> | null>(null);
+  const uiState = useAssistantUi(assistant);
+  const scanFindings = useStudioStore((s) => s.scan.result?.findings);
+  const edges = useStudioStore((s) => s.understanding.result?.edges);
+  const finding = useMemo(() => scanFindings?.find((f) => f.id === findingId), [scanFindings, findingId]);
+  const notSetUp = uiState.status.kind === 'live' && !uiState.status.ready;
+  const checking = uiState.status.kind === 'checking';
+
+  // Leaving the panel (another panel opens, or it closes) drops a question that is waiting for the notice.
+  useEffect(() => () => assistant.discardHeld?.(), [assistant]);
 
   const loadedFiles = snapshot.files.filter((f) => f.loadStatus === 'loaded');
   const filteredFiles = loadedFiles.filter((f) =>
@@ -62,18 +78,24 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
       setInlineError('');
       return;
     }
-    if (ai.status === 'pending') return;
-    const msg = assistant.send({ snapshot, instruction, taskType, selectedPaths, includeContent });
+    if (ai.status === 'pending' || notSetUp || checking) return;
+    const input: Omit<SendInput, 'bypassCache'> = {
+      snapshot, instruction, taskType, selectedPaths, includeContent,
+      ...(finding ? { finding: { path: finding.path, skillId: finding.skillId, firstLine: finding.firstLine }, findingId: finding.id } : {}),
+      edges,
+    };
+    lastInput.current = input;
+    const msg = assistant.send(input);
     setInlineError(msg ?? '');
   }
 
   return (
     <section className="assistant" aria-labelledby="ai-heading">
       <h2 id="ai-heading">AI Assistant</h2>
-      <p className="mock-label">
-        Mock mode: responses are canned examples. No AI model is used and nothing is sent to an AI
-        provider.
-      </p>
+      <AIStatusBanner status={uiState.status} />
+      {uiState.noticeOpen && (
+        <AINotice status={uiState.status} onOk={() => assistant.acceptNotice?.()} onCancel={() => assistant.discardHeld?.()} />
+      )}
 
       {harness && proposal && (
         <ProposalCard proposal={proposal} onApprove={() => harness.run('approve')} onReject={() => harness.run('reject')} />
@@ -128,6 +150,22 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
           Select no file to get a clarifying question, one file for a patch proposal, or several
           files for a plan.
         </p>
+        {taskType === 'act' && (
+          <p className="note">
+            "Do something" lets the AI start a safe action such as start crew or open log. Leave the contents box unticked: an action is never run when file contents were sent. The AI can never approve, reject, or reset.
+          </p>
+        )}
+
+        <FindingFocus
+          findings={scanFindings?.map((f) => ({ id: f.id, skillId: f.skillId, path: f.path, firstLine: f.firstLine }))}
+          value={findingId}
+          disabled={ai.status === 'pending'}
+          onChange={(id) => {
+            setFindingId(id);
+            const f = scanFindings?.find((x) => x.id === id);
+            if (f) setSelectedPaths((prev) => (prev.includes(f.path) ? prev : [...prev, f.path].slice(0, AI_LIMITS.maxSelectedPaths)));
+          }}
+        />
 
         <label htmlFor="ai-filter">Filter files</label>
         <input
@@ -173,7 +211,7 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
         )}
 
         <p>
-          <button type="submit" disabled={ai.status === 'pending' || overInstruction}>
+          <button type="submit" disabled={ai.status === 'pending' || overInstruction || notSetUp || checking}>
             Send
           </button>{' '}
           {ai.status === 'pending' && (
@@ -192,7 +230,14 @@ export function AIAssistantPanel({ snapshot, assistant, harness }: Props) {
         <p role="status" className="ai-pending">Waiting for the response …</p>
       )}
       {ai.status === 'done' && ai.result && (
-        <AIResponseView response={ai.result.response} mode={ai.result.mode} />
+        <AIResponseView
+          response={ai.result.response}
+          mode={ai.result.mode}
+          meta={ai.result.meta}
+          fromCache={ai.fromCache}
+          proposalNote={ai.proposalNote}
+          onAskAgain={lastInput.current ? () => { if (lastInput.current) setInlineError(assistant.send({ ...lastInput.current, bypassCache: true }) ?? ''); } : undefined}
+        />
       )}
       {ai.status === 'failed' && ai.error && (
         <div className="error-panel" role="alert">

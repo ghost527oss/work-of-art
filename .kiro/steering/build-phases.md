@@ -4,7 +4,7 @@ inclusion: always
 
 # 5-Phase Product Build Strategy
 
-Current Active Phase: Phase 2 (Sub-phase 2A)
+Current Active Phase: Phase 3 (Sub-phase 3B)
 
 ## 1. Hard Gates & Phase Precedence (Non-Negotiable)
 1. **Strict Phase Boundary:** Design, spec, and implement **ONLY** what belongs to `Current Active Phase` above. Never build features, install libraries, or write styles belonging to a later phase.
@@ -63,6 +63,9 @@ wireframe. The Edit pad's colour tools only change the imported app's elements, 
   - Feed a deliberate bug into the system: verify it detects the error, generates a valid patch, and verifies the fix.
   - Verify the loop halts cleanly at the 3-retry cap on an unsolvable error without infinite looping.
   - Simulate a `429` rate limit on the primary provider and verify automatic fallback to the backup provider.
+- **Sub-phases (added by the user's approval, 2026-11-26).** Phase 3 is built in sub-phases 3A and 3B, one at a time. Design, spec, and implement ONLY the Current Active Sub-phase. The human advances sub-phases, never the agent. PatchBay's own screens stay black-and-white wireframe. `AI_MODE=mock` stays the default and keeps working.
+  - **3A Live AI in AI Chat** (spec `11-live-ai-chat`): live providers behind `api/assistant.ts` with the Gemini, Groq, OpenRouter fallback; a Context Engine (smallest useful redacted context, playbook cards, session cache); a Model Router (light and heavy tiers); a notice before the first live request; the AI starting safe actions; AI-proposed changes through Approve, Reject, and Undo; at most 3 AI fix attempts per finding. Gate: the three Phase 3 exit-gate items above pass with fake providers, plus no secret, key, or AI text in the Log, storage, or errors. A real-key check is run by the user and stays Unverified until then.
+  - **3B Live AI in the Journal and Skeleton Crew** (spec `12`, not started): "explain in my project" in the Journal and "review this finding" and narration in Skeleton Crew, using the 3A Context Engine and Model Router unchanged. Gate: all 3A gates pass again; the same privacy rules hold.
 
 ### Phase 4: Visual UI & UX
 - **Allowed Scope:**

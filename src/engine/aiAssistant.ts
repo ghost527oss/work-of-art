@@ -1,4 +1,5 @@
 // @node: F2.5
+// @node: F11.8 (Phase 3A: buildLiveRequest uses the Context Engine)
 // Client-side AI assistant service. All calls to /api/assistant come from here.
 // Never in React components and never substitutes a response from the browser.
 import { AI_LIMITS } from '../config/aiLimits';
@@ -10,6 +11,9 @@ import {
   type RepoSnapshot,
 } from '../types/contracts';
 import { validateAIRequest, validateAIResult } from './aiValidate';
+import { buildContext, type FocusFinding } from './contextEngine';
+import type { Edge } from './understandTypes';
+import { redact } from './redact';
 
 // Re-export the type alias we need
 export type { AIRequest, AIResult };
@@ -121,6 +125,54 @@ export function buildAIRequest(
   if (!v.ok) return { ok: false, message: v.message };
 
   return { ok: true, request: v.request };
+}
+
+export interface BuildLiveRequestOptions extends BuildAIRequestOptions {
+  finding?: FocusFinding | undefined;
+  edges?: readonly Edge[] | undefined;
+  /** The practice copy's text for a path (so snippets match what an approved change would be applied to). */
+  contentOf?: ((path: string) => string | undefined) | undefined;
+}
+
+export type LiveBuildResult = { ok: true; request: AIRequest; notes: string[] } | { ok: false; message: string };
+
+/**
+ * Live mode: builds the request with the Context Engine (snippets only when `includeContent` is true, connection facts, a skill id).
+ * The question is redacted here and again on the server. Phase 2's limits all still apply through `validateAIRequest`.
+ */
+export function buildLiveRequest(
+  snapshot: RepoSnapshot,
+  options: BuildLiveRequestOptions,
+  requestId: string = nextId(),
+): LiveBuildResult {
+  const trimmed = options.instruction.trim();
+  if (trimmed.length === 0) return { ok: false, message: 'The instruction is empty.' };
+  if (trimmed.length > AI_LIMITS.maxInstructionChars) {
+    return { ok: false, message: `The instruction must be at most ${AI_LIMITS.maxInstructionChars} characters.` };
+  }
+  const built = buildContext({
+    snapshot,
+    paths: options.selectedPaths,
+    finding: options.finding,
+    includeContent: options.includeContent,
+    // Connection facts come from file text, so they are never sent with a "Do something" request (an action may not follow file text).
+    edges: options.taskType === 'act' ? undefined : options.edges,
+    contentOf: options.contentOf,
+  });
+  if (!built.ok) return { ok: false, message: built.message };
+  const c = built.context;
+  const req: AIRequest = {
+    requestId,
+    instruction: redact(trimmed).text,
+    taskType: options.taskType,
+    selectedPaths: c.selectedPaths,
+    ...(c.sourceContext !== undefined ? { sourceContext: c.sourceContext } : {}),
+    ...(c.skillId !== undefined ? { skillId: c.skillId } : {}),
+    ...(c.connections !== undefined ? { connections: c.connections } : {}),
+  };
+  const v = validateAIRequest(req);
+  if (!v.ok) return { ok: false, message: v.message };
+  return { ok: true, request: v.request, notes: c.notes };
 }
 
 // ---------------------------------------------------------------------------

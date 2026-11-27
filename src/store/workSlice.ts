@@ -1,4 +1,5 @@
 // @node: F4.4
+// @node: F11.9 (Phase 3A: Proposal source `ai`)
 // Pure state for the practice run: the run, the one waiting proposal, the history, and the
 // command replies. Every transition returns the SAME object when it refuses, so nothing
 // re-renders and nothing is saved. The `*Refusal` helpers give the plain-English reason.
@@ -26,8 +27,11 @@ export interface Proposal {
   path: string;
   title: string;
   diff: string;
-  source: 'practice' | 'crew';
+  /** `ai` (Phase 3A): a live AI change that was checked against the real file and waits for Approve. Never saved while waiting. */
+  source: 'practice' | 'crew' | 'ai';
   findingId?: string;
+  /** Phase 3A, shown on the card only (for example "Answered by Groq (light)"). Never saved. */
+  byline?: string;
 }
 
 export interface HistoryEntry {

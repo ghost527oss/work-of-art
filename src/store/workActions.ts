@@ -1,6 +1,7 @@
 // @node: F4.5
 // @node: F6.7 (crew runs: start crew, crew steps, re-check after changes)
 // @node: F8.5 (applyUserEdit)
+// @node: F11.9 (approve: hash round trip and re-check line for AI proposals)
 // Whole-state work actions: pure transitions from workSlice plus Log entries and chat replies,
 // as one atomic update. Imports withLog from useStudioStore, as aiActions.ts does.
 // useStudioStore imports only `idleWork` from workSlice, so there is no import cycle.
@@ -11,6 +12,7 @@ import { buildCrewScript, narrate } from '../engine/crewScript';
 import { buildFixProposal } from '../engine/scanFix';
 import { rescanPaths, scanFile } from '../engine/scanProject';
 import { crewStartState, mergedFindings } from '../engine/scanView';
+import { scanSkillById } from '../skillbook';
 import { refreshScan } from './scanActions';
 import { buildLineDiff } from '../edit/textDiff';
 import { REASONS as EDIT_REASONS } from '../edit/elementMap';
@@ -308,8 +310,15 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
     case 'stop': {
       const aiPending = state.ai.status === 'pending';
       const refusal = stopRefusal(w);
-      if (refusal && !aiPending) return refuse(state, label, refusal);
+      // Phase 3A: Stop also rejects a waiting AI change, even when no run is active.
+      const aiWaiting = refusal !== null && w.proposal !== null && w.proposal.source === 'ai';
+      if (refusal && !aiPending && !aiWaiting) return refuse(state, label, refusal);
       let s = state;
+      if (aiWaiting) {
+        s = logAll({ ...state, work: { ...w, proposal: null } }, ctx.now, [
+          { action: 'proposal_rejected', status: 'rejected', message: 'rejected: stopped', affectedPaths: [w.proposal!.path] },
+        ]);
+      }
       if (!refusal) {
         const entries: LogEntry[] = [];
         if (w.proposal) {
@@ -319,7 +328,7 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
         s = logAll({ ...state, work: stopRun(w) }, ctx.now, entries);
         if (w.run?.kind === 'crew') s = logAll(s, ctx.now, [{ action: 'crew_stopped', status: 'info', message: `Skeleton Crew stopped: ${crewSummary(s)}` }]);
       }
-      return accept(s, label, refusal ? 'Cancelled the pending AI request.' : 'Stopped.', [{ type: 'cancel_ai' }]);
+      return accept(s, label, refusal ? (aiWaiting ? 'Rejected the waiting AI change.' : 'Cancelled the pending AI request.') : 'Stopped.', [{ type: 'cancel_ai' }]);
     }
     case 'approve': {
       const refusal = decisionRefusal(w, 'approve');
@@ -332,15 +341,37 @@ export function runCommand(state: StudioState, cmd: CommandInput, ctx: WorkCtx):
         const s = logAll(state, ctx.now, [{ action: 'proposal_failed', status: 'failed', message: `failed: ${reason}`, affectedPaths: [proposal.path] }]);
         return refuse(s, label, `The change could not be applied: ${reason}`);
       }
+      // An AI change must reverse to the exact original text before anything is recorded (mixed line endings fail here).
+      if (proposal.source === 'ai') {
+        const back = reverseUnifiedDiff(proposal.diff);
+        const undone = back === null ? undefined : applyUnifiedDiff(result.text, back);
+        if (!undone || !undone.ok || hashText(undone.text) !== hashText(current)) {
+          const s = logAll(state, ctx.now, [{ action: 'proposal_failed', status: 'failed', message: 'failed: the change could not be undone exactly', affectedPaths: [proposal.path] }]);
+          return refuse(s, label, 'The change could not be applied: it could not be undone exactly, so nothing was changed.');
+        }
+      }
+      const aiFinding = proposal.source === 'ai' && proposal.findingId
+        ? mergedFindings(state).find((f) => f.id === proposal.findingId)
+        : undefined;
       const entry: HistoryEntry = {
         id: ctx.newId(), path: proposal.path, title: proposal.title, at: ctx.now, diff: proposal.diff,
         beforeHash: hashText(current), afterHash: hashText(result.text),
         ...(proposal.source === 'crew' && proposal.findingId ? { area: state.scan.result?.findings.find((f) => f.id === proposal.findingId)?.primary } : {}),
       };
-      const s = logAll(refreshFindings({ ...state, work: decideProposal(w, 'approve', entry) }, [proposal.path]), ctx.now, [
+      const afterState = refreshFindings({ ...state, work: decideProposal(w, 'approve', entry) }, [proposal.path]);
+      const lines: LogEntry[] = [
         { action: 'proposal_approved', status: 'approved', message: `Approved the change to ${proposal.path}.`, affectedPaths: [proposal.path] },
         { action: 'change_applied', status: 'applied', message: `Applied to the practice copy of ${proposal.path}.`, affectedPaths: [proposal.path] },
-      ]);
+      ];
+      if (aiFinding) {
+        // Only the re-scan decides: "no longer found" is said only when the check no longer reports it. Never "fixed".
+        const still = mergedFindings(afterState).some((f) => f.skillId === aiFinding.skillId && f.path === aiFinding.path);
+        const title = scanSkillById(aiFinding.skillId)?.title ?? aiFinding.skillId;
+        lines.push(still
+          ? { action: 'ai_recheck', status: 'info', message: `Re-check: ${title} is still found in ${aiFinding.path}.`, affectedPaths: [aiFinding.path] }
+          : { action: 'ai_recheck', status: 'verified', message: `Re-check: ${title} is no longer found in ${aiFinding.path}.`, affectedPaths: [aiFinding.path] });
+      }
+      const s = logAll(afterState, ctx.now, lines);
       return accept(s, label, 'Approved and applied to the practice copy.');
     }
     case 'reject': {

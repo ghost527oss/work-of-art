@@ -31,6 +31,6 @@ export const AI_LIMITS: AILimits = {
   maxContextFileBytes: 20 * 1024,
   maxContextTotalBytes: 60 * 1024,
   maxResponseBytes: 256 * 1024,
-  clientTimeoutMs: 15_000,
+  clientTimeoutMs: 28_000,
   maxPickerRows: 200,
 };

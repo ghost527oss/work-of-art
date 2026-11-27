@@ -2,6 +2,7 @@
 // @node: F2.7
 // @node: F3.5
 // @node: F4.9 (calls useHarness once)
+// @node: F11.9 (calls useAIHandoff once)
 // @node: F5.11 (calls useUnderstanding once)
 // @node: F6.11 (calls useScan once)
 // @node: F7.10 (calls usePreview once)
@@ -14,6 +15,7 @@ import { LoadingScene } from './components/LoadingScene';
 import { StartScreen } from './components/StartScreen';
 import { StudioLayout } from './components/StudioLayout';
 import { useIngestion } from './hooks/useIngestion';
+import { useAIHandoff } from './hooks/useAIHandoff';
 import { useAssistant } from './hooks/useAssistant';
 import { useHarness } from './hooks/useHarness';
 import { useUnderstanding } from './hooks/useUnderstanding';
@@ -34,6 +36,7 @@ export function App() {
   const ingestion = useIngestion();
   const assistant = useAssistant();
   const harness = useHarness(assistant);
+  useAIHandoff(assistant, harness);
   const understanding = useUnderstanding();
   const scan = useScan();
   const preview = usePreview();

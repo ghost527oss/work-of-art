@@ -202,3 +202,24 @@ describe('wiring into the Studio (B9)', () => {
     expect(render()).not.toContain('arrive in sub-phase 2B');
   });
 });
+
+// ---------------------------------------------------------------------------
+// @node: F11.10 Phase 3A: the AI proposal card
+// ---------------------------------------------------------------------------
+
+describe('ProposalCard: AI-proposed change', () => {
+  const proposal = { title: 'AI-proposed change to a.ts', path: 'a.ts', diff: '--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-a\n+b\n', source: 'ai' as const, byline: 'Answered by Groq (heavy). Answered by a lighter model; review carefully.' };
+  it('is labelled, shows the byline and the lighter warning, keeps the practice-copy promise, and has only Approve and Reject', () => {
+    const m = html(createElement(ProposalCard, { proposal, onApprove: noop, onReject: noop }));
+    expect(m).toContain('<h3>AI-proposed change</h3>');
+    expect(m).toContain('Answered by a lighter model; review carefully.');
+    expect(m).toContain('AI-proposed change: it changes only the in-memory practice copy, never your repository.');
+    expect(buttons(m)).toEqual(['Approve', 'Reject']);
+  });
+  it('the practice and crew cards are unchanged', () => {
+    const base = { title: 'T', path: 'a.ts', diff: 'd' };
+    expect(html(createElement(ProposalCard, { proposal: { ...base, source: 'crew' }, onApprove: noop, onReject: noop }))).toContain('Skeleton Crew fix: it changes only');
+    expect(html(createElement(ProposalCard, { proposal: base, onApprove: noop, onReject: noop }))).toContain('Practice proposal: it changes only');
+    expect(html(createElement(ProposalCard, { proposal: base, onApprove: noop, onReject: noop }))).toContain('<h3>T</h3>');
+  });
+});

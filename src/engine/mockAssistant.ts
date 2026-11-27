@@ -1,4 +1,5 @@
 // @node: F2.3
+// @node: F11.1 (Phase 3A: the `act` task returns a mock explanation and runs nothing)
 // Pure, deterministic mock AI responder. Same request → byte-identical output.
 // Never echoes the instruction text. Response type is determined solely by
 // taskType and the number of selected paths — no content of the instruction
@@ -39,6 +40,15 @@ export function mockResponse(request: AIRequest, context: MockContext): AIRespon
 
   if (taskType === 'review_finding') {
     return buildExplanation(selectedPaths, redactedNote, true);
+  }
+
+  if (taskType === 'act') {
+    return {
+      type: 'explanation',
+      summary: 'Mock mode cannot run actions. Type a command word such as help or status in the box, or set AI_MODE=live on the server.',
+      evidencePaths: [],
+      limitations: [MOCK_NOTICE, 'No action was run.', ...redactedNote],
+    };
   }
 
   // suggest_change

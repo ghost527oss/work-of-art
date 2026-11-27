@@ -276,3 +276,72 @@ describe('no browser-side canned response', () => {
     expect(src).not.toContain('mockResponse');
   });
 });
+
+// ---------------------------------------------------------------------------
+// @node: F11.8 Phase 3A: buildLiveRequest (Context Engine)
+// ---------------------------------------------------------------------------
+
+import { buildLiveRequest } from '../src/engine/aiAssistant';
+import { analyze, snapshotOf } from './helpers/analyzeFixture';
+
+describe('buildLiveRequest', () => {
+  const longJs = Array.from({ length: 120 }, (_, i) => `const v${i} = ${i}; // padding line ${i}`).join('\n');
+  const snapshot = snapshotOf({ 'a.js': longJs, 'index.html': '<img src="x.png">' });
+  const opts = { instruction: '  Why is this flagged?  ', taskType: 'review_finding' as const, selectedPaths: ['index.html'], includeContent: false };
+
+  it('with the box off sends no snippet, but the paths, the skill id, and the trimmed question', () => {
+    const r = buildLiveRequest(snapshot, { ...opts, finding: { path: 'index.html', skillId: 'scan.frontend.img-alt', firstLine: 1 } }, 'id-1');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.request).toEqual({ requestId: 'id-1', instruction: 'Why is this flagged?', taskType: 'review_finding', selectedPaths: ['index.html'], skillId: 'scan.frontend.img-alt' });
+  });
+  it('with the box on sends a window with its first line, never the whole large file', () => {
+    const r = buildLiveRequest(snapshot, { ...opts, selectedPaths: [], includeContent: true, finding: { path: 'a.js', skillId: 'scan.frontend.listener-cleanup', firstLine: 60 } }, 'id-2');
+    if (!r.ok) throw new Error(r.message);
+    const item = r.request.sourceContext![0]!;
+    expect(item.startLine).toBe(45);
+    expect(item.content.split('\n')).toHaveLength(31);
+    expect(r.notes.join(' ')).toContain('Only lines 45 to 75 of "a.js" were included.');
+  });
+  it('adds connection facts from the analysis', async () => {
+    const files = { 'index.html': '<script src="app.js"></script>', 'app.js': 'fetch("/api/x");' };
+    const a = await analyze(files);
+    const r = buildLiveRequest(snapshotOf(files), { ...opts, selectedPaths: ['app.js'], edges: a.edges }, 'id-3');
+    if (!r.ok) throw new Error(r.message);
+    expect(r.request.connections?.some((c) => c.includes('app.js'))).toBe(true);
+  });
+  it('redacts a secret in the question', () => {
+    const r = buildLiveRequest(snapshot, { ...opts, instruction: 'why AKIAABCDEFGHIJKLMNOP?' }, 'id-4');
+    if (!r.ok) throw new Error(r.message);
+    expect(r.request.instruction).not.toContain('AKIA');
+    expect(r.request.instruction).toContain('[REDACTED:');
+  });
+  it('keeps the Phase 2 checks: empty, too long, unknown file, and the 10-file limit', () => {
+    expect(buildLiveRequest(snapshot, { ...opts, instruction: '   ' })).toEqual({ ok: false, message: 'The instruction is empty.' });
+    expect(buildLiveRequest(snapshot, { ...opts, instruction: 'x'.repeat(2001) }).ok).toBe(false);
+    expect(buildLiveRequest(snapshot, { ...opts, selectedPaths: ['nope.js'] })).toEqual({ ok: false, message: '"nope.js" is not in the loaded snapshot.' });
+  });
+  it('generates a request id when none is given', () => {
+    const r = buildLiveRequest(snapshot, opts);
+    expect(r.ok && r.request.requestId).toMatch(/^ai-/);
+  });
+});
+
+describe('buildLiveRequest: review fixes', () => {
+  const files = { 'index.html': '<script src="app.js"></script>', 'app.js': 'fetch("/api/x");\nconst a = 1;\n'.repeat(80) };
+  const snap = snapshotOf(files);
+  it('a "Do something" request carries no connection facts, even when edges are given', async () => {
+    const a = await analyze(files);
+    const base = { instruction: 'start it', selectedPaths: ['app.js'], includeContent: false, edges: a.edges };
+    const act = buildLiveRequest(snap, { ...base, taskType: 'act' }, 'i1');
+    const explain = buildLiveRequest(snap, { ...base, taskType: 'explain' }, 'i2');
+    if (!act.ok || !explain.ok) throw new Error('expected ok');
+    expect(act.request.connections).toBeUndefined();
+    expect(explain.request.connections?.length).toBeGreaterThan(0);
+  });
+  it('contentOf supplies the text the snippet is cut from', () => {
+    const r = buildLiveRequest(snap, { instruction: 'q', taskType: 'explain', selectedPaths: ['index.html'], includeContent: true, contentOf: (p) => (p === 'index.html' ? '<p>PRACTICE_TEXT</p>' : undefined) }, 'i3');
+    if (!r.ok) throw new Error(r.message);
+    expect(r.request.sourceContext![0]!.content).toBe('<p>PRACTICE_TEXT</p>');
+  });
+});
