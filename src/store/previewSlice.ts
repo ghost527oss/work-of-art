@@ -7,6 +7,9 @@ import type { PreviewMode } from '../preview/previewMode';
 
 export type PreviewWidth = 375 | 768 | 1024 | 0;
 
+/** 3B-1: the keep-or-undo run of a recipe. Absent when idle. Never saved. */
+export interface RecipeState { status: 'applying' | 'measuring' | 'kept' | 'undone' | 'refused'; message: string; /** The finding id the recipe was started for. */ targetId?: string }
+
 export interface PreviewState {
   mode: PreviewMode;
   chosenBy: 'auto' | 'user';
@@ -20,6 +23,7 @@ export interface PreviewState {
   notes: string[];
   console: Array<{ level: string; text: string }>;
   invalidMessages: number;
+  recipe?: RecipeState;
   layout: {
     status: 'idle' | 'running' | 'done' | 'stopped'; widths: number[]; findings: Finding[]; contentKey: string; partialReasons: string[]; message?: string;
     /** 3B-1: elements that could not be measured, by plain reason (set when a check is done). Never saved. */
@@ -80,6 +84,11 @@ export function pvConsole(s: PreviewState, level: string, text: string): Preview
 
 export function pvInvalid(s: PreviewState): PreviewState {
   return { ...s, invalidMessages: s.invalidMessages + 1 };
+}
+
+export function pvRecipe(s: PreviewState, recipe: RecipeState | undefined): PreviewState {
+  if (recipe === undefined) { if (s.recipe === undefined) return s; const { recipe: _drop, ...rest } = s; void _drop; return rest; }
+  return { ...s, recipe };
 }
 
 export function pvLayoutBegin(s: PreviewState, widths: number[]): PreviewState {

@@ -96,12 +96,14 @@ export const SUGGESTION_DECLS = {
 
 /** The fixed order new properties are appended in. */
 export const PROP_ORDER: readonly string[] = [
-  'width', 'height', 'max-width', 'border-radius', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+  'width', 'height', 'max-width', 'min-width', 'min-height', 'border-radius', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
   'margin-top', 'margin-right', 'margin-bottom', 'margin-left', 'border-width', 'border-style', 'border-color', 'box-shadow',
-  'font-size', 'color', 'background-color', 'background-image', 'overflow-wrap',
+  'font-size', 'color', 'background-color', 'background-image', 'overflow-wrap', 'display',
 ];
 
 /** True when a declaration is something this model can produce. A last guard before writing anything. */
 export function isSafeDeclaration(d: StyleDeclaration): boolean {
+  // 3B-1 (recipes): `display` is allowed with one value only.
+  if (d.prop === 'display') return d.value === 'inline-block';
   return PROP_ORDER.includes(d.prop) && /^[#a-z0-9 .,%()-]+$/i.test(d.value) && !/url\(|expression\(/i.test(d.value) && d.value.length <= 120;
 }

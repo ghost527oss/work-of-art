@@ -1,6 +1,7 @@
 // @node: F7.9
 // @node: F12.6 (blocked list and outside-host note)
 // @node: F12.11 (picture and font wait, lint summary)
+// @node: F12.12 (a recipe being checked makes the automatic check run at all three widths)
 // @node: F8.8 (edit overlay, Preview Only styles, Page selector, scroll restore)
 // @node: F9.10 (Open in viewer target)
 // The Sandbox panel: the locked preview iframe and its controls. The iframe is built from `srcdoc` only.
@@ -144,7 +145,8 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
     return l.status === 'done' ? l.findings.length : null;
   };
   useEffect(() => {
-    if (canMeasure && autoRan.current !== contentKey && pv.layout.status === 'idle') { autoRan.current = contentKey; check([pv.width === 0 ? 1024 : pv.width]); }
+    // While a recipe is being checked, the rebuilt page is measured at all three widths so before and after can be compared.
+    if (canMeasure && autoRan.current !== contentKey && pv.layout.status === 'idle') { autoRan.current = contentKey; check(pv.recipe?.status === 'measuring' ? [375, 768, 1024] : [pv.width === 0 ? 1024 : pv.width]); }
   });
 
   if (!snapshot) return null;

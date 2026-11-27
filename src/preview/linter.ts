@@ -2,7 +2,7 @@
 // The pure part of the Visual Linter: plain measurements in, results out. No DOM, no clock, no page text.
 // Overflow stays in layoutCheck.ts. A check that can't be trusted counts as "can't measure" and never reports.
 import { PREVIEW_LIMITS as L } from '../config/previewLimits';
-import { blend, contrastRatio, isLargeText, parseCssColor, type Rgb } from './colors';
+import { blend, contrastRatio, isLargeText, parseCssColor, toHex, type Rgb } from './colors';
 import type { Measurement } from './layoutCheck';
 
 export type LintKind = 'tap-target' | 'text-small' | 'contrast' | 'overlap' | 'media-wide';
@@ -11,6 +11,8 @@ export interface LintResult {
   id: number; kind: LintKind; width: number; value: number; limit: number; confidence: Confidence;
   /** Tap target: [width, height]. Overlap: [other element id, overlapping area]. */
   aux?: number[];
+  /** What a recipe needs: colours as hex, the display value. */
+  info?: Record<string, string>;
 }
 export interface LintOutput {
   results: LintResult[];
@@ -50,7 +52,7 @@ export function evaluateLint(ms: readonly Measurement[], width: number, entryTag
       const native = TAP_TAGS.has(dom) && !(dom === 'a' && !m.hasHref) && !(dom === 'input' && m.inputType === 'hidden');
       if (native || m.roleButton) {
         const side = Math.min(m.width, m.height);
-        if (side < L.tapMinPx) out.results.push({ id: m.id, kind: 'tap-target', width, value: round1(side), limit: L.tapMinPx, confidence: native ? 'high' : 'medium', aux: [round1(m.width), round1(m.height)] });
+        if (side < L.tapMinPx) out.results.push({ id: m.id, kind: 'tap-target', width, value: round1(side), limit: L.tapMinPx, confidence: native ? 'high' : 'medium', aux: [round1(m.width), round1(m.height)], info: { display: (m.display ?? 'block').slice(0, 20) } });
       }
     }
 
@@ -70,7 +72,7 @@ export function evaluateLint(ms: readonly Measurement[], width: number, entryTag
           const solid: Rgb = fg.alpha < 1 ? blend(fg, bgc.rgb) : fg.rgb;
           const ratio = contrastRatio(solid, bgc.rgb);
           const limit = isLargeText(m.fontSize ?? 16, m.bold === true) ? L.contrastLarge : L.contrastNormal;
-          if (ratio < limit) out.results.push({ id: m.id, kind: 'contrast', width, value: round1(ratio), limit, confidence: fg.alpha < 1 ? 'medium' : 'high' });
+          if (ratio < limit) out.results.push({ id: m.id, kind: 'contrast', width, value: round1(ratio), limit, confidence: fg.alpha < 1 ? 'medium' : 'high', info: { fg: toHex(solid), bg: toHex(bgc.rgb) } });
         }
       }
     }

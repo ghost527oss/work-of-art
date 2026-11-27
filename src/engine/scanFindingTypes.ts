@@ -24,7 +24,7 @@ export interface Finding {
   /** 3B-1: how sure a measurement is (never saved). */
   confidence?: 'high' | 'medium' | 'low';
   /** 3B-1: what was measured (never saved). */
-  measure?: { kind: string; value: number; limit: number };
+  measure?: { kind: string; value: number; limit: number; /** What a recipe needs (colours as hex, the display value). Fixed short values only. */ info?: Record<string, string> };
 }
 
 export interface RawFinding {

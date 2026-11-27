@@ -3,8 +3,8 @@
 import { MODE_NAMES, type PreviewMode } from '../preview/previewMode';
 import type { Finding } from '../engine/scanFindingTypes';
 import {
-  pvComponent, pvConsole, pvEntry, pvInit, pvInvalid, pvLayoutBegin, pvLayoutDiscard, pvLayoutDone, pvLayoutStop, pvMode, pvScripts, pvStatus, pvWidth,
-  type PreviewState, type PreviewWidth,
+  pvComponent, pvConsole, pvEntry, pvInit, pvInvalid, pvLayoutBegin, pvLayoutDiscard, pvLayoutDone, pvLayoutStop, pvMode, pvRecipe, pvScripts, pvStatus, pvWidth,
+  type PreviewState, type PreviewWidth, type RecipeState,
 } from './previewSlice';
 import { withLog, type StudioState } from './useStudioStore';
 
@@ -72,4 +72,9 @@ export function discardLayout(state: StudioState): StudioState {
 export function resetPreview(state: StudioState, now: number): StudioState {
   const next = put(state, { ...pvScripts(state.preview, false), status: 'idle' });
   return { ...next, ...withLog(next, now, { action: 'preview_reset', status: 'info', message: 'The preview tried to leave the page and was reset.' }) };
+}
+
+/** 3B-1: the recipe's own state line (undefined clears it). */
+export function setRecipeState(state: StudioState, recipe: RecipeState | undefined): StudioState {
+  return put(state, pvRecipe(state.preview, recipe));
 }
