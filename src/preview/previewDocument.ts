@@ -9,6 +9,9 @@ import { sanitizeCss, styleBody } from './cssSanitize';
 import { cspFor } from './previewFlags';
 import { INSPECTOR_SOURCE } from './previewBridge';
 import { isSafeDeclaration } from '../edit/styleModel';
+import { STYLE_HOSTS } from '../config/previewHosts';
+import { addBlocked, type BlockedEntry } from './blockedReport';
+import { matchOutsideUrl } from './hostMatch';
 
 export interface ElementEntry {
   id: number; path: string; tag: string; line: number; col: number; startOffset: number; endOffset: number; endLine: number;
@@ -19,7 +22,13 @@ export interface ElementEntry {
 }
 
 export interface PreviewStyle { elementKey: string; property: string; value: string }
-export interface PreviewReport { removed: Record<string, number>; blockedExternal: string[]; placeholders: string[]; inlinedFiles: number; unknownTags: number; truncated: boolean }
+export interface PreviewReport {
+  removed: Record<string, number>; blockedExternal: string[]; placeholders: string[]; inlinedFiles: number; unknownTags: number; truncated: boolean;
+  /** 3B-1: what was not loaded and why (plain words, at most 200). */
+  blocked: BlockedEntry[];
+  /** 3B-1: outside stylesheet hosts written into the preview. */
+  outsideStyles: string[];
+}
 export type PreviewBuild = { ok: true; html: string; elements: ElementEntry[]; report: PreviewReport; notes: string[] } | { ok: false; reason: string };
 
 export interface StaticInput {
@@ -66,7 +75,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (!isSafeDeclaration({ prop: ps.property, value: ps.value })) continue;
       styleFor.set(ps.elementKey, `${styleFor.get(ps.elementKey) ?? ''};${ps.property}:${ps.value}`);
     }
-    const report: PreviewReport = { removed: {}, blockedExternal: [], placeholders: [], inlinedFiles: 0, unknownTags: 0, truncated: false };
+    const report: PreviewReport = { removed: {}, blockedExternal: [], placeholders: [], inlinedFiles: 0, unknownTags: 0, truncated: false, blocked: [], outsideStyles: [] };
     const elements: ElementEntry[] = [];
     const styles: string[] = [];
     const body: string[] = [];
@@ -84,7 +93,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       let s = '';
       for (const a of attrs) {
         const n = a.name;
-        if (/^on[a-z]+$/.test(n)) { if (input.scripts) s += ` ${n}="${escapeAttr(a.value)}"`; else count(report, 'event handler'); continue; }
+        if (/^on[a-z]+$/.test(n)) { if (input.scripts) s += ` ${n}="${escapeAttr(a.value)}"`; else { count(report, 'event handler'); addBlocked(report, `${tag} ${n}`, 'event_handler'); } continue; }
         if (n === 'style') { s += ` style="${escapeAttr(sanitizeCss(a.value))}"`; continue; }
         if (n === 'href' && tag === 'a') { s += ' href="#"'; if (a.value && !a.value.startsWith('#')) report.blockedExternal.push(a.value.slice(0, 80)); continue; }
         if (n.startsWith('data-')) { s += ` data-x-${escapeAttr(n.slice(5))}="${escapeAttr(a.value)}"`; continue; }
@@ -124,7 +133,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (name === 'body') { bodyAttrs = writeAttrs(attrs.filter((a) => ['class', 'id', 'style', 'lang', 'dir'].includes(a.name)), 'body'); continue; }
       if (name === 'title') { if (rawNext) { title = (rawNext.text ?? '').trim().slice(0, 200); skipText = rawNext.start; } continue; }
       if (name === 'style') {
-        if (rawNext) { styles.push(styleBody(rawNext.text ?? '')); skipText = rawNext.start; }
+        if (rawNext) { styles.push(`<style>${styleBody(rawNext.text ?? '')}</style>`); skipText = rawNext.start; }
         continue;
       }
       if (name === 'link') {
@@ -132,19 +141,30 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
         const href = attrs.find((a) => a.name === 'href')?.value ?? '';
         if (rel.split(/\s+/).includes('stylesheet')) {
           const p = resolve(input.entryPath, href, input.loaded);
-          if (p && report.inlinedFiles < L.maxInlinedFiles) styles.push(styleBody(inline(p)));
-          else { report.blockedExternal.push(href.slice(0, 80)); count(report, 'stylesheet'); }
+          if (p && report.inlinedFiles < L.maxInlinedFiles) styles.push(`<style>${styleBody(inline(p))}</style>`);
+          else {
+            const outside = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href) ? matchOutsideUrl(href, STYLE_HOSTS) : null;
+            if (outside && report.outsideStyles.length < L.maxExternalStyles) {
+              styles.push(`<link rel="stylesheet" href="${escapeAttr(outside)}">`);
+              report.outsideStyles.push(new URL(outside).hostname);
+            } else {
+              report.blockedExternal.push(href.slice(0, 80));
+              count(report, 'stylesheet');
+              const absolute = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href);
+              addBlocked(report, href, !absolute ? 'local_missing' : outside ? 'too_many_outside' : href.length > L.maxOutsideUrlChars ? 'too_long' : /^https:/i.test(href) ? 'not_on_list' : 'not_https');
+            }
+          }
         } else count(report, 'link');
         continue;
       }
       if (name === 'script') {
-        if (!input.scripts) { count(report, 'script'); if (rawNext) skipText = rawNext.start; continue; }
+        if (!input.scripts) { count(report, 'script'); addBlocked(report, attrs.find((a) => a.name === 'src')?.value ?? 'inline script', 'scripts_off'); if (rawNext) skipText = rawNext.start; continue; }
         if (rawNext) skipText = rawNext.start;
         const src = attrs.find((a) => a.name === 'src')?.value;
         if (src) {
           const p = resolve(input.entryPath, src, input.loaded);
           if (p && report.inlinedFiles < L.maxInlinedFiles) scriptBodies.push(inline(p));
-          else { report.blockedExternal.push(src.slice(0, 80)); count(report, 'script'); }
+          else { report.blockedExternal.push(src.slice(0, 80)); count(report, 'script'); addBlocked(report, src, /^https:/i.test(src) ? 'not_on_list' : /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src) ? 'not_https' : 'local_missing'); }
         } else {
           if (rawNext) scriptBodies.push(rawNext.text ?? '');
         }
@@ -174,6 +194,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
           const h = attrs.find((a) => a.name === 'height')?.value ?? '80';
           const label = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src) ? 'outside address' : src.slice(0, 80) || name;
           report.placeholders.push(label);
+          addBlocked(report, label, 'image_not_loaded');
           const keep = attrs.filter((a) => ['id', 'class'].includes(a.name));
           const own = sanitizeCss(attrs.find((a) => a.name === 'style')?.value ?? '');
           const mediaKey = `${input.entryPath}#${name}#${tagCounts.get(name) ?? 0}`;
@@ -187,7 +208,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (!known && !/^[a-z][a-z0-9-]*$/.test(name)) { count(report, name); continue; }
       let tag = name;
       if (!known) {
-        if (['iframe', 'object', 'embed', 'frame', 'frameset', 'applet', 'portal', 'template', 'foreignobject', 'use', 'image', 'meta', 'base'].includes(name)) { count(report, name); if (!tok.selfClosing && !VOID.has(name)) skipDepth = name; continue; }
+        if (['iframe', 'object', 'embed', 'frame', 'frameset', 'applet', 'portal', 'template', 'foreignobject', 'use', 'image', 'meta', 'base'].includes(name)) { count(report, name); addBlocked(report, `<${name}>`, 'removed_tag'); if (!tok.selfClosing && !VOID.has(name)) skipDepth = name; continue; }
         tag = 'span';
         report.unknownTags++;
       }
@@ -218,7 +239,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
     const scriptTags = input.scripts ? `<script>${INSPECTOR_SOURCE(input.nonce, input.origin)}</script>${scriptBodies.map((s) => `<script>${s}</script>`).join('')}` : '';
     const html =
       `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${escapeAttr(cspFor(input.scripts))}"><meta charset="utf-8">` +
-      `<style>${BASE_STYLE}</style><title>${escapeText(title)}</title>${styles.map((s) => `<style>${s}</style>`).join('')}</head>` +
+      `<style>${BASE_STYLE}</style><title>${escapeText(title)}</title>${styles.join('')}</head>` +
       `<body${bodyAttrs}>${input.scripts ? scriptTags : ''}${body.join('')}</body></html>`;
     if (html.length > L.maxDocBytes) return { ok: false, reason: 'The page is too large to preview.' };
     if (report.inlinedFiles > L.maxInlinedFiles) return { ok: false, reason: 'The page loads too many files to preview.' };

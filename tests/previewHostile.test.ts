@@ -83,3 +83,21 @@ describe('references that are not loaded files', () => {
     expect(r.report.placeholders).toHaveLength(1);
   });
 });
+
+// @node: F12.6 (3B-1: hostile outside-stylesheet addresses never reach the document)
+describe('hostile outside stylesheet addresses', () => {
+  const HOSTILE = [
+    'https://cdn.jsdelivr.net.evil.test/x.css', 'https://evilcdn.jsdelivr.net/x.css', 'https://user@cdn.jsdelivr.net/x.css', 'https://cdn.jsdelivr.net:8443/x.css',
+    'https://cdn.jsdelivr.net/x.css"onload="alert(1)', 'https://cdn.jsdelivr.net/x.css\\evil', 'javascript:alert(1)', 'data:text/css,*{}', 'https://cdn.jsdelivr.net./x.css',
+    'https://unpkg.com/' + 'a'.repeat(400),
+  ];
+  it('none of them is written, each is blocked, and the document stays valid', () => {
+    for (const href of HOSTILE) {
+      const r = buildStaticPreview({ entryPath: 'i.html', effective: () => `<link rel="stylesheet" href='${href.replace(/'/g, '')}'><p>x</p>`, loaded: new Set(['i.html']), scripts: false, nonce: NONCE, origin: 'http://a' });
+      if (!r.ok) throw new Error('x');
+      expect(r.report.outsideStyles, href).toEqual([]);
+      expect(r.html, href).not.toContain('<link');
+      expect(r.report.blocked.length, href).toBeGreaterThan(0);
+    }
+  });
+});

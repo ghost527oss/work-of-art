@@ -1,4 +1,5 @@
 // @node: F7.9
+// @node: F12.6 (blocked list and outside-host note)
 // @node: F8.8 (edit overlay, Preview Only styles, Page selector, scroll restore)
 // @node: F9.10 (Open in viewer target)
 // The Sandbox panel: the locked preview iframe and its controls. The iframe is built from `srcdoc` only.
@@ -19,6 +20,7 @@ import { setScroll } from '../edit/previewEditDom';
 import type { EditActions } from '../hooks/useEditPad';
 import { useLayout } from '../hooks/useLayout';
 import { EditOverlay } from './EditOverlay';
+import { BlockedList } from './BlockedList';
 import { findEntryPage } from '../preview/previewMode';
 
 import { studioStore } from '../store/useStudioStore';
@@ -141,6 +143,7 @@ export function SandboxPanel({ preview, pad }: { preview: PreviewActions; pad?: 
         onCheck={() => check([pv.width === 0 ? 1024 : pv.width])} onCheckAll={() => check([375, 768, 1024])}
       />
       <PreviewNotes reason={pv.reason} mode={pv.mode} notes={pv.notes} invalid={pv.invalidMessages} />
+      {build && build.ok && pv.mode === 'static' && <BlockedList blocked={build.report.blocked} outsideStyles={build.report.outsideStyles} />}
       {pv.layout.status === 'running' && <p role="status">Checking layout...</p>}
       {pv.layout.status === 'done' && <p>Layout check: {pv.layout.findings.length} findings at {pv.layout.widths.join(', ')} px.{pv.layout.partialReasons.length > 0 ? ` Partial result: ${pv.layout.partialReasons.join(' ')}` : ''}</p>}
       {pv.layout.status === 'stopped' && <p role="alert">{pv.layout.message}</p>}
