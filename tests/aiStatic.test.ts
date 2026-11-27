@@ -91,9 +91,9 @@ describe('new code hygiene', () => {
       expect(read(p), p).not.toMatch(/localStorage|sessionStorage|indexedDB|document\.cookie/);
     }
   });
-  it('package.json still has exactly react, react-dom, and zod as runtime dependencies', () => {
+  it('package.json has exactly acorn, react, react-dom, and zod as runtime dependencies (3B-1 added acorn on purpose)', () => {
     const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { dependencies: Record<string, string> };
-    expect(Object.keys(pkg.dependencies).sort()).toEqual(['react', 'react-dom', 'zod']);
+    expect(Object.keys(pkg.dependencies).sort()).toEqual(['acorn', 'react', 'react-dom', 'zod']);
   });
   it('the Phase 3A CSS uses only #000 and #fff and no motion', () => {
     const css = readFileSync('src/styles.css', 'utf8');

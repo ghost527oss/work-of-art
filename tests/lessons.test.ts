@@ -10,12 +10,12 @@ describe('the playbook', () => {
     const ids = PLAYBOOK.cards.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
-  it('has one lesson per check (17), the 12 concepts, and the sorting lesson', () => {
+  it('has one lesson per check (29), the 12 concepts, and the sorting lesson', () => {
     for (const s of SKILLBOOK.scan) expect(cardsForSkill(s.id).map((c) => c.id), s.id).toEqual([`lesson.${s.id}`]);
     const concepts = ['page', 'stylesheet', 'script', 'import', 'route', 'api-call', 'env-var', 'request-flow', 'validation', 'secret', 'layout', 'label'].map((n) => `concept.${n}`);
     expect(PLAYBOOK.cards.filter((c) => c.kind === 'concept').map((c) => c.id)).toEqual(concepts);
     expect(cardById('lesson.sorting.unsure')?.kind).toBe('sorting');
-    expect(PLAYBOOK.cards).toHaveLength(30);
+    expect(PLAYBOOK.cards).toHaveLength(42);
   });
   it('every card and level follows the writing rules', () => {
     for (const c of PLAYBOOK.cards) for (const lvl of ['simple', 'practical', 'deeper'] as const) expect(checkLessonText(lvl, c.levels[lvl]), `${c.id} ${lvl}`).toEqual([]);

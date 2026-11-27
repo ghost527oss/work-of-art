@@ -87,7 +87,7 @@ describe('static document', () => {
   });
   it('fails cleanly when the page is missing or too large', () => {
     expect(buildStaticPreview({ entryPath: 'x.html', ...files({}), scripts: false, nonce: NONCE, origin: 'http://a' })).toEqual({ ok: false, reason: 'The page could not be read.' });
-    const big = buildStaticPreview({ entryPath: 'i.html', ...files({ 'i.html': '<p>' + 'a'.repeat(1100 * 1024) + '</p>' }), scripts: false, nonce: NONCE, origin: 'http://a' });
+    const big = buildStaticPreview({ entryPath: 'i.html', ...files({ 'i.html': '<p>' + 'a'.repeat(3100 * 1024) + '</p>' }), scripts: false, nonce: NONCE, origin: 'http://a' });
     expect(big.ok).toBe(false);
   });
   it('the output has no data-pb collision from page attributes', () => {

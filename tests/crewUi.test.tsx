@@ -129,9 +129,9 @@ describe('command box and helpers', () => {
     expect(filterFindings(result.findings, { text: 'nope' })).toHaveLength(0);
     expect(linksBetweenAreas(analysis, applyCorrections(analysis, {}))).toEqual([]);
     const w = whatWasChecked(result);
-    expect(w.checks).toHaveLength(17);
+    expect(w.checks).toHaveLength(29);
     expect(w.notCheckedLines).toHaveLength(3);
-    expect(SKILLBOOK.scan).toHaveLength(17);
+    expect(SKILLBOOK.scan).toHaveLength(29);
   });
   it('new files carry node tags; no dangerous HTML; the CSS block is black and white without motion', () => {
     for (const f of ['CommandBar', 'AreaMap', 'WorkerSlots', 'FindingsTable', 'FindingDetail', 'CrewNarration', 'RequestTrace', 'ChangesMade', 'WhatWasChecked']) {

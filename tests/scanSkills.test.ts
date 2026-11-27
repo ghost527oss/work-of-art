@@ -7,11 +7,11 @@ import { SKILLBOOK, scanSkillById } from '../src/skillbook';
 const JARGON = /\b(AST|regex|heuristic|DOM|middleware|endpoint|polymorphi|namespace|transpil|bundler)\b/i;
 
 describe('scan skills', () => {
-  it('there are exactly 17 (16 text checks and one measured) with unique stable ids, areas, severities, and plain text', () => {
+  it('there are exactly 29 (23 text checks and six measured) with unique stable ids, areas, severities, and plain text', () => {
     const ids = SKILLBOOK.scan.map((s) => s.id);
-    expect(ids).toHaveLength(17);
-    expect(new Set(ids).size).toBe(17);
-    expect(SKILLBOOK.scan.filter((s) => s.kind === 'measured').map((s) => s.id)).toEqual(['scan.frontend.layout-overflow']);
+    expect(ids).toHaveLength(29);
+    expect(new Set(ids).size).toBe(29);
+    expect(SKILLBOOK.scan.filter((s) => s.kind === 'measured').map((s) => s.id)).toEqual(['scan.frontend.layout-overflow', 'scan.frontend.layout-overlap', 'scan.frontend.tap-target', 'scan.frontend.text-small', 'scan.frontend.contrast', 'scan.frontend.media-unsized']);
     for (const s of SKILLBOOK.scan) {
       expect(s.id).toMatch(/^scan\.(frontend|backend|security|api)\.[a-z-]+$/);
       expect(['frontend', 'backend', 'security', 'api_data']).toContain(s.primary);
@@ -22,8 +22,8 @@ describe('scan skills', () => {
       expect(scanSkillById(s.id)).toBe(s);
     }
   });
-  it('exactly one skill is Auto-supported, and Possible checks are never High', () => {
-    expect(SKILLBOOK.scan.filter((s) => s.fix === 'auto').map((s) => s.id)).toEqual(['scan.security.target-blank']);
+  it('exactly three skills are Auto-supported (target-blank and the two syntax checks), and Possible checks are never High', () => {
+    expect(SKILLBOOK.scan.filter((s) => s.fix === 'auto').map((s) => s.id)).toEqual(['scan.security.target-blank', 'scan.frontend.js-syntax', 'scan.frontend.html-structure']);
     expect(SKILLBOOK.scan.filter((s) => s.certainty === 'possible').every((s) => s.severity !== 'high')).toBe(true);
   });
   it('the 31 sort skills are unchanged and limits are provisional', () => {

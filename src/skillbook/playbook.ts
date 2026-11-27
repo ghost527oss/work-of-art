@@ -287,5 +287,114 @@ export const PLAYBOOK: Playbook = {
         deeper: 'Sorting uses only evidence from the skill-book. Weak clues on their own give low confidence, and low confidence goes to Needs Review rather than becoming a label. Your corrections are saved for this repository, change the counts and the checks that run, and never change the connection map.',
       },
     },
+    // ---------------------------------------------------------------- 3B-1 checks (F12.1)
+    {
+      id: 'lesson.scan.frontend.js-syntax', kind: 'check', skillId: 'scan.frontend.js-syntax', title: 'JavaScript must be readable to run', summary: 'One typing mistake can make the browser stop reading a whole JavaScript file.',
+      tags: ['frontend', 'backend'], keywords: ['javascript', 'syntax', 'error'], related: ['concept.script'],
+      levels: {
+        simple: 'The browser reads JavaScript one piece at a time. If it meets a mistake, it stops there. Everything after that spot does not run.',
+        practical: 'A JavaScript file must follow strict spelling rules. A missing bracket, quote, or comma is enough to break it. PatchBay reads the file with a checker named acorn and shows the exact line and column where reading failed. The real cause is often on that line or just before it.',
+        deeper: 'The checker reads a file as a module first, then as a plain script, because the two follow slightly different rules. It reports the first mistake only, so fixing one can reveal the next. PatchBay never runs the code to find mistakes. A file that reads cleanly can still behave wrongly, because this check looks at spelling, not at meaning. An automatic fix is offered only when exactly one tiny repair makes the first mistake go away.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.balance', kind: 'check', skillId: 'scan.frontend.balance', title: 'Brackets and quotes come in pairs', summary: 'Every opening bracket or quote needs a closing partner. A counting check can warn but cannot prove.',
+      tags: ['frontend', 'backend'], keywords: ['bracket', 'quote', 'balance'], related: ['lesson.scan.frontend.js-syntax'],
+      levels: {
+        simple: 'Brackets and quotes come in pairs, like a door that opens and closes. If one is missing, the code breaks. PatchBay counts them and warns when the counts differ.',
+        practical: 'Every opening bracket, such as a round, square, or curly one, needs a closing partner. PatchBay counts them in files it cannot fully read, such as React and TypeScript files. A difference means a bracket may be missing or extra. The count can be fooled by unusual code, so treat it as a hint.',
+        deeper: 'For React and TypeScript files PatchBay does not run a full reader. It walks through the text, skips strings and comments, and keeps a stack of open brackets. A closing bracket that does not match the top of the stack is reported. Page text with apostrophes can confuse quote tracking, so for React files the check runs twice and reports only when both runs disagree. Because of that, this check can say "may not match" but never "valid".',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.html-structure', kind: 'check', skillId: 'scan.frontend.html-structure', title: 'Tags must open and close in order', summary: 'Each opening tag needs its closing tag, and tags must close in the reverse order they opened.',
+      tags: ['frontend', 'design'], keywords: ['html', 'tag', 'closing'], related: ['concept.page'],
+      levels: {
+        simple: 'Page tags work like boxes inside boxes. Each box you open must be closed, inner box first. A missing close can shift the whole page.',
+        practical: 'Most tags come in pairs, such as div and its closing tag. They must close in the reverse order they opened. A few tags, such as br and img, stand alone, and a few, such as p and li, may skip their closing tag. PatchBay reports the tag that was left open or closed in the wrong place.',
+        deeper: 'Browsers never stop on broken tags. They repair them with fixed rules, and the repair may not match what the author meant. PatchBay keeps a list of open tags and checks each closing tag against it. When a closing tag matches an outer tag, every inner tag still open is reported at its own start line. An automatic fix inserts one closing tag just before the outer closing tag, and only when that is the single possible repair.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.html-id-duplicate', kind: 'check', skillId: 'scan.frontend.html-id-duplicate', title: 'An id must be used once', summary: 'An id names one tag only. Repeating it confuses links, labels, and scripts.',
+      tags: ['frontend', 'design'], keywords: ['id', 'duplicate', 'html'], related: ['concept.page'],
+      levels: {
+        simple: 'An id is a name tag for one thing on the page. Two things with the same name get mixed up. Give each its own name.',
+        practical: 'An id should appear once per page. Links that jump to a spot, labels tied to a field, and scripts that look up a tag all use it. With two matches, they usually pick the first. Use a class when several tags need the same style.',
+        deeper: 'The rules of HTML say an id must be unique in a page. Browsers do not complain, so the mistake hides until something depends on it. A script that asks for an id gets the first match only, and a link to that id jumps to the first match only. PatchBay compares plain id values exactly and skips values built by templates.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.html-attr-missing', kind: 'check', skillId: 'scan.frontend.html-attr-missing', title: 'Some tags need an address', summary: 'An image needs a source and a stylesheet link needs an address, or nothing loads.',
+      tags: ['frontend', 'design'], keywords: ['attribute', 'src', 'href'], related: ['concept.page', 'concept.stylesheet'],
+      levels: {
+        simple: 'Some tags need one more piece of information to work. An image tag needs the address of its picture. Without it, nothing shows.',
+        practical: 'An img tag needs a src attribute that points to the picture. A link tag for a stylesheet needs an href that points to the file. Without them the browser loads nothing and stays quiet. PatchBay checks these two cases in plain HTML pages.',
+        deeper: 'Browsers ignore a tag that lacks the attribute that gives it purpose, and they report nothing to the visitor. That makes this mistake easy to miss when a page looks nearly right. PatchBay checks only attributes that are always required, in files without template syntax, because a template may fill the value in later. Other missing attributes, such as alt, have their own checks.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.css-possible-invalid', kind: 'check', skillId: 'scan.frontend.css-possible-invalid', title: 'CSS the browser ignores', summary: 'A rule the browser drops has no effect. It may be misspelled or too new for this browser.',
+      tags: ['frontend', 'design'], keywords: ['css', 'rule', 'invalid'], related: ['concept.stylesheet'],
+      levels: {
+        simple: 'A style rule is like an instruction. If the browser cannot understand it, the browser skips it. Then the look you wanted does not appear.',
+        practical: 'PatchBay gives each style rule to the browser and sees whether it was kept. A dropped rule often has a spelling mistake or a missing bracket. It can also be a new feature that this browser does not know yet. That is why the label says possible.',
+        deeper: 'Browsers throw away style rules they cannot read and carry on, so a typing mistake leaves no error message. PatchBay uses a style sheet object that is never shown on the page, so nothing loads and nothing changes. A rule can also be dropped because it is newer than the browser or meant for a different browser, which is why this finding is only possible. Import rules are ignored by this check.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.css-braces', kind: 'check', skillId: 'scan.frontend.css-braces', title: 'Style rules need matching braces', summary: 'Every opening curly bracket in CSS needs a closing one, or later rules can be lost.',
+      tags: ['frontend', 'design'], keywords: ['css', 'brace', 'bracket'], related: ['concept.stylesheet'],
+      levels: {
+        simple: 'Each style rule is wrapped in curly brackets. If one is missing, the browser gets confused. Later styles may stop working.',
+        practical: 'A style rule starts with a curly bracket and ends with a closing one. A missing closing bracket can swallow the rules after it. An extra one can end a block too early. PatchBay counts the brackets and reports the line where they stop matching.',
+        deeper: 'The counter walks through the file once and skips comments and quoted text, so a bracket inside a comment is not counted. Grouped rules, such as those inside a media query, nest brackets, and each level must close. The reported line is where the count first goes wrong, which is not always where the mistake was typed. Automatic fixes are not offered because the right place for a missing bracket cannot be known.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.layout-overlap', kind: 'check', skillId: 'scan.frontend.layout-overlap', title: 'Boxes should not hide each other', summary: 'Two neighbouring boxes that overlap can hide text or buttons, unless the overlap is on purpose.',
+      tags: ['frontend', 'design'], keywords: ['overlap', 'layout', 'boxes'], related: ['concept.layout'],
+      levels: {
+        simple: 'Boxes on a page normally sit next to each other. Sometimes two boxes land on top of each other. Then one can hide the other.',
+        practical: 'PatchBay measures the boxes in the preview at three screen widths. It reports neighbouring boxes whose areas overlap by a clear amount. Menus, pop-ups, and fixed bars are skipped on purpose. Because PatchBay cannot know what the designer wanted, the confidence is never high.',
+        deeper: 'Only neighbours in the normal page flow are compared, and hidden boxes are skipped. A box moved by a transform or a negative margin gets low confidence, because designers often overlap things on purpose. An overlap smaller than 16 square pixels, or smaller than 15 percent of the smaller box, is ignored.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.tap-target', kind: 'check', skillId: 'scan.frontend.tap-target', title: 'Buttons need room for a finger', summary: 'Buttons and links under 44 pixels are hard to tap on a phone.',
+      tags: ['frontend', 'design'], keywords: ['tap', 'button', 'size', 'phone'], related: ['concept.layout', 'lesson.scan.frontend.button-name'],
+      levels: {
+        simple: 'Fingers are bigger than mouse arrows. A tiny button is hard to press on a phone. Make buttons big enough to tap.',
+        practical: 'A common guide is that buttons and links should be at least 44 pixels high and wide on phones. PatchBay measures them at 375 and 768 pixels wide. Links inside a sentence are skipped, because they are allowed to be small. A fix adds a minimum height and width.',
+        deeper: 'Touch screens are less exact than a mouse, so small targets cause missed taps. The measured size is the box the browser draws, so padding counts. Hidden and disabled controls are skipped, and a tag marked as a button by role is reported with medium confidence. The recipe adds a minimum size, and PatchBay measures again at all three widths and undoes the change if anything gets worse.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.text-small', kind: 'check', skillId: 'scan.frontend.text-small', title: 'Text must be big enough to read', summary: 'Text under 12 pixels is hard to read on a phone.',
+      tags: ['frontend', 'design'], keywords: ['text', 'font', 'size', 'phone'], related: ['concept.stylesheet', 'concept.layout'],
+      levels: {
+        simple: 'Tiny words are hard to read on a small screen. Make the text a little bigger. Your visitors will thank you.',
+        practical: 'PatchBay measures the text size in the preview at phone and tablet widths. Text under 12 pixels is reported. Notes written in small, sub, or sup tags get medium confidence, because small text is often meant there. A fix raises the size to 14 pixels.',
+        deeper: 'Size is measured as the browser works it out, after all style rules and inherited values. Sizes written in relative units are therefore measured in real pixels. Raising the size can make text wrap onto more lines, so PatchBay measures the page again after the fix and undoes it if it caused a new problem.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.contrast', kind: 'check', skillId: 'scan.frontend.contrast', title: 'Text needs contrast', summary: 'Text colour must differ enough from its background. 4.5 to 1 is the common minimum.',
+      tags: ['frontend', 'design'], keywords: ['contrast', 'colour', 'readability'], related: ['concept.stylesheet', 'concept.layout'],
+      levels: {
+        simple: 'Light grey words on a white page are hard to read. The words and the background need to look very different. Dark on light, or light on dark, works well.',
+        practical: 'Contrast is a number that compares two colours. Normal text should reach 4.5 to 1, and large text should reach 3 to 1. PatchBay measures it only when the background is one plain colour. Over a gradient or a picture it says it cannot measure.',
+        deeper: 'The number comes from the brightness of each colour, as the web accessibility guidelines define it. Large text is 24 pixels, or 18.66 pixels and bold. A see-through text colour is mixed with the background first, and the result gets medium confidence. The fix moves the text colour toward black or white in small steps and stops at the first colour that reaches the minimum.',
+      },
+    },
+    {
+      id: 'lesson.scan.frontend.media-unsized', kind: 'check', skillId: 'scan.frontend.media-unsized', title: 'Pictures need a size limit', summary: 'A picture with no size limit can overflow its box or make the page jump as it loads.',
+      tags: ['frontend', 'design'], keywords: ['image', 'picture', 'size', 'width'], related: ['lesson.scan.frontend.img-alt', 'concept.layout'],
+      levels: {
+        simple: 'A big picture can spill out of its box. It can push the page wider than the phone screen. Give pictures a size limit.',
+        practical: 'PatchBay measures real pictures in the preview and reports one that is wider than its container. It also reports a picture with no written width, height, or maximum width when the picture could not be measured. A fix adds a maximum width of 100 percent and a height of auto. The second kind of report has low confidence, because it is read from the page text.',
+        deeper: 'A picture is measured only after it has loaded, so slow outside pictures may still be waiting when the check runs, and PatchBay says so. Pictures PatchBay could not load, such as ones that are too large or from a blocked address, appear as boxes and cannot be measured. For those, the check reads the page and style text and reports a picture that has no size limit anywhere. That reading can be wrong, so it always has low confidence.',
+      },
+    },
   ],
 };
