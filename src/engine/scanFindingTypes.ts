@@ -40,6 +40,8 @@ export interface ScanCoverage {
   filesNotRead: number;
   notChecked: Record<string, number>;
   couldNotCheck: Array<{ path: string; skillId: string }>;
+  /** 3B-1: how many files had part of the code checks skipped, by plain reason (absent when none). */
+  codeNotChecked?: Record<string, number>;
 }
 
 export interface ScanResult {

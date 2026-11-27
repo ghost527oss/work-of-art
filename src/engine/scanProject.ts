@@ -5,6 +5,8 @@ import { SCAN_LIMITS as L } from '../config/scanLimits';
 import { scanSkillById } from '../skillbook';
 import type { RepoSnapshot } from '../types/contracts';
 import { hashText } from './diffApply';
+import { loadAcorn } from './checks/acornLoader';
+import { hasCodeChecks, runCodeChecks } from './checks';
 import { buildFixProposal, FIX_NOTE } from './scanFix';
 import { scanFetchNoOk, scanInsecureUrl } from './scanApi';
 import { scanErrorLeak, scanInputValidation, scanSqlConcat } from './scanBackend';
@@ -47,7 +49,7 @@ const CHECKS: readonly Check[] = [
   { id: 'scan.security.cors-wildcard', area: 'security', exts: set('js ts mjs cjs py'), run: scanCorsWildcard },
 ];
 
-export const CHECK_COUNT = 17;
+export const CHECK_COUNT = 29;
 
 export interface ScanInputs {
   snapshot: RepoSnapshot;
@@ -108,7 +110,7 @@ function toFinding(raw: RawFinding, lines: readonly string[], seen: Map<string, 
   };
 }
 
-interface FileScan { findings: Finding[]; couldNot: string[] }
+interface FileScan { findings: Finding[]; couldNot: string[]; codeNot: string[] }
 
 function scanOneFile(path: string, text: string, labels: readonly Label[], hasCalls: boolean): FileScan {
   const lines = text.split('\n');
@@ -123,7 +125,18 @@ function scanOneFile(path: string, text: string, labels: readonly Label[], hasCa
       couldNot.push(check.id);
     }
   }
-  return { findings, couldNot };
+  // 3B-1 code checks: by file type, whatever the file's label (a syntax mistake is a syntax mistake).
+  const codeNot: string[] = [];
+  if (hasCodeChecks(path)) {
+    try {
+      const code = runCodeChecks(path, text);
+      for (const i of code.issues) findings.push(toFinding({ skillId: i.skillId, path, firstLine: i.line, lastLine: i.line, extra: i.extra }, lines, seen));
+      codeNot.push(...code.notChecked);
+    } catch {
+      couldNot.push('scan.frontend.js-syntax');
+    }
+  }
+  return { findings, couldNot, codeNot };
 }
 
 /** Runs every check that applies to a path on the given text (used by the fix safety check and the crew verify step). */
@@ -193,10 +206,12 @@ export async function scanProject(inputs: ScanInputs, options: ScanOptions = {})
   const findings: Finding[] = [];
   const couldNotCheck: Array<{ path: string; skillId: string }> = [];
   const notChecked: Record<string, number> = {};
+  const codeNotChecked: Record<string, number> = {};
   const partialReasons: string[] = [];
   let filesScanned = 0;
   let timedOut = false;
   const todo = loaded.slice(0, L.maxFiles);
+  if (todo.some((p) => /\.(?:m?js|cjs|html?)$/i.test(p))) await loadAcorn();
   if (loaded.length > L.maxFiles) partialReasons.push(`File limit (${L.maxFiles.toLocaleString('en-US')}) reached: ${loaded.length - L.maxFiles} files were not checked.`);
   for (let i = 0; i < todo.length; i += L.batchSize) {
     if (now() - start > L.maxMs) { timedOut = true; partialReasons.push(`Time limit (${L.maxMs / 1000} seconds) reached: ${todo.length - i} files were not checked.`); break; }
@@ -204,7 +219,7 @@ export async function scanProject(inputs: ScanInputs, options: ScanOptions = {})
       const text = inputs.effective(p) ?? '';
       texts.set(p, text);
       const labels = labelsOf.get(p)?.labels ?? ['unknown'];
-      if (applicable(p, labels, callers.has(p)).length === 0) {
+      if (applicable(p, labels, callers.has(p)).length === 0 && !hasCodeChecks(p)) {
         const e = extOf(p) || '(no extension)';
         notChecked[e] = (notChecked[e] ?? 0) + 1;
         continue;
@@ -213,6 +228,7 @@ export async function scanProject(inputs: ScanInputs, options: ScanOptions = {})
       const r = scanOneFile(p, text, labels, callers.has(p));
       findings.push(...r.findings);
       for (const id of r.couldNot) couldNotCheck.push({ path: p, skillId: id });
+      for (const why of r.codeNot) codeNotChecked[why] = (codeNotChecked[why] ?? 0) + 1;
     }
     options.onProgress?.({ done: Math.min(i + L.batchSize, todo.length), total: todo.length });
     await yieldToMain();
@@ -239,7 +255,7 @@ export async function scanProject(inputs: ScanInputs, options: ScanOptions = {})
   }
   const filesNotRead = inputs.snapshot.inventory.entries.filter((e) => e.entryType === 'file' && !texts.has(e.path) && !labelsOf.get(e.path)?.ignored).length;
   return finish(applyFixLabels(kept, inputs), inputs, {
-    coverage: { filesScanned, filesNotRead, notChecked, couldNotCheck }, partial: partialReasons.length > 0, partialReasons,
+    coverage: { filesScanned, filesNotRead, notChecked, couldNotCheck, ...(Object.keys(codeNotChecked).length ? { codeNotChecked } : {}) }, partial: partialReasons.length > 0, partialReasons,
   });
 }
 

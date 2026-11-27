@@ -48,7 +48,7 @@ describe('Screen 4', () => {
     const m = render();
     expect(m).toContain('Skeleton Crew');
     expect(m).toContain('stop-bar');
-    expect(m).toContain('Scan is up to date: 2 findings from 17 checks over 1 files.');
+    expect(m).toContain('Scan is up to date: 2 findings from 29 checks over 1 files.');
     for (const a of ['Frontend', 'Backend', 'Security', 'APIs &amp; Data']) expect(m).toContain(`${a} crew`);
     expect(m).toContain('Workers take turns in this version.');
     expect(m).toContain('No findings from the checks that ran.');

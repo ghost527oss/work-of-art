@@ -101,9 +101,18 @@ export function workerSlots(state: StudioState): Array<{ area: AreaId; name: str
   });
 }
 
+const CODE_NOT_CHECKED: Record<string, string> = {
+  too_large: 'Too large for the code checks',
+  minified: 'Minified file, not read by the JavaScript check',
+  template: 'Template syntax found, so that part of the code checks was skipped',
+  no_checker: 'The JavaScript reader could not be loaded, so JavaScript was not checked',
+  no_probe: 'This browser could not check CSS rules, so "Possible invalid CSS" was not checked',
+  too_many_scripts: 'More than 20 inline scripts, so the later ones were not checked',
+};
+
 export function whatWasChecked(result: ScanResult): {
   filesScanned: number; filesNotRead: number; checks: Array<{ id: string; title: string; area: AreaId; fix: string }>;
-  notChecked: Array<[string, number]>; notCheckedLines: string[]; couldNotCheck: number;
+  notChecked: Array<[string, number]>; notCheckedLines: string[]; couldNotCheck: number; codeNotCheckedLines: string[];
 } {
   return {
     filesScanned: result.coverage.filesScanned,
@@ -112,5 +121,6 @@ export function whatWasChecked(result: ScanResult): {
     notChecked: Object.entries(result.coverage.notChecked).sort(),
     notCheckedLines: ['Layout overflow: measured in the preview (look-only mode, static pages only).', 'Data shapes are not checked.', 'Imported code is never run.'],
     couldNotCheck: result.coverage.couldNotCheck.length,
+    codeNotCheckedLines: Object.entries(result.coverage.codeNotChecked ?? {}).sort().map(([why, n]) => `${CODE_NOT_CHECKED[why] ?? why}: ${n} file${n === 1 ? '' : 's'}.`),
   };
 }
