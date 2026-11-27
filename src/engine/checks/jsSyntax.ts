@@ -16,7 +16,7 @@ export interface CodeIssue {
 export interface JsFileResult {
   issues: CodeIssue[];
   /** Plain reasons for parts that were not checked. */
-  notChecked: Array<'too_large' | 'minified' | 'template' | 'no_checker' | 'too_many_scripts'>;
+  notChecked: Array<'too_large' | 'minified' | 'template' | 'no_checker' | 'too_many_scripts' | 'jsx'>;
 }
 
 export interface RawSyntaxError { pos: number; line: number; column: number; message: string; mode: 'module' | 'script' }
@@ -70,6 +70,8 @@ export function parseJs(acorn: AcornModule, code: string, kind: 'module' | 'scri
   return asScript.pos > asModule.pos ? asScript : asModule;
 }
 
+const LOOKS_LIKE_JSX = /<>|<\/[A-Za-z][\w.]*>|<[A-Z][\w.]*(?:\s[^<>]*)?\/?>|return\s*\(?\s*<[a-z]/;
+
 function ext(path: string): string {
   const base = path.slice(path.lastIndexOf('/') + 1).toLowerCase();
   const dot = base.lastIndexOf('.');
@@ -92,6 +94,8 @@ export function checkJsFile(path: string, text: string, acorn: AcornModule | nul
   if (!acorn) { result.notChecked.push('no_checker'); return result; }
   if (isJs) {
     const err = parseJs(acorn, text, e === 'mjs' ? 'module' : e === 'cjs' ? 'script' : 'either');
+    // React code in a .js file reads as an error to a plain JavaScript reader, so it is not reported as one.
+    if (err && LOOKS_LIKE_JSX.test(text)) { result.notChecked.push('jsx'); return result; }
     if (err) result.issues.push(issueFrom(err, err.line, err.column + 1));
     return result;
   }

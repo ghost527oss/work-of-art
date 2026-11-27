@@ -8,7 +8,8 @@ interface Pass { kind: 'mismatch' | 'unclosed' | 'quote'; line: number }
 
 const OPEN = '([{';
 const CLOSE: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
-const REGEX_AFTER = '(,=:[!&|?{};+-*%~^';
+// '}' is left out on purpose: after it a '/' is far more often JSX (<A x={1}/>) than a regex.
+const REGEX_AFTER = '(,=:[!&|?{;+-*%~^';
 const REGEX_WORDS = /(?:^|[^\w$])(?:return|typeof|case|in|of|delete|void|throw|yield|await)$/;
 
 /** `always`: every quote starts a string. `contextual`: a quote starts a string only where code expects a value (not in page text such as Don't). */

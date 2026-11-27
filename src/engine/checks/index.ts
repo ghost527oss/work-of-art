@@ -8,7 +8,7 @@ import { getCssProbe } from './cssProbe';
 import { checkHtml } from './htmlStructure';
 import { checkJsFile, type CodeIssue } from './jsSyntax';
 
-export type NotCheckedReason = 'too_large' | 'minified' | 'template' | 'no_checker' | 'no_probe' | 'too_many_scripts';
+export type NotCheckedReason = 'too_large' | 'minified' | 'template' | 'no_checker' | 'no_probe' | 'too_many_scripts' | 'jsx';
 
 export interface CodeCheckResult {
   issues: CodeIssue[];

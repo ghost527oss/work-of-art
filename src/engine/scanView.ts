@@ -108,6 +108,7 @@ const CODE_NOT_CHECKED: Record<string, string> = {
   no_checker: 'The JavaScript reader could not be loaded, so JavaScript was not checked',
   no_probe: 'This browser could not check CSS rules, so "Possible invalid CSS" was not checked',
   too_many_scripts: 'More than 20 inline scripts, so the later ones were not checked',
+  jsx: 'React code (JSX) inside a .js file, which the plain JavaScript reader cannot read',
 };
 
 export function whatWasChecked(result: ScanResult): {

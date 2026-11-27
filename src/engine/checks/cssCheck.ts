@@ -43,7 +43,9 @@ export function splitCssRules(css: string): { items: CssItem[]; braceProblems: B
     if (c === '"' || c === "'") {
       let j = i + 1;
       while (j < n && css[j] !== c && css[j] !== '\n') j += css[j] === '\\' ? 2 : 1;
-      i = Math.min(j + 1, n);
+      const next = Math.min(j + 1, n);
+      for (let k = i; k < next; k++) if (css[k] === '\n') line++; // a string cut short by a newline, or a backslash-newline
+      i = next;
       continue;
     }
     if (c === '{') { depth++; openLines.push(line); i++; continue; }

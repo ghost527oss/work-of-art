@@ -95,7 +95,7 @@ export function gatherMeasurements(doc: Document, win: Window): Gathered {
       const cur = Object.getOwnPropertyDescriptor(W.HTMLImageElement.prototype, 'currentSrc')?.get?.call(img) as string | undefined;
       m.img = {
         naturalWidth: nw ?? 0, naturalHeight: nh ?? 0, complete: done === true, local: typeof cur === 'string' && cur.startsWith('data:'),
-        parentClientWidth: parent && parent.nodeType === 1 ? (parent as Element).clientWidth : 0,
+        parentClientWidth: boxWidthAbove(parent),
       };
     }
     out.push(m);
@@ -105,6 +105,16 @@ export function gatherMeasurements(doc: Document, win: Window): Gathered {
     for (const link of Array.from(W.Document.prototype.querySelectorAll.call(doc, 'link[rel="stylesheet"]') as NodeListOf<HTMLLinkElement>)) if (link.sheet === null) outsideStyleFailed++;
   } catch { /* reading links is best effort */ }
   return { measurements: out, docScrollWidth: doc.documentElement ? doc.documentElement.scrollWidth : 0, outsideStyleFailed };
+}
+
+/** Width of the nearest ancestor that has a box (an inline parent such as <a> reports 0). */
+function boxWidthAbove(start: Node | null): number {
+  let n: Node | null = start;
+  for (let d = 0; n && n.nodeType === 1 && d < 12; d++, n = n.parentNode) {
+    const w = (n as Element).clientWidth;
+    if (w > 0) return w;
+  }
+  return 0;
 }
 
 /**
