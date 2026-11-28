@@ -1110,3 +1110,91 @@ Deviations from the spec text (details in `PHASE_3B1_REPORT.md`):
 - The referrer wording is exact: "PatchBay's address is not sent as a referrer"; a font requested by an allowed style sheet carries that style sheet's host.
 - Two layers (IPv4 rule, last-label letters rule) both reject numeric hosts; mutation checks remove both together.
 - Independent review fixes: JSX in `.js` is "not checked", `}` no longer starts a regex guess, linked pictures measure the nearest boxed ancestor, CSS line numbers after a cut-short string.
+
+## F14 — Autonomous Crew Run v2
+Contract: A Crew run builds a frozen queue from the scan findings and works through it while the page is open: free code fixes first, then free visual recipes, then (live AI only) single-file AI fixes. Review is the default (every change waits for Approve or Apply); one Autopilot switch per run lets the app apply a change after its own safety checks, re-check it (re-scan, and re-measure when the preview is open), and undo it automatically if the re-check fails. "Undo this run" reverts every change of the run, newest first, or changes nothing. When every free AI provider is busy the run waits and resumes from saved clock times; a daily limit stops the run safely as `paused_quota`. `api/assistant.ts` passes the provider's wait time (a number of seconds and `minute|day|unknown`, never provider text) to the browser. The AI never approves, rejects, undoes, resets, or changes the run mode. No AI text, key, or file text is stored or logged. Only the practice copy changes. No new dependency, no new storage key, no checkpoints.
+
+### F14.1 — Limits, history cap 120, `runId`
+- Inputs: requirements R1, R6, R14; decisions 1, 7
+- Outputs: `crewRunLimits.ts`; `maxHistoryEntries` 120; optional `runId` on History entries and the saved record
+- Invariants: limits provisional in one file; old saved records still load; bad `runId` rejected; byte cap still holds
+- Files: `src/config/crewRunLimits.ts`, `src/config/workLimits.ts`, `src/store/workSlice.ts`, `src/store/workStorage.ts`, `tests/crewRunLimits.test.ts`, `tests/workStorage.test.ts`, `tests/workState.test.ts`, `tests/sessionRestore.test.ts`, `tests/aiStatic.test.ts`
+- Depends on: F12 (3B-1), F10
+- verify: `npm run typecheck && npx vitest run tests/crewRunLimits.test.ts tests/workStorage.test.ts tests/workState.test.ts tests/sessionRestore.test.ts tests/aiStatic.test.ts`
+
+### F14.2 — 429 wait-time passthrough
+- Inputs: requirement R11
+- Outputs: `retryAfterSeconds` and `limit` on the 429 answer, the `Retry-After` header, and on `AssistantError`
+- Invariants: only a clamped integer and a three-value word leave the adapter; provider text never reaches response, Log, or storage; shortest wait; `day` only if all say day; older answers without the fields work; keys stay server-side
+- Files: `src/engine/live/providers.ts`, `src/engine/live/modelRouter.ts`, `src/engine/live/liveAssistant.ts`, `api/assistant.ts`, `src/types/contracts.ts`, `src/engine/aiAssistant.ts`, `src/store/aiActions.ts`, `src/store/aiSlice.ts`, `tests/waitPassthrough.test.ts`, `tests/liveProviders.test.ts`, `tests/liveAssistant.test.ts`, `tests/assistantApiLive.test.ts`, `tests/contracts.test.ts`, `tests/aiPrivacy.test.ts`
+- Depends on: F11
+- verify: `npm run typecheck && npx vitest run tests/waitPassthrough.test.ts tests/liveProviders.test.ts tests/liveAssistant.test.ts tests/assistantApiLive.test.ts tests/contracts.test.ts tests/aiPrivacy.test.ts tests/aiStatic.test.ts`
+
+### F14.3 — Queue builder and run state
+- Inputs: merged findings, mode, preview and AI status
+- Outputs: ordered frozen queue (fix, recipe, ai), guided list, caps, skip reasons; in-memory run state and summary
+- Invariants: pure and deterministic; caps 60 items, 8 AI items, 20 AI requests; mock mode skips `ai` items; notes are fixed phrases only; never stored
+- Files: `src/engine/crewQueue.ts`, `src/store/crewRunState.ts`, `src/engine/practiceScript.ts`, `src/engine/crewScript.ts`, `tests/helpers/runFixtures.ts`, `tests/crewQueue.test.ts`, `tests/crewRunState.test.ts`, `tests/crewRun.test.ts`
+- Depends on: F14.1, F6
+- verify: `npm run typecheck && npx vitest run tests/crewQueue.test.ts tests/crewRunState.test.ts tests/crewRun.test.ts`
+
+### F14.4 — Run-level undo
+- Inputs: History with `runId`
+- Outputs: `undo run` command, all-or-nothing undo, run-aware merge rule
+- Invariants: simulation before any change; tail check; exact refusal reasons; never an AI action; Redo works one at a time afterward
+- Files: `src/store/runUndo.ts`, `src/store/workActions.ts`, `src/store/workSlice.ts`, `src/engine/commands.ts`, `tests/runUndo.test.ts`, `tests/workActions.test.ts`, `tests/commands.test.ts`, `tests/aiActionPolicy.test.ts`
+- Depends on: F14.1, F4
+- verify: `npm run typecheck && npx vitest run tests/runUndo.test.ts tests/workActions.test.ts tests/commands.test.ts tests/aiActionPolicy.test.ts`
+
+### F14.5 — Keep-or-undo decision and Autopilot apply
+- Inputs: before and after findings, optional visual keys
+- Outputs: `decideKeep`; `autoApply` through the real Approve path; automatic undo; run cap
+- Invariants: kept only if target gone, no new skill count, no new visual key; undo only the newest entry, else stop; wording "no longer found", never "fixed"
+- Files: `src/engine/runVerify.ts`, `src/store/workActions.ts`, `src/store/crewRunState.ts`, `tests/runVerify.test.ts`, `tests/autoApply.test.ts`, `tests/workActions.test.ts`
+- Depends on: F14.3, F14.4, F12.12
+- verify: `npm run typecheck && npx vitest run tests/runVerify.test.ts tests/autoApply.test.ts tests/workActions.test.ts`
+
+### F14.6 — Run controller, fix stage, Review, Stop
+- Inputs: store, injectable clock and timers
+- Outputs: `createCrewRunController` and `useCrewRun`; Review and Autopilot modes; Stop; dispose
+- Invariants: Review changes nothing without Approve or Apply; Autopilot never default and per run; Stop leaves no half-applied change; dispose removes every timer and subscription
+- Files: `src/hooks/useCrewRun.ts`, `src/store/workActions.ts`, `src/engine/scanView.ts`, `tests/helpers/clockHarness.ts`, `tests/crewRunController.test.ts`, `tests/crewRun.test.ts`, `tests/harnessController.test.ts`
+- Depends on: F14.3, F14.5, F4
+- verify: `npm run typecheck && npx vitest run tests/crewRunController.test.ts tests/crewRun.test.ts tests/harnessController.test.ts`
+
+### F14.7 — Recipe stage and AI stage
+- Inputs: recipes (F12.12), assistant, `checkAIProposal`
+- Outputs: recipe items with start conditions and skip reasons; single-file AI items with `queueOwned` requests, the 3-attempt cap, mock skip
+- Invariants: `queueOwned` exists only in the controller; the AI never approves or sets the mode; a rate limit is not a try; normal AI Chat still refuses during a run; no AI text stored
+- Files: `src/hooks/useCrewRun.ts`, `src/hooks/useRecipe.ts`, `src/hooks/useAssistant.ts`, `src/hooks/useAIHandoff.ts`, `src/engine/aiProposal.ts`, `src/store/aiProposalActions.ts`, `tests/crewRecipeStage.test.ts`, `tests/crewAiStage.test.ts`, `tests/aiProposal.test.ts`, `tests/aiProposalFlow.test.ts`, `tests/recipeController.test.ts`, `tests/aiActionPolicy.test.ts`
+- Depends on: F14.6, F14.2, F11, F12.12
+- verify: `npm run typecheck && npx vitest run tests/crewRecipeStage.test.ts tests/crewAiStage.test.ts tests/aiProposal.test.ts tests/aiProposalFlow.test.ts tests/recipeController.test.ts tests/aiActionPolicy.test.ts`
+
+### F14.8 — Wait and resume, quota
+- Inputs: `retryAfterSeconds`, `limit`, counters, clock
+- Outputs: `planWait`; waiting status with `resumeAt`; `paused_quota`; Continue
+- Invariants: min 5 s; over 300 s or `day` is quota; 3 waits per item; 900 s per run; resume decided by the clock, not a counter; `visibilitychange` handled; every run terminates in a bounded number of steps
+- Files: `src/engine/waitPlan.ts`, `src/hooks/useCrewRun.ts`, `src/store/crewRunState.ts`, `tests/waitPlan.test.ts`, `tests/crewWait.test.ts`, `tests/crewRunController.test.ts`
+- Depends on: F14.2, F14.7
+- verify: `npm run typecheck && npx vitest run tests/waitPlan.test.ts tests/crewWait.test.ts tests/crewRunController.test.ts`
+
+### F14.9 — Run panel and summary
+- Inputs: crew run state, History
+- Outputs: Run panel, summary, Autopilot confirm, wait countdown, "Run <id>" labels
+- Invariants: wireframe `#000`/`#fff`, no motion; every state has text; only fixed phrases and paths shown
+- Files: `src/components/CrewRunPanel.tsx`, `src/components/CrewRunSummary.tsx`, `src/components/SkeletonCrewScreen.tsx`, `src/components/StopBar.tsx`, `src/components/ChangesMade.tsx`, `src/components/HistoryPanel.tsx`, `src/components/CrewNarration.tsx`, `src/styles.css`, `tests/crewRunUi.test.tsx`, `tests/crewUi.test.tsx`, `tests/sandboxUi.test.tsx`
+- Depends on: F14.6, F14.7, F14.8
+- verify: `npm run typecheck && npx vitest run tests/crewRunUi.test.tsx tests/crewUi.test.tsx tests/sandboxUi.test.tsx`
+
+### F14.10 — Privacy, static, hostile, and gate tests
+- Inputs: all of F14.1 to F14.9
+- Outputs: sentinel, static, hostile-input, and exit-gate tests with a fake provider server
+- Invariants: key, AI answer, question, file text, and provider error text never reach Log, History (except diffs), storage, errors, summary; no new storage key; browser code never imports the live engine
+- Files: `tests/crewPrivacy.test.ts`, `tests/crewStatic.test.ts`, `tests/crewHostile.test.ts`, `tests/phase3b3Gate.test.ts`, `tests/helpers/fakeProviderServer.ts`
+- Depends on: F14.1 to F14.9
+- verify: `npm run typecheck && npx vitest run tests/crewPrivacy.test.ts tests/crewStatic.test.ts tests/crewHostile.test.ts tests/phase3b3Gate.test.ts`
+
+### F14 gate
+- verify: `npm run typecheck && npx vitest run && npm run build && npm audit`
+- 3B-3 gate (requirements section 6): all earlier tests pass again; queue order, Review, Autopilot keep and undo, Undo this run, wait and resume, `paused_quota`, the 3-attempt cap, and the 429 passthrough pass their tests; the privacy and static tests pass
+- manual gate (Unverified until run): the real-browser run with fake providers, the 35 mutation checks (design 12), the independent review; real provider headers, real daily quotas, sleeping tabs on real devices, and phones are **Unverified**
