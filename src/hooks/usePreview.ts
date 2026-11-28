@@ -7,7 +7,11 @@ import type { Finding } from '../engine/scanFindingTypes';
 import { practiceContent } from '../engine/practiceScript';
 import { detectPreviewMode, modeChoices, type PreviewMode } from '../preview/previewMode';
 import { RateLimiter, validateBridgeEvent, type BridgeEvent } from '../preview/previewBridge';
-import { evaluateOverflow, layoutFindings, type Measurement, type OverflowResult } from '../preview/layoutCheck';
+import { evaluateOverflow, type Measurement, type OverflowResult } from '../preview/layoutCheck';
+import { evaluateLint, type LintOutput } from '../preview/linter';
+import { buildMeasuredFindings } from '../preview/linterFindings';
+import { cssRulesOf } from '../preview/mediaSize';
+import { styleBlocks } from '../engine/checks/cssCheck';
 import type { ElementEntry } from '../preview/previewDocument';
 import {
   addConsoleLine, beginLayout, countInvalid, discardLayout, finishLayout, initPreview, resetPreview, setPreviewComponent, setPreviewEntry, setPreviewMode, setPreviewScripts,
@@ -19,7 +23,9 @@ import { studioStore, type Store, type StudioState } from '../store/useStudioSto
 export interface LayoutRunner {
   setWidth(px: number): void;
   restore(): void;
-  measure(): { measurements: Measurement[]; docScrollWidth: number } | null;
+  measure(): { measurements: Measurement[]; docScrollWidth: number; outsideStyleFailed?: number } | null;
+  /** Waits (with its own caps) for fonts and pictures to finish loading. Optional so older runners still work. */
+  ready?(): Promise<{ pendingImages: number } | void>;
   elements: readonly ElementEntry[];
   contentKey: string;
 }
@@ -150,6 +156,10 @@ export function createPreviewController(studio: Store<StudioState> = studioStore
       clearTimer();
       timer = services.setTimer(() => { stopped = true; }, L.layoutMs);
       const results: OverflowResult[] = [];
+      const lintRuns: Array<{ width: number; lint: LintOutput }> = [];
+      let outsideStyleFailed = 0;
+      const tagById = new Map(runner.elements.map((e) => [e.id, e.tag] as const));
+      const entryTag = (id: number) => tagById.get(id);
       try {
         for (const w of widths) {
           if (stopped || disposed) break;
@@ -159,7 +169,12 @@ export function createPreviewController(studio: Store<StudioState> = studioStore
           let m = runner.measure();
           for (let tries = 0; !m && tries < 20 && !stopped && !disposed; tries++) { await services.raf(); m = runner.measure(); }
           if (!m) { stopped = true; break; }
+          if (runner.ready) await runner.ready();
+          if (stopped || disposed) break;
+          m = runner.measure() ?? m;
           results.push(...evaluateOverflow(m.measurements, w, m.docScrollWidth));
+          lintRuns.push({ width: w, lint: evaluateLint(m.measurements, w, entryTag) });
+          outsideStyleFailed = Math.max(outsideStyleFailed, m.outsideStyleFailed ?? 0);
         }
       } catch {
         stopped = true;
@@ -172,8 +187,13 @@ export function createPreviewController(studio: Store<StudioState> = studioStore
       // Content changed while measuring: line numbers would not match, so the result is dropped.
       if (currentKey && currentKey() !== runner.contentKey) { studio.update((st) => stopLayout(st, 'The page changed while it was measured, so the result was dropped.')); return; }
       const s = studio.getState();
-      const { findings, partialReasons } = layoutFindings(results, runner.elements, effectiveOf(s));
-      studio.update((st) => finishLayout(st, findings as Finding[], runner.contentKey, partialReasons, services.now()));
+      const eff = effectiveOf(s);
+      const cssTexts: string[] = [];
+      if (s.snapshot) for (const f of s.snapshot.files) if (/\.css$/i.test(f.path)) cssTexts.push(eff(f.path) ?? '');
+      const entry = s.preview.entryPath ? eff(s.preview.entryPath) : undefined;
+      if (entry) for (const b of styleBlocks(entry)) cssTexts.push(b.css);
+      const built = buildMeasuredFindings({ overflow: results, perWidth: lintRuns, elements: runner.elements, effective: eff, cssRules: cssRulesOf(cssTexts) });
+      studio.update((st) => finishLayout(st, built.findings as Finding[], runner.contentKey, built.partialReasons, services.now(), { cantMeasure: built.cantMeasure, outsideStyleFailed }));
     },
   };
 

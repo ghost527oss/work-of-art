@@ -17,6 +17,7 @@ import {
   type RepoSnapshot,
 } from '../types/contracts';
 import { computeCoverage, planLoading } from './fileSelector';
+import { loadMedia } from './mediaLoader';
 import {
   IngestError,
   fetchFileCapped,
@@ -283,6 +284,14 @@ export async function runIngestion(request: RepoRequest, deps: PipelineDeps): Pr
     detail: `${files.length} of ${planned.length} planned files loaded.`,
   });
 
+  // 3B-1: small referenced pictures for the Sandbox, kept apart from the text files.
+  const mediaPass = await loadMedia({
+    owner, repo, ref, files, byPath, scope: request.scope, budgets, source,
+    shouldStop,
+    stopReason: () => ((stop as { code?: string } | null)?.code === 'rate_limited' ? 'GitHub rate limit reached.' : `Time limit of ${Math.round(budgets.totalDeadlineMs / 1000)} s reached.`),
+  });
+  warnings.push(...mediaPass.warnings);
+
   // 4. Assemble and self-check the snapshot.
   files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const inventory = {
@@ -300,7 +309,8 @@ export async function runIngestion(request: RepoRequest, deps: PipelineDeps): Pr
     repoUrl: `https://github.com/${owner}/${repo}`,
     inventory,
     files,
-    coverage: computeCoverage(inventory, files, warnings),
+    ...(mediaPass.media.length > 0 ? { media: mediaPass.media } : {}),
+    coverage: computeCoverage(inventory, files, warnings, mediaPass.media),
     loadedAt,
   };
   assertCoverageConsistent(snapshot);

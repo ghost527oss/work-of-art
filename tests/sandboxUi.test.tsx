@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PreviewNotes, PreviewToolbar, ScriptsSwitch, SourceViewer, ConsolePane } from '../src/components/PreviewParts';
+import { BlockedList } from '../src/components/BlockedList';
 import { SandboxPanel } from '../src/components/SandboxPanel';
 import { StudioLayout } from '../src/components/StudioLayout';
 import { buildSampleSnapshot } from '../src/data/sampleRepos';
@@ -94,5 +95,41 @@ describe('Sandbox panel', () => {
     const block = css.slice(css.indexOf('/* @node: F7.9'));
     expect(block).not.toMatch(/transition|animation|rgb|hsl/);
     for (const c of block.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []) expect(['#000', '#fff']).toContain(c.toLowerCase());
+  });
+});
+
+// @node: F12.6 (3B-1: blocked list and the outside-host note)
+describe('blocked-resources list', () => {
+  it('always shows the plain note about outside hosts and the IP address', () => {
+    const m = html(createElement(BlockedList, { blocked: [] }));
+    expect(m).toContain('Styles and fonts may load from: cdnjs.cloudflare.com, cdn.jsdelivr.net, unpkg.com, fonts.googleapis.com, fonts.gstatic.com.');
+    expect(m).toContain("Any of these hosts can see your IP address. PatchBay&#x27;s address is not sent as a referrer.");
+    expect(m).toContain('Pictures may load from their own https addresses.');
+    expect(m).toContain('Nothing was blocked.');
+  });
+  it('lists at most 20 lines then the rest, as React text', () => {
+    const blocked = Array.from({ length: 25 }, (_, i) => ({ what: `<b>x${i}</b>`, reason: 'not_on_list' as const }));
+    const m = html(createElement(BlockedList, { blocked, outsideStyles: ['unpkg.com', 'unpkg.com'] }));
+    expect(m).toContain('Not loaded in the preview (25)');
+    expect(m).toContain('and 5 more.');
+    expect(m).toContain('&lt;b&gt;x0&lt;/b&gt;');
+    expect(m).not.toContain('<b>x0');
+    expect(m).toContain('Loaded from outside: unpkg.com (styles).');
+  });
+  it('the Sandbox panel shows it for a static page', () => {
+    studioStore.setState({ ...initialState(), experience: 'studio', snapshot: buildSampleSnapshot('static-site', 1), preview: { ...initialState().preview, mode: 'static', entryPath: 'index.html', reason: 'A plain page.', status: 'ready' } });
+    const m = html(createElement(SandboxPanel, { preview }));
+    expect(m).toContain('can see your IP address');
+  });
+});
+
+// @node: F12.9 (the Run-scripts warning tells the truth about pictures and script hosts)
+describe('Run scripts warning', () => {
+  it('says scripts can ask any https address for a picture and which script hosts may load', () => {
+    const src = readFileSync('src/components/PreviewParts.tsx', 'utf8');
+    expect(src).toContain('Scripts on the page can ask any https address for a picture');
+    expect(src).toContain('that address&apos;s host can see your IP address (PatchBay&apos;s address is not sent as a referrer)');
+    expect(src).toContain('cannot send data to a server');
+    expect(src).not.toContain('or the internet.');
   });
 });

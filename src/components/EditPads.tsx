@@ -152,8 +152,17 @@ export function PreviewOnlyList({ items, suggestions, existing, onRemove, onRemo
   );
 }
 
-export function LayoutFixList({ findings, isWorkbench, status, canCheck, onCheck, onCheckAll, onTry }: {
-  findings: readonly Finding[]; isWorkbench: boolean; status: string; canCheck: boolean; onCheck(): void; onCheckAll(): void; onTry(f: Finding): void;
+/** 3B-1: what the recipe button of a finding does and says. */
+export interface RecipeUi {
+  /** Null when a recipe is possible, else the plain reason. */
+  reasonFor(f: Finding): string | null;
+  busy: boolean;
+  state?: { status: string; message: string; targetId?: string };
+  onRecipe(f: Finding): void;
+}
+
+export function LayoutFixList({ findings, isWorkbench, status, canCheck, onCheck, onCheckAll, onTry, recipe }: {
+  findings: readonly Finding[]; isWorkbench: boolean; status: string; canCheck: boolean; onCheck(): void; onCheckAll(): void; onTry(f: Finding): void; recipe?: RecipeUi;
 }) {
   if (isWorkbench) return <section><h3>Layout</h3><p>Layout checks run on real pages, not on approximate pictures.</p></section>;
   return (
@@ -161,8 +170,19 @@ export function LayoutFixList({ findings, isWorkbench, status, canCheck, onCheck
       <h3 id="layout-heading">Layout ({findings.length} findings)</h3>
       <p><button type="button" disabled={!canCheck} onClick={onCheck}>Check layout</button> <button type="button" disabled={!canCheck} onClick={onCheckAll}>Check at all widths</button> <span className="note">{status}</span></p>
       {findings.length === 0 ? <p>No layout findings.</p> : (
-        <ul>{findings.map((f) => <li key={f.id}>{f.path}, line {f.firstLine}: {f.extra} <button type="button" onClick={() => onTry(f)}>Try a fix</button></li>)}</ul>
+        <ul>{findings.map((f) => {
+          const why = recipe ? recipe.reasonFor(f) : 'no recipe';
+          return (
+            <li key={f.id}>{f.path}, line {f.firstLine}: {f.extra}{f.confidence ? ` Confidence: ${f.confidence}.` : ''}{' '}
+              {f.skillId === 'scan.frontend.layout-overflow' && <button type="button" onClick={() => onTry(f)}>Try a fix</button>}{' '}
+              {recipe && <button type="button" disabled={recipe.busy || why !== null} onClick={() => recipe.onRecipe(f)}>Recipe fix</button>}
+              {recipe && why !== null && <span className="note"> {why}</span>}
+              {recipe?.state?.targetId === f.id && <span className="note" role="status"> {recipe.state.message}</span>}
+            </li>
+          );
+        })}</ul>
       )}
+      {recipe?.state && !findings.some((f) => f.id === recipe.state?.targetId) && <p className="note" role="status">{recipe.state.message}</p>}
     </section>
   );
 }

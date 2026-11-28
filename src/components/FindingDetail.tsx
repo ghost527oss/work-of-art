@@ -1,5 +1,6 @@
 // @node: F6.10
 // @node: F9.10 (Learn more)
+// @node: F12.11 (confidence and the static-render label)
 // One finding with its proof: lines, snippet, explanation, why it matters, plan, certainty in words. Props only.
 import { cardsForSkill, scanSkillById } from '../skillbook';
 import type { Finding } from '../engine/scanFindingTypes';
@@ -24,7 +25,8 @@ export function FindingDetail({ finding, onLearnMore }: { finding: Finding; onLe
       <p><strong>Why it matters:</strong> {skill.why}</p>
       <p><strong>Plan:</strong></p>
       <ol>{skill.how.map((h, i) => <li key={i}>{h}</li>)}</ol>
-      <p>{skill.kind === 'measured' ? 'Measured in the preview (not read from the code).' : finding.certainty === 'found' ? 'Found by the check.' : 'Possible: only the loaded files were read, so protection or handling may exist elsewhere.'}</p>
+      <p>{skill.kind === 'measured' ? 'Measured in the preview (static render, scripts off: pages built by JavaScript are not measured), not read from the code.' : finding.certainty === 'found' ? 'Found by the check.' : 'Possible: only the loaded files were read, so protection or handling may exist elsewhere.'}</p>
+      {finding.confidence && <p>Confidence: {finding.confidence}. {finding.confidence === 'high' ? 'The measurement is clear.' : finding.confidence === 'medium' ? 'The measurement is likely right, but the design may be on purpose.' : 'This is a hint: PatchBay cannot be sure.'}</p>}
       <p>{FIX_MEANING[finding.fix]}{finding.fixNote ? ` ${finding.fixNote}` : ''}</p>
       <p className="note">Check: {skill.id}</p>
       {onLearnMore && lesson && <p><button type="button" onClick={() => onLearnMore(lesson.id)}>Learn more</button></p>}

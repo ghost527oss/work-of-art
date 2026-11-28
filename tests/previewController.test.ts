@@ -164,3 +164,60 @@ describe('layout check run', () => {
     expect(store.getState().preview.layout.findings).toEqual([]);
   });
 });
+
+// @node: F12.11 (3B-1: the Full check reads the extra values, waits for fonts and pictures, and keeps what it could not measure)
+describe('Full check with the Visual Linter', () => {
+  const ELEMENTS = [
+    { id: 0, path: 'index.html', tag: 'button', line: 1, col: 1, startOffset: 0, endOffset: 5, endLine: 1 },
+    { id: 1, path: 'index.html', tag: 'p', line: 2, col: 1, startOffset: 6, endOffset: 9, endLine: 2 },
+  ];
+  const m = (over: object) => ({
+    id: 0, tag: 'button', clientWidth: 30, scrollWidth: 30, clientHeight: 30, scrollHeight: 30, overflowX: 'visible', overflowY: 'visible', hasText: true,
+    parentKey: 1, left: 0, top: 0, width: 30, height: 30, display: 'block', position: 'static', visibility: 'visible', opacity: 1, fontSize: 16, color: 'rgb(0, 0, 0)', bg: { color: 'rgb(255, 255, 255)' }, hasHref: true, ...over,
+  });
+  const lintRunner = (over: Partial<LayoutRunner> = {}): LayoutRunner => ({
+    setWidth: vi.fn(), restore: vi.fn(), elements: ELEMENTS, contentKey: 'k1',
+    measure: () => ({ measurements: [m({}), m({ id: 1, tag: 'p', parentKey: 2, width: 200, height: 20, color: 'rgb(200, 200, 200)', bg: { unknown: 'picture' } })], docScrollWidth: 375, outsideStyleFailed: 1 }), ...over,
+  });
+  it('stores new findings with confidence, the can\'t-measure counts, and the outside-style note; waits at every width', async () => {
+    const { store, c } = setup();
+    c.actions.init();
+    const ready = vi.fn(async () => ({ pendingImages: 0 }));
+    await c.actions.checkLayout(lintRunner({ ready }), [375, 768, 1024]);
+    const l = store.getState().preview.layout;
+    expect(l.status).toBe('done');
+    expect(l.findings.map((f) => f.measure?.kind)).toEqual(['tap-target']);
+    expect(l.findings[0]).toMatchObject({ confidence: 'high', skillId: 'scan.frontend.tap-target' });
+    expect(l.findings[0]!.extra).toContain('measured at 375, 768 px wide previews (static render, scripts off)');
+    expect(l.cantMeasure).toEqual({ picture: 1 });
+    expect(l.outsideStyleFailed).toBe(1);
+    expect(ready).toHaveBeenCalledTimes(3);
+    c.dispose();
+  });
+  it('nothing about the measurements is written to the Log except the count line', async () => {
+    const { store, c } = setup();
+    c.actions.init();
+    await c.actions.checkLayout(lintRunner(), [375]);
+    expect(store.getState().log.at(-1)!.message).toBe('Layout check: 1 findings at 375 px.');
+    expect(JSON.stringify(store.getState().log)).not.toContain('rgb(');
+    c.dispose();
+  });
+  it('a runner without ready() still works, and a check that hangs in ready() is stopped by the timer', async () => {
+    const a = setup(); a.c.actions.init();
+    await a.c.actions.checkLayout(lintRunner(), [375]);
+    expect(a.store.getState().preview.layout.status).toBe('done');
+    const b = setup(); b.c.actions.init();
+    const r = lintRunner({ ready: async () => { b.timers[0]?.(); } });
+    await b.c.actions.checkLayout(r, [375, 768]);
+    expect(b.store.getState().preview.layout.status).toBe('stopped');
+    expect(r.restore).toHaveBeenCalled();
+  });
+  it('findings and counts are dropped with the layout when the content changes', async () => {
+    const { store, c } = setup();
+    c.actions.init();
+    await c.actions.checkLayout(lintRunner(), [375]);
+    c.actions.markContent('other');
+    expect(store.getState().preview.layout).toMatchObject({ status: 'idle', findings: [] });
+    expect(store.getState().preview.layout.cantMeasure).toBeUndefined();
+  });
+});

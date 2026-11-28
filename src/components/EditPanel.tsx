@@ -11,7 +11,8 @@ import { tokenizeHtml } from '../preview/htmlTokens';
 import type { HarnessActions } from '../hooks/useHarness';
 import type { EditActions } from '../hooks/useEditPad';
 import type { PreviewActions } from '../hooks/usePreview';
-import { useStudioStore } from '../store/useStudioStore';
+import { useRecipe, offerFor, NEED_FULL_CHECK, FULL_WIDTHS } from '../hooks/useRecipe';
+import { studioStore, useStudioStore } from '../store/useStudioStore';
 import { EditTools, LayoutFixList, PreviewOnlyList, PropertyForm, SelectionInfo } from './EditPads';
 
 export interface EditPanelProps {
@@ -33,6 +34,7 @@ function Pad({ pad, preview, harness }: Required<Omit<EditPanelProps, 'mode'>>) 
   const applied = useStudioStore((s) => s.work.applied);
   const undone = useStudioStore((s) => s.work.undone);
   const chat = useStudioStore((s) => s.work.chat);
+  const recipe = useRecipe();
   const narrow = typeof window !== 'undefined' && window.innerWidth < EDIT_LIMITS.minWindow;
 
   useEffect(() => { if (pv.scripts) { preview.setScripts(false); pad.setReply('Scripts were turned off because editing needs look-only mode.'); } }, [pv.scripts, preview, pad]);
@@ -91,6 +93,16 @@ function Pad({ pad, preview, harness }: Required<Omit<EditPanelProps, 'mode'>>) 
         onCheck={() => { void previewInfoStore; document.querySelector<HTMLButtonElement>('.sandbox .preview-toolbar button[data-check="one"]')?.click(); }}
         onCheckAll={() => document.querySelector<HTMLButtonElement>('.sandbox .preview-toolbar button[data-check="all"]')?.click()}
         onTry={pad.tryFix}
+        recipe={{
+          busy: pv.recipe?.status === 'applying' || pv.recipe?.status === 'measuring',
+          state: pv.recipe,
+          reasonFor: (f) => {
+            if (!FULL_WIDTHS.every((w) => pv.layout.widths.includes(w))) return NEED_FULL_CHECK;
+            const o = offerFor(studioStore.getState(), info, f);
+            return o.ok ? null : o.reason;
+          },
+          onRecipe: (f) => recipe.start(f.id),
+        }}
       />
     </>
   );

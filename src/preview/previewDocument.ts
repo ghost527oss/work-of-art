@@ -9,6 +9,13 @@ import { sanitizeCss, styleBody } from './cssSanitize';
 import { cspFor } from './previewFlags';
 import { INSPECTOR_SOURCE } from './previewBridge';
 import { isSafeDeclaration } from '../edit/styleModel';
+import { SCRIPT_HOSTS, STYLE_HOSTS } from '../config/previewHosts';
+import { STORAGE_SHIM_SOURCE } from './storageShim';
+import { addBlocked, type BlockedEntry } from './blockedReport';
+import { matchImageUrl, matchOutsideUrl } from './hostMatch';
+import { bytesOfBase64, mimeMatchesBytes } from '../engine/imageSniff';
+import { resolveLocalRef } from '../engine/mediaRefs';
+import type { BlockedReason } from './blockedReport';
 
 export interface ElementEntry {
   id: number; path: string; tag: string; line: number; col: number; startOffset: number; endOffset: number; endLine: number;
@@ -19,7 +26,15 @@ export interface ElementEntry {
 }
 
 export interface PreviewStyle { elementKey: string; property: string; value: string }
-export interface PreviewReport { removed: Record<string, number>; blockedExternal: string[]; placeholders: string[]; inlinedFiles: number; unknownTags: number; truncated: boolean }
+export interface PreviewReport {
+  removed: Record<string, number>; blockedExternal: string[]; placeholders: string[]; inlinedFiles: number; unknownTags: number; truncated: boolean;
+  /** 3B-1: what was not loaded and why (plain words, at most 200). */
+  blocked: BlockedEntry[];
+  /** 3B-1: outside stylesheet hosts written into the preview. */
+  outsideStyles: string[];
+  /** 3B-1: outside script hosts written into a Run-scripts preview. */
+  outsideScripts: string[];
+}
 export type PreviewBuild = { ok: true; html: string; elements: ElementEntry[]; report: PreviewReport; notes: string[] } | { ok: false; reason: string };
 
 export interface StaticInput {
@@ -38,6 +53,10 @@ export interface StaticInput {
   previewStyles?: readonly PreviewStyle[];
   /** Set by the workbench: elements are annotated but never mappable. */
   approximate?: boolean;
+  /** 3B-1: a loaded local picture (the stored `media` list), by repository path. Absent means no pictures are loaded. */
+  media?: (path: string) => { mime: string; base64: string } | undefined;
+  /** 3B-1: why a local picture was not loaded (plain words and a blocked-list reason), by repository path. */
+  mediaNote?: (path: string) => { text: string; reason: BlockedReason } | undefined;
 }
 
 const BASE_STYLE = '.pb-img{display:inline-block;border:1px dashed #000;font:12px monospace;box-sizing:border-box;overflow:hidden;padding:2px}.pb-expr{border:1px dashed #000;font:12px monospace}.pb-box{display:block;border:1px dashed #000;font:12px monospace;padding:4px}';
@@ -66,7 +85,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (!isSafeDeclaration({ prop: ps.property, value: ps.value })) continue;
       styleFor.set(ps.elementKey, `${styleFor.get(ps.elementKey) ?? ''};${ps.property}:${ps.value}`);
     }
-    const report: PreviewReport = { removed: {}, blockedExternal: [], placeholders: [], inlinedFiles: 0, unknownTags: 0, truncated: false };
+    const report: PreviewReport = { removed: {}, blockedExternal: [], placeholders: [], inlinedFiles: 0, unknownTags: 0, truncated: false, blocked: [], outsideStyles: [], outsideScripts: [] };
     const elements: ElementEntry[] = [];
     const styles: string[] = [];
     const body: string[] = [];
@@ -77,15 +96,43 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
     let skipDepth: string | null = null;
     let inSvg = 0;
     let bodyAttrs = '';
-    let scriptBodies: string[] = [];
+    const scriptList: Array<{ src: string } | { body: string }> = [];
+    const isModuleWithImports = (type: string | undefined, code: string): boolean => (type ?? '').trim().toLowerCase() === 'module' && /^\s*(?:import|export)\b/m.test(code);
     const inline = (path: string) => { report.inlinedFiles++; return input.effective(path) ?? ''; };
+    // 3B-1 pictures: a loaded local picture becomes a data address, once its signature is re-checked and the
+    // per-document budget (repeats counted) allows it.
+    let embedded = 0;
+    const verified = new Map<string, boolean>();
+    const embedLocal = (path: string): { url: string } | { reason: BlockedReason; note: string } | undefined => {
+      const m = input.media?.(path);
+      if (!m) return undefined;
+      let ok = verified.get(path);
+      if (ok === undefined) { try { ok = mimeMatchesBytes(m.mime, bytesOfBase64(m.base64)); } catch { ok = false; } verified.set(path, ok); }
+      if (!ok) return { reason: 'picture_failed', note: 'not a real picture' };
+      const url = `data:${m.mime};base64,${m.base64}`;
+      if (embedded + url.length > L.maxEmbeddedMediaBytes) return { reason: 'picture_embed_limit', note: 'too many pictures for one preview' };
+      embedded += url.length;
+      return { url };
+    };
+    /** Local `url(picture)` in a loaded stylesheet or style attribute becomes `url(data:...)` before the sanitizer runs. */
+    const rewriteLocalUrls = (css: string, fromPath: string): string => {
+      if (!input.media || !/url\(/i.test(css)) return css;
+      return css.replace(/url\(\s*(['"]?)([^'")]+?)\1\s*\)/gi, (whole, _q: string, ref: string) => {
+        const p = resolveLocalRef(fromPath, ref);
+        if (!p) return whole;
+        const e = embedLocal(p);
+        if (e && 'url' in e) return `url(${e.url})`;
+        if (e) addBlocked(report, p, e.reason);
+        return whole;
+      });
+    };
 
     const writeAttrs = (attrs: HtmlAttr[], tag: string): string => {
       let s = '';
       for (const a of attrs) {
         const n = a.name;
-        if (/^on[a-z]+$/.test(n)) { if (input.scripts) s += ` ${n}="${escapeAttr(a.value)}"`; else count(report, 'event handler'); continue; }
-        if (n === 'style') { s += ` style="${escapeAttr(sanitizeCss(a.value))}"`; continue; }
+        if (/^on[a-z]+$/.test(n)) { if (input.scripts) s += ` ${n}="${escapeAttr(a.value)}"`; else { count(report, 'event handler'); addBlocked(report, `${tag} ${n}`, 'event_handler'); } continue; }
+        if (n === 'style') { s += ` style="${escapeAttr(sanitizeCss(rewriteLocalUrls(a.value, input.entryPath)))}"`; continue; }
         if (n === 'href' && tag === 'a') { s += ' href="#"'; if (a.value && !a.value.startsWith('#')) report.blockedExternal.push(a.value.slice(0, 80)); continue; }
         if (n.startsWith('data-')) { s += ` data-x-${escapeAttr(n.slice(5))}="${escapeAttr(a.value)}"`; continue; }
         if (!attrAllowed(n, inSvg > 0)) { count(report, n); continue; }
@@ -124,7 +171,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (name === 'body') { bodyAttrs = writeAttrs(attrs.filter((a) => ['class', 'id', 'style', 'lang', 'dir'].includes(a.name)), 'body'); continue; }
       if (name === 'title') { if (rawNext) { title = (rawNext.text ?? '').trim().slice(0, 200); skipText = rawNext.start; } continue; }
       if (name === 'style') {
-        if (rawNext) { styles.push(styleBody(rawNext.text ?? '')); skipText = rawNext.start; }
+        if (rawNext) { styles.push(`<style>${styleBody(rewriteLocalUrls(rawNext.text ?? '', input.entryPath))}</style>`); skipText = rawNext.start; }
         continue;
       }
       if (name === 'link') {
@@ -132,21 +179,48 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
         const href = attrs.find((a) => a.name === 'href')?.value ?? '';
         if (rel.split(/\s+/).includes('stylesheet')) {
           const p = resolve(input.entryPath, href, input.loaded);
-          if (p && report.inlinedFiles < L.maxInlinedFiles) styles.push(styleBody(inline(p)));
-          else { report.blockedExternal.push(href.slice(0, 80)); count(report, 'stylesheet'); }
+          if (p && report.inlinedFiles < L.maxInlinedFiles) styles.push(`<style>${styleBody(rewriteLocalUrls(inline(p), p))}</style>`);
+          else {
+            const outside = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href) ? matchOutsideUrl(href, STYLE_HOSTS) : null;
+            if (outside && report.outsideStyles.length < L.maxExternalStyles) {
+              styles.push(`<link rel="stylesheet" href="${escapeAttr(outside)}">`);
+              report.outsideStyles.push(new URL(outside).hostname);
+            } else {
+              report.blockedExternal.push(href.slice(0, 80));
+              count(report, 'stylesheet');
+              const absolute = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href);
+              addBlocked(report, href, !absolute ? 'local_missing' : outside ? 'too_many_outside' : href.length > L.maxOutsideUrlChars ? 'too_long' : /^https:/i.test(href) ? 'not_on_list' : 'not_https');
+            }
+          }
         } else count(report, 'link');
         continue;
       }
       if (name === 'script') {
-        if (!input.scripts) { count(report, 'script'); if (rawNext) skipText = rawNext.start; continue; }
+        if (!input.scripts) { count(report, 'script'); addBlocked(report, attrs.find((a) => a.name === 'src')?.value ?? 'inline script', 'scripts_off'); if (rawNext) skipText = rawNext.start; continue; }
         if (rawNext) skipText = rawNext.start;
         const src = attrs.find((a) => a.name === 'src')?.value;
+        const stype = attrs.find((a) => a.name === 'type')?.value;
         if (src) {
           const p = resolve(input.entryPath, src, input.loaded);
-          if (p && report.inlinedFiles < L.maxInlinedFiles) scriptBodies.push(inline(p));
-          else { report.blockedExternal.push(src.slice(0, 80)); count(report, 'script'); }
-        } else {
-          if (rawNext) scriptBodies.push(rawNext.text ?? '');
+          const absolute = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src);
+          if (p && report.inlinedFiles < L.maxInlinedFiles) {
+            const code = inline(p);
+            if (isModuleWithImports(stype, code)) { count(report, 'script'); addBlocked(report, src, 'module_script'); }
+            else scriptList.push({ body: code });
+          } else {
+            const outside = absolute ? matchOutsideUrl(src, SCRIPT_HOSTS) : null;
+            if (outside) {
+              if (isModuleWithImports(stype, 'import x')) { count(report, 'script'); addBlocked(report, src, 'module_script'); }
+              else { scriptList.push({ src: outside }); report.outsideScripts.push(new URL(outside).hostname); }
+            } else {
+              report.blockedExternal.push(src.slice(0, 80)); count(report, 'script');
+              addBlocked(report, src, !absolute ? 'local_missing' : src.length > L.maxOutsideUrlChars ? 'too_long' : /^https:/i.test(src) ? 'not_on_list' : 'not_https');
+            }
+          }
+        } else if (rawNext) {
+          const code = rawNext.text ?? '';
+          if (isModuleWithImports(stype, code)) { count(report, 'script'); addBlocked(report, 'inline module script', 'module_script'); }
+          else scriptList.push({ body: code });
         }
         continue;
       }
@@ -166,18 +240,46 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
         const src = attrs.find((a) => a.name === 'src')?.value ?? '';
         const p = name === 'img' ? resolve(input.entryPath, src, input.loaded) : undefined;
         const svg = p && /\.svg$/i.test(p) ? input.effective(p) : undefined;
+        const mediaKey = `${input.entryPath}#${name}#${tagCounts.get(name) ?? 0}`;
+        const po = styleFor.get(mediaKey);
+        const imgTag = (address: string): string => {
+          const attrsOut = writeAttrs(attrs.filter((a) => ['alt', 'width', 'height', 'class', 'id', 'style'].includes(a.name)), 'img');
+          return `<img src="${escapeAttr(address)}"${po ? withExtraStyle(attrsOut, po) : attrsOut}${mediaMarker}>`;
+        };
+        const absolute = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src);
+        // 3B-1: a loaded local picture, or an outside https picture that passes the strict address rules.
+        let note: string | undefined;
+        let reason: BlockedReason = 'image_not_loaded';
+        if (name === 'img' && svg === undefined) {
+          if (!absolute) {
+            const local = resolveLocalRef(input.entryPath, src);
+            if (local && input.media?.(local)) {
+              const e = embedLocal(local);
+              if (e && 'url' in e) { body.push(imgTag(e.url)); continue; }
+              if (e) { note = e.note; reason = e.reason; }
+            } else if (local) {
+              const n = input.mediaNote?.(local);
+              if (n) { note = n.text; reason = n.reason; }
+            }
+          } else {
+            const outside = matchImageUrl(src);
+            if (outside) { body.push(imgTag(outside)); continue; }
+            note = /^https:/i.test(src) ? 'its address is not allowed for pictures' : 'only https pictures are shown';
+            reason = /^https:/i.test(src) ? 'picture_outside_rejected' : 'not_https';
+          }
+        }
         if (svg !== undefined && svg.length <= L.svgDataBytes) {
           const safe = svg.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+="[^"]*"/gi, '');
           body.push(`<img src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(safe)}"${writeAttrs(attrs.filter((a) => ['alt', 'width', 'height', 'class', 'id', 'style'].includes(a.name)), 'img')}${mediaMarker}>`);
         } else {
           const w = attrs.find((a) => a.name === 'width')?.value ?? '120';
           const h = attrs.find((a) => a.name === 'height')?.value ?? '80';
-          const label = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src) ? 'outside address' : src.slice(0, 80) || name;
+          const baseLabel = absolute ? 'outside address' : src.slice(0, 80) || name;
+          const label = note ? `${baseLabel} (${note})` : baseLabel;
           report.placeholders.push(label);
+          addBlocked(report, label, reason);
           const keep = attrs.filter((a) => ['id', 'class'].includes(a.name));
           const own = sanitizeCss(attrs.find((a) => a.name === 'style')?.value ?? '');
-          const mediaKey = `${input.entryPath}#${name}#${tagCounts.get(name) ?? 0}`;
-          const po = styleFor.get(mediaKey);
           // Default size first, the page's own style after it, then Preview Only values, so recorded sizes win.
           body.push(`<span class="pb-img"${writeAttrs(keep, 'span')} style="width:${/^\d{1,4}$/.test(w) ? w : 120}px;height:${/^\d{1,4}$/.test(h) ? h : 80}px;${escapeAttr(own)}${po ? escapeAttr(po) : ''}"${mediaMarker}>${escapeText(`image not loaded: ${label}`)}</span>`);
         }
@@ -187,7 +289,7 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (!known && !/^[a-z][a-z0-9-]*$/.test(name)) { count(report, name); continue; }
       let tag = name;
       if (!known) {
-        if (['iframe', 'object', 'embed', 'frame', 'frameset', 'applet', 'portal', 'template', 'foreignobject', 'use', 'image', 'meta', 'base'].includes(name)) { count(report, name); if (!tok.selfClosing && !VOID.has(name)) skipDepth = name; continue; }
+        if (['iframe', 'object', 'embed', 'frame', 'frameset', 'applet', 'portal', 'template', 'foreignobject', 'use', 'image', 'meta', 'base'].includes(name)) { count(report, name); addBlocked(report, `<${name}>`, 'removed_tag'); if (!tok.selfClosing && !VOID.has(name)) skipDepth = name; continue; }
         tag = 'span';
         report.unknownTags++;
       }
@@ -214,12 +316,14 @@ export function buildStaticPreview(input: StaticInput): PreviewBuild {
       if (!(tok.selfClosing || VOID.has(tag))) open.push({ tag }); else if (isSvg && tag === 'svg') inSvg = Math.max(0, inSvg - 1);
     }
     while (open.length) { const t = open.pop()!.tag; body.push(`</${SVG_CASE[t] ?? t}>`); }
-    scriptBodies = scriptBodies.map((s) => s.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--'));
-    const scriptTags = input.scripts ? `<script>${INSPECTOR_SOURCE(input.nonce, input.origin)}</script>${scriptBodies.map((s) => `<script>${s}</script>`).join('')}` : '';
+    // Run-scripts: the inspector and the storage stand-in first, then the page content, then the project scripts in page order.
+    const escapeScript = (s: string): string => s.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
+    const headScripts = input.scripts ? `<script>${INSPECTOR_SOURCE(input.nonce, input.origin)}</script><script>${STORAGE_SHIM_SOURCE}</script>` : '';
+    const tailScripts = input.scripts ? scriptList.map((s) => ('src' in s ? `<script src="${escapeAttr(s.src)}"></script>` : `<script>${escapeScript(s.body)}</script>`)).join('') : '';
     const html =
-      `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${escapeAttr(cspFor(input.scripts))}"><meta charset="utf-8">` +
-      `<style>${BASE_STYLE}</style><title>${escapeText(title)}</title>${styles.map((s) => `<style>${s}</style>`).join('')}</head>` +
-      `<body${bodyAttrs}>${input.scripts ? scriptTags : ''}${body.join('')}</body></html>`;
+      `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${escapeAttr(cspFor(input.scripts))}"><meta name="referrer" content="no-referrer"><meta charset="utf-8">` +
+      `<style>${BASE_STYLE}</style><title>${escapeText(title)}</title>${styles.join('')}</head>` +
+      `<body${bodyAttrs}>${headScripts}${body.join('')}${tailScripts}</body></html>`;
     if (html.length > L.maxDocBytes) return { ok: false, reason: 'The page is too large to preview.' };
     if (report.inlinedFiles > L.maxInlinedFiles) return { ok: false, reason: 'The page loads too many files to preview.' };
     return { ok: true, html, elements, report, notes: notesFrom(report) };

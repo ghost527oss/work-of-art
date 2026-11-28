@@ -2,6 +2,9 @@
 // The one automatic fix (scan.security.target-blank) and the safety conditions for offering it. Pure.
 import { containsSecret } from './redact';
 import { applyUnifiedDiff } from './diffApply';
+import { ONE_AT_A_TIME_SKILLS, proposeSyntaxFix } from './checks/syntaxFix';
+import { CHECK_LIMITS } from '../config/checkLimits';
+import { buildLineDiff } from '../edit/textDiff';
 import type { Finding } from './scanFindingTypes';
 
 const MAX_DIFF = 2000;
@@ -71,6 +74,7 @@ export const FIX_NOTE = 'A safe automatic fix could not be built here.';
  * to a file's text and returns its findings.
  */
 export function buildFixProposal(finding: Finding, content: string, recheck: (path: string, text: string) => Finding[]): FixResult {
+  if (finding.skillId === 'scan.frontend.js-syntax' || finding.skillId === 'scan.frontend.html-structure') return buildSyntaxFixProposal(finding, content, recheck);
   if (finding.skillId !== 'scan.security.target-blank') return { ok: false, reason: 'No automatic fix exists for this check.' };
   const diff = buildTargetBlankFix(content, finding);
   if (diff === null) return { ok: false, reason: 'The link could not be changed safely.' };
@@ -84,4 +88,25 @@ export function buildFixProposal(finding: Finding, content: string, recheck: (pa
   const had = new Set(before.map((f) => `${f.skillId}@${f.firstLine}`));
   if (after.some((f) => !had.has(`${f.skillId}@${f.firstLine}`))) return { ok: false, reason: 'The change would cause a new finding.' };
   return { ok: true, diff, title: `Add rel="noopener noreferrer" to the link in ${finding.path}` };
+}
+
+/** 3B-1: the candidate-and-verify syntax fix, with the same safety checks. A later mistake of the same skill is progress. */
+function buildSyntaxFixProposal(finding: Finding, content: string, recheck: (path: string, text: string) => Finding[]): FixResult {
+  const proposal = proposeSyntaxFix(finding, content);
+  if (!proposal.ok) return proposal;
+  if (proposal.newContent.length - content.length > CHECK_LIMITS.maxFixChars) return { ok: false, reason: 'The change is too large.' };
+  const diff = buildLineDiff(finding.path, content, proposal.newContent);
+  if (diff === null) return { ok: false, reason: 'The change could not be built.' };
+  if (diff.length > CHECK_LIMITS.maxFixDiffChars) return { ok: false, reason: 'The change is too large.' };
+  const changedLine = (content.split('\n')[finding.firstLine - 1] ?? '');
+  if (containsSecret(diff) || containsSecret(changedLine)) return { ok: false, reason: 'The change contains a likely secret.' };
+  const applied = applyUnifiedDiff(content, diff);
+  if (!applied.ok || applied.text !== proposal.newContent) return { ok: false, reason: 'The change does not apply exactly.' };
+  const before = recheck(finding.path, content);
+  const after = recheck(finding.path, applied.text);
+  if (after.some((f) => f.skillId === finding.skillId && f.firstLine === finding.firstLine)) return { ok: false, reason: 'The check would still report this spot.' };
+  const had = new Set(before.map((f) => `${f.skillId}@${f.firstLine}`));
+  const damage = after.some((f) => !had.has(`${f.skillId}@${f.firstLine}`) && !ONE_AT_A_TIME_SKILLS.includes(f.skillId));
+  if (damage) return { ok: false, reason: 'The change would cause a new finding.' };
+  return { ok: true, diff, title: proposal.title };
 }

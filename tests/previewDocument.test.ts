@@ -26,7 +26,8 @@ describe('flags', () => {
     expect(IFRAME_ATTRS).toMatchObject({ referrerPolicy: 'no-referrer', allow: '' });
   });
   it('the policies are exact', () => {
-    expect(POLICY_LOOK).toBe("default-src 'none'; img-src data:; font-src data:; media-src data:; style-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'");
+    // 3B-1 (V6, V9): font-src and style-src gained the allowed outside hosts and img-src gained https:; every other directive is as before.
+    expect(POLICY_LOOK).toBe("default-src 'none'; img-src data: https:; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; media-src data:; style-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com; connect-src 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'");
     expect(POLICY_SCRIPTS).toContain("script-src 'unsafe-inline'");
     expect(POLICY_LOOK).not.toContain('script-src');
     expect(cspFor(true)).toBe(POLICY_SCRIPTS);
@@ -87,7 +88,7 @@ describe('static document', () => {
   });
   it('fails cleanly when the page is missing or too large', () => {
     expect(buildStaticPreview({ entryPath: 'x.html', ...files({}), scripts: false, nonce: NONCE, origin: 'http://a' })).toEqual({ ok: false, reason: 'The page could not be read.' });
-    const big = buildStaticPreview({ entryPath: 'i.html', ...files({ 'i.html': '<p>' + 'a'.repeat(1100 * 1024) + '</p>' }), scripts: false, nonce: NONCE, origin: 'http://a' });
+    const big = buildStaticPreview({ entryPath: 'i.html', ...files({ 'i.html': '<p>' + 'a'.repeat(3100 * 1024) + '</p>' }), scripts: false, nonce: NONCE, origin: 'http://a' });
     expect(big.ok).toBe(false);
   });
   it('the output has no data-pb collision from page attributes', () => {
@@ -110,5 +111,51 @@ describe('css sanitizer', () => {
       expect(out, css).not.toMatch(/@import|url\(|\\/i);
     }
     expect(sanitizeCss('a{b:url(data:image/png;base64,AAA)}')).toContain('data:image/png;base64,AAA');
+  });
+});
+
+// @node: F12.6 (3B-1: outside styles and fonts in Look-only mode, and the blocked list)
+describe('outside stylesheets from the allowed hosts', () => {
+  const CDN = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css';
+  it('an allowed outside stylesheet is written as a link with only rel and href, in page order between the page styles', () => {
+    const r = build({ 'index.html': `<style>a{color:red}</style><link rel="stylesheet" href="${CDN}"><link rel="stylesheet" href="s.css"><p>x</p>`, 's.css': 'p{color:blue}' });
+    const head = r.html.slice(r.html.indexOf('</title>'), r.html.indexOf('</head>'));
+    expect(head).toContain(`<link rel="stylesheet" href="${CDN}">`);
+    expect(head.indexOf('a{color:red}')).toBeLessThan(head.indexOf('<link'));
+    expect(head.indexOf('<link')).toBeLessThan(head.indexOf('p{color:blue}'));
+    expect(r.report.outsideStyles).toEqual(['cdn.jsdelivr.net']);
+    expect(r.report.blocked).toEqual([]);
+  });
+  it('Google Fonts css is allowed; other hosts, http, and protocol-relative addresses are blocked with a reason', () => {
+    const html = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap"><link rel="stylesheet" href="https://evil.test/a.css"><link rel="stylesheet" href="http://cdn.jsdelivr.net/a.css"><link rel="stylesheet" href="//cdn.jsdelivr.net/a.css"><link rel="stylesheet" href="missing.css">';
+    const r = build({ 'index.html': html });
+    expect(r.report.outsideStyles).toEqual(['fonts.googleapis.com']);
+    expect(r.html).not.toContain('evil.test');
+    expect(r.html).not.toContain('http://cdn.jsdelivr.net');
+    expect(r.html).not.toContain('//cdn.jsdelivr.net/a.css');
+    expect(r.report.blocked.map((b) => b.reason)).toEqual(['not_on_list', 'not_https', 'not_https', 'local_missing']);
+  });
+  it('at most 10 outside styles are written; the rest are blocked as too many', () => {
+    const links = Array.from({ length: 12 }, (_, i) => `<link rel="stylesheet" href="https://unpkg.com/p${i}/a.css">`).join('');
+    const r = build({ 'index.html': links });
+    expect(r.report.outsideStyles).toHaveLength(10);
+    expect(r.report.blocked.filter((b) => b.reason === 'too_many_outside')).toHaveLength(2);
+  });
+  it('@import and non-data url() inside the page\'s own CSS stay removed', () => {
+    const r = build({ 'index.html': '<style>@import "https://cdn.jsdelivr.net/a.css"; p{background:url(https://cdn.jsdelivr.net/x.png)}</style>' });
+    expect(r.html).not.toContain('@import');
+    expect(r.html).not.toContain('x.png');
+  });
+  it('the written document uses the exact Look-only policy and no script policy', () => {
+    const r = build({ 'index.html': `<link rel="stylesheet" href="${CDN}">` });
+    expect(r.html).toContain(`content="${POLICY_LOOK.replace(/'/g, '&#39;')}"`);
+    expect(r.html).not.toContain('script-src');
+  });
+  it('the blocked list records scripts, handlers, removed tags, and placeholders without page text', () => {
+    const r = build({ 'index.html': '<div onclick="x()">SECRETTEXT</div><script src="app.js"></script><script>var a=1</script><iframe src="https://x.test"></iframe><img src="a.png">' });
+    const reasons = r.report.blocked.map((b) => b.reason);
+    expect(reasons).toEqual(expect.arrayContaining(['event_handler', 'scripts_off', 'removed_tag', 'image_not_loaded']));
+    expect(JSON.stringify(r.report.blocked)).not.toContain('SECRETTEXT');
+    expect(r.report.blocked.every((b) => b.what.length <= 80)).toBe(true);
   });
 });

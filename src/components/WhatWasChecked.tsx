@@ -12,6 +12,7 @@ export function WhatWasChecked({ result }: { result: ScanResult }) {
       <ul>
         <li>Files scanned: {w.filesScanned}. Files not read: {w.filesNotRead}.</li>
         {w.couldNotCheck > 0 && <li>Could not be checked: {w.couldNotCheck} file and check pairs.</li>}
+        {w.codeNotCheckedLines.map((l) => <li key={l}>{l}</li>)}
         {w.notChecked.map(([ext, n]) => <li key={ext}>.{ext}: {n} files, no checks for this type.</li>)}
         {w.notCheckedLines.map((l) => <li key={l}>{l}</li>)}
       </ul>

@@ -1,7 +1,7 @@
 // @node: F1.1
 // All ingestion limits live here. Every value is PROVISIONAL until the Phase 0
 // benchmark on the 4 GB target laptop. The coverage panel shows these numbers.
-import { MAX_SCOPE_ENTRIES } from '../types/contracts';
+import { MAX_SCOPE_ENTRIES, MEDIA_HARD_MAX_BYTES, MEDIA_HARD_MAX_COUNT, MEDIA_HARD_MAX_TOTAL_BYTES } from '../types/contracts';
 
 export interface Budgets {
   /** True until the values are replaced by benchmarked numbers. */
@@ -24,6 +24,10 @@ export interface Budgets {
   maxInventoryEntries: number;
   /** Maximum number of scope paths in one request. */
   maxScopeEntries: number;
+  /** 3B-1: pictures kept for the Sandbox. Per picture, in all per session (bytes before encoding), and how many. */
+  maxImageBytes: number;
+  maxTotalImageBytes: number;
+  maxImages: number;
 }
 
 export const BUDGETS: Budgets = {
@@ -37,6 +41,9 @@ export const BUDGETS: Budgets = {
   totalDeadlineMs: 60_000,
   maxInventoryEntries: 20_000,
   maxScopeEntries: MAX_SCOPE_ENTRIES,
+  maxImageBytes: MEDIA_HARD_MAX_BYTES,
+  maxTotalImageBytes: MEDIA_HARD_MAX_TOTAL_BYTES,
+  maxImages: MEDIA_HARD_MAX_COUNT,
 };
 
 /**

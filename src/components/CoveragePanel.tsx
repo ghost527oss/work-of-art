@@ -11,6 +11,13 @@ function kb(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
 }
 
+/** Plain counts of pictures that stayed placeholders, by reason. */
+function pictureLabels(snapshot: RepoSnapshot): Array<[string, number]> {
+  const n = (code: string) => snapshot.inventory.entries.filter((e) => e.reasonCode === code).length;
+  const rows: Array<[string, number]> = [['Pictures too large (placeholder)', n('media_too_large')], ['Pictures over the picture budget (placeholder)', n('media_budget_reached')], ['Pictures not loaded or not real (placeholder)', n('media_failed')]];
+  return rows.filter(([, c]) => c > 0);
+}
+
 export interface CoveragePanelProps {
   snapshot: RepoSnapshot;
   /** True while a (scoped) reload is running. */
@@ -63,6 +70,8 @@ export function CoveragePanel({ snapshot, busy, onLoadFolders }: CoveragePanelPr
           <tr><th scope="row">Skipped files</th><td>{c.skippedFiles}</td></tr>
           <tr><th scope="row">Failed files</th><td>{c.failedFiles}</td></tr>
           <tr><th scope="row">Content loaded</th><td>{kb(c.totalLoadedBytes)}</td></tr>
+          {(c.loadedMediaFiles ?? 0) > 0 && <tr><th scope="row">Pictures loaded (preview only)</th><td>{c.loadedMediaFiles} ({kb(c.loadedMediaBytes ?? 0)})</td></tr>}
+          {pictureLabels(snapshot).map(([label, n]) => <tr key={label}><th scope="row">{label}</th><td>{n}</td></tr>)}
         </tbody>
       </table>
 

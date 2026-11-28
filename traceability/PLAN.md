@@ -983,76 +983,130 @@ Contract: With `AI_MODE=live`, AI Chat answers come from a free provider chain (
 
 ---
 
-> plan_id: `P3B-LIVE-JOURNAL-CREW` — Live AI in the Journal and Skeleton Crew (spec `.kiro/specs/12-live-ai-journal-crew/`). Active product phase: Phase 3, Sub-phase 3B. Status: draft for approval; no node is approved for modification. Black-and-white wireframe, no animation, `AI_MODE=mock` stays the default, no new runtime dependency, free tiers only. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+> plan_id: `P3B1-CHECKS-LINTER` — Code checks, Visual Linter, and sandbox compatibility (Phase 3, step 3B-1; spec `.kiro/specs/12-code-checks-visual-linter/`; overall plan `PHASE_3B_IMPLEMENTATION_PLAN.md`). Status: draft for approval; no node is approved for modification. Black-and-white wireframe, no animation, `AI_MODE=mock` stays the default, **no AI request in 3B-1**, one new runtime dependency (`acorn`, approved), free tiers only. `scripts/traceability/*` do not exist, so `verify:` commands call npm/vitest directly.
+> Planned, not yet specified: `P3B2-LIBRARY-MAP` (spec 13, nodes F13.x: Knowledge Library, Repo Map, 10 visual templates) and `P3B3-AUTONOMOUS-RUN` (spec 14, nodes F14.x: Crew Run v2, Review and Autopilot, wait-and-resume, Undo this whole run). The old draft `P3B-LIVE-JOURNAL-CREW` (AI explanations in the Journal and narration) is replaced and not part of 3B.
 
-## F12 — Live AI in the Journal and Skeleton Crew
-Contract: Next to the fixed Journal and crew text, buttons ask the live AI (3A router and Context Engine) to explain a lesson or flow in your project, review a finding, and (one opt-in request) narrate up to 8 findings. The AI text is shown in labelled blocks, kept in memory only, never in the Log, storage, or any download. A hand-off button opens AI Chat prefilled for a fix and sends nothing. Nothing here can change a file.
+## F12 — Code checks, Visual Linter, and sandbox compatibility
+Contract: PatchBay reads JavaScript (with `acorn`), HTML, and CSS and reports real mistakes with the exact place, offers a narrow candidate-and-verify fix, measures the rendered preview at 375, 768, and 1024 px with a confidence on every result, fixes objective visual problems with fixed zero-AI recipes that are re-measured and undone automatically when they don't help, and lets real pages look styled (CDN styles and fonts, small local pictures, and outside `https:` pictures in Look-only mode; CDN scripts, a storage stand-in, and scripts after content in Run-scripts mode). Image bytes are shown only in the Sandbox and never reach an AI. It never runs imported code in PatchBay's page and makes no AI request. Nothing changes without the existing Approve or an explicit recipe button, and only the practice copy changes.
 
-### F12.1 — Contracts, validators, limits, mock `narrate`
-- Inputs: an AI request or result
-- Outputs: the extended schemas (`level`, `findings`, task `narrate`, answer `narration`, 6 facts) and limits
-- Invariants: `findings` only for `narrate` and each path is selected; a narration answer has exactly one line per finding; chat requests are unchanged; mock output for every earlier input is byte-identical
-- Files: `src/types/contracts.ts`, `src/config/aiLive.ts`, `src/engine/aiValidate.ts`, `src/engine/mockAssistant.ts`, `tests/aiContracts.test.ts`, `tests/aiValidate.test.ts`, `tests/mockAssistant.test.ts`, `tests/aiLiveConfig.test.ts`
-- Depends on: F11.1
-- verify: `npm run typecheck && npx vitest run tests/aiContracts.test.ts tests/aiValidate.test.ts tests/mockAssistant.test.ts tests/aiLiveConfig.test.ts`
+### F12.1 — Dependency, limits, host lists, skills, lesson cards, `Finding` fields
+- Inputs: the vision, requirements R1 to R13
+- Outputs: `acorn` dependency; `checkLimits.ts`; `previewHosts.ts`; 12 scan skills and 12 lesson cards; optional `confidence` and `measure` on `Finding`
+- Invariants: runtime dependencies are exactly `acorn`, `react`, `react-dom`, `zod`; host names exist only in `previewHosts.ts`; one `lesson.<id>` card per skill; text is plain English; limits are provisional
+- Files: `package.json`, `package-lock.json`, `src/config/checkLimits.ts`, `src/config/previewHosts.ts`, `src/config/previewLimits.ts`, `src/skillbook/scanSkills.ts`, `src/skillbook/playbook.ts`, `src/engine/scanFindingTypes.ts`, `tests/checkLimits.test.ts`, `tests/aiStatic.test.ts`, `tests/scanSkills.test.ts`, `tests/lessons.test.ts`
+- Depends on: F6.1, F9.1, F7.1
+- verify: `npm run typecheck && npx vitest run tests/checkLimits.test.ts tests/aiStatic.test.ts tests/scanSkills.test.ts tests/lessons.test.ts`
 
-### F12.2 — Server: prompt, narration answer, cards rule, cache key
-- Inputs: a request with a level or findings
-- Outputs: a prompt with LEVEL and FINDINGS data blocks; a mapped `narration` answer
-- Invariants: findings text and paths sit inside data blocks; a wrong line count, patch, action, or plan for `narrate` is refused; no cards for `narrate`; the cache key holds the level and the ordered findings
-- Files: `src/engine/live/promptBuilder.ts`, `src/engine/live/answerParser.ts`, `src/engine/live/liveAssistant.ts`, `src/engine/aiCache.ts`, `tests/promptBuilder.test.ts`, `tests/answerParser.test.ts`, `tests/liveAssistant.test.ts`, `tests/aiCache.test.ts`
-- Depends on: F12.1, F11.2, F11.3, F11.4, F11.7
-- verify: `npm run typecheck && npx vitest run tests/promptBuilder.test.ts tests/answerParser.test.ts tests/liveAssistant.test.ts tests/aiCache.test.ts`
+### F12.2 — JavaScript syntax check, inline scripts, balance check
+- Inputs: file path and text
+- Outputs: raw findings with line and column; "could not check" when the loader fails
+- Invariants: no `eval` or `new Function`; module then script; inline scripts offset to file lines; template syntax skipped; "may not match", never "valid"; names copied only when safe
+- Files: `src/engine/checks/acornLoader.ts`, `src/engine/checks/jsSyntax.ts`, `src/engine/checks/inlineScripts.ts`, `src/engine/checks/balance.ts`, `tests/acornLoader.test.ts`, `tests/jsSyntax.test.ts`, `tests/inlineScripts.test.ts`, `tests/balance.test.ts`, `tests/helpers/lintFixtures.ts`
+- Depends on: F12.1
+- verify: `npm run typecheck && npx vitest run tests/acornLoader.test.ts tests/jsSyntax.test.ts tests/inlineScripts.test.ts tests/balance.test.ts`
 
-### F12.3 — Context Engine additions, request builders, level note
-- Inputs: a lesson, a flow, a finding, or a findings list, the level, the switch
-- Outputs: a validated `AIRequest`; a soft note
-- Invariants: code lines only with the switch and never for narration; up to 6 facts for a flow, 3 for a finding; at most 8 findings; fixed instruction texts; the note never causes a retry
-- Files: `src/engine/contextEngine.ts`, `src/engine/explainRequests.ts`, `src/engine/levelNote.ts`, `tests/contextEngine.test.ts`, `tests/explainRequests.test.ts`, `tests/levelNote.test.ts`
-- Depends on: F12.1, F11.6, F9.1
-- verify: `npm run typecheck && npx vitest run tests/contextEngine.test.ts tests/explainRequests.test.ts tests/levelNote.test.ts`
+### F12.3 — HTML structure check and CSS check
+- Inputs: file path and text, an optional CSS probe
+- Outputs: raw findings (tags, repeated ids, missing attributes, braces, "Possible invalid CSS")
+- Invariants: optional closing tags never reported; template files skipped; no probe means "not checked", never "fine"; the probe type has no network or document access
+- Files: `src/engine/checks/htmlStructure.ts`, `src/engine/checks/cssCheck.ts`, `src/engine/checks/cssProbe.ts`, `tests/htmlStructure.test.ts`, `tests/cssCheck.test.ts`, `tests/helpers/fakeCssProbe.ts`
+- Depends on: F12.1, F7.2
+- verify: `npm run typecheck && npx vitest run tests/htmlStructure.test.ts tests/cssCheck.test.ts`
 
-### F12.4 — Controller `sendBuilt`, origin, explain store, `heldOrigin`
-- Inputs: a built request and its origin
-- Outputs: AI slice and explain store changes, Log lines
-- Invariants: one request at a time across chat and 3B; a held request never fires late; the explain store is memory only with at most 12 entries; answers end on a snapshot change, a practice change, reset, and a mode change; AI Chat shows only chat results
-- Files: `src/store/explainStore.ts`, `src/store/aiSlice.ts`, `src/store/aiActions.ts`, `src/hooks/useAssistant.ts`, `src/components/AIAssistantPanel.tsx`, `tests/explainStore.test.ts`, `tests/useAssistant.test.ts`, `tests/aiState.test.ts`, `tests/aiPanelLive.test.tsx`
-- Depends on: F12.1, F12.3, F11.8
-- verify: `npm run typecheck && npx vitest run tests/explainStore.test.ts tests/useAssistant.test.ts tests/aiState.test.ts tests/aiPanelLive.test.tsx`
+### F12.4 — Wire the code checks into the scan; browser CSS probe; coverage; samples
+- Inputs: loaded files, the analysis, the probe
+- Outputs: new findings in the scan result; coverage counts for not-checked files
+- Invariants: checks run by extension whatever the label; a loader or probe failure is shown as not checked; the three bundled samples show no unexplained new finding; `CSSStyleSheet` appears only in `cssProbeBrowser.ts`
+- Files: `src/engine/checks/index.ts`, `src/engine/checks/cssProbeBrowser.ts`, `src/engine/scanProject.ts`, `src/engine/scanView.ts`, `src/main.tsx`, `tests/codeChecksScan.test.ts`, `tests/scanProject.test.ts`, `tests/scanSamples.test.ts`, `tests/scanController.test.ts`, `tests/screen5Scan.test.ts`
+- Depends on: F12.2, F12.3, F6.5
+- verify: `npm run typecheck && npx vitest run tests/codeChecksScan.test.ts tests/scanProject.test.ts tests/scanSamples.test.ts tests/scanController.test.ts tests/screen5Scan.test.ts`
 
-### F12.5 — The explainer, availability, and the chat prefill
-- Inputs: button presses and the current state
-- Outputs: requests sent through `sendBuilt`; a prefill for AI Chat
-- Invariants: the hand-off sends nothing and carries the finding id; the prefill is taken once; availability texts are fixed; narration is one request
-- Files: `src/hooks/useExplainer.ts`, `src/store/chatPrefill.ts`, `src/engine/aiNotes.ts`, `tests/explainer.test.ts`, `tests/chatPrefill.test.ts`, `tests/aiNotes.test.ts`
-- Depends on: F12.3, F12.4
-- verify: `npm run typecheck && npx vitest run tests/explainer.test.ts tests/chatPrefill.test.ts tests/aiNotes.test.ts`
+### F12.5 — Candidate-and-verify syntax fix
+- Inputs: a finding and the file text
+- Outputs: a small diff through the existing Approve path, or a plain refusal
+- Invariants: exactly one passing candidate; at most 8 characters; no fix at the end of a file; no fix on a secret line; diff at most 2,000 characters; reverses exactly; a later mistake of the same skill is not damage
+- Files: `src/engine/checks/syntaxFix.ts`, `src/engine/scanFix.ts`, `tests/syntaxFix.test.ts`, `tests/scanFix.test.ts`, `tests/syntaxFixFlow.test.ts`
+- Depends on: F12.2, F12.3, F12.4, F6.3, F4.4
+- verify: `npm run typecheck && npx vitest run tests/syntaxFix.test.ts tests/scanFix.test.ts tests/syntaxFixFlow.test.ts tests/workActions.test.ts`
 
-### F12.6 — The components
-- Inputs: an explainer binding and its state
-- Outputs: the block, switch, notice, and narration bar
-- Invariants: props only; all AI text is React text; the heading says the AI text is not part of the lesson; no color or motion; buttons at least 44 px
-- Files: `src/components/AIExplainBlock.tsx`, `src/components/ExplainSwitch.tsx`, `src/components/ExplainNotice.tsx`, `src/components/AINarrationBar.tsx`, `tests/explainUi.test.tsx`
-- Depends on: F12.5, F11.10
-- verify: `npm run typecheck && npx vitest run tests/explainUi.test.tsx`
+### F12.6 — Look-only sandbox: host matching, CSP, outside styles, blocked list
+- Inputs: the page source, the host lists
+- Outputs: the preview document with allowed outside style links; the CSP; the blocked-resources list
+- Invariants: exact `https:` host match only; `img-src` stays `data:` until F12.9; no script in Look-only mode; sandbox flags and `referrerPolicy` unchanged; `@import` and non-data `url()` in the page's own CSS stay removed
+- Files: `src/preview/hostMatch.ts`, `src/preview/blockedReport.ts`, `src/preview/previewFlags.ts`, `src/preview/previewDocument.ts`, `src/components/BlockedList.tsx`, `tests/hostMatch.test.ts`, `tests/previewHosts.test.ts`, `tests/blockedReport.test.ts`, `tests/previewDocument.test.ts`, `tests/previewHostile.test.ts`, `tests/sandboxUi.test.tsx`
+- Depends on: F12.1, F7.3
+- verify: `npm run typecheck && npx vitest run tests/hostMatch.test.ts tests/previewHosts.test.ts tests/blockedReport.test.ts tests/previewDocument.test.ts tests/previewHostile.test.ts tests/sandboxUi.test.tsx`
 
-### F12.7 — Wiring Journal, Screens 4 and 5, App, and the prefill
-- Inputs: the explainer
-- Outputs: buttons and blocks on the Journal and the crew screens; AI Chat prefilled by the hand-off
-- Invariants: the `explain` prop is optional and screens without it render as before; the fixed text is untouched and first; the notice appears in one place; leaving a screen drops a held request
-- Files: `src/components/LessonsSection.tsx`, `src/components/FlowsSection.tsx`, `src/components/JournalPanel.tsx`, `src/components/FindingDetail.tsx`, `src/components/DomainScreen.tsx`, `src/components/SkeletonCrewScreen.tsx`, `src/components/CrewNarration.tsx`, `src/components/StudioLayout.tsx`, `src/components/AIAssistantPanel.tsx`, `src/App.tsx`, `src/styles.css`, `tests/explainUi.test.tsx`, `tests/journalUi.test.tsx`, `tests/crewUi.test.tsx`
-- Depends on: F12.6, F9.9, F6.10
-- verify: `npm run typecheck && npx vitest run && npm run build`
+### F12.7 — Run-scripts sandbox: script order, CDN scripts, storage stand-in
+- Inputs: the page source, the script host list
+- Outputs: the Run-scripts document with ordered scripts and the storage stand-in
+- Invariants: opaque origin (no `allow-same-origin`) with scripts; `connect-src 'none'`; inspector, stand-in, content, then project scripts; module scripts with `import` or `export` listed as blocked; the stand-in text is a fixed constant
+- Files: `src/preview/previewDocument.ts`, `src/preview/previewFlags.ts`, `src/preview/storageShim.ts`, `tests/storageShim.test.ts`, `tests/scriptOrder.test.ts`, `tests/previewDocument.test.ts`, `tests/previewHostile.test.ts`, `tests/previewHosts.test.ts`
+- Depends on: F12.6, F7.3, F7.6
+- verify: `npm run typecheck && npx vitest run tests/storageShim.test.ts tests/scriptOrder.test.ts tests/previewDocument.test.ts tests/previewHostile.test.ts tests/previewHosts.test.ts`
 
-### F12.8 — Privacy, injection, static, and exit-gate tests
-- Inputs: the whole app at store level with fakes
+### F12.8 — Image loader: contracts, caps, signature check, reference finder, loading pass, coverage
+- Inputs: loaded HTML and CSS text, the tree sizes, the raw host
+- Outputs: an optional `media` list in the snapshot; four policy reason codes; coverage numbers for pictures
+- Invariants: types are png, jpg, jpeg, webp, gif, ico only; at most 150 KB per image, 1 MB in all, 30 images; an over-size image is never downloaded; the signature must match the type; only referenced, in-scope images load; bytes live only in `media` and never reach files, scan, Journal, AI, exports, Log, storage, or errors; snapshots without `media` still validate
+- Files: `src/types/contracts.ts`, `src/config/budgets.ts`, `src/engine/imageSniff.ts`, `src/engine/mediaRefs.ts`, `src/engine/mediaLoader.ts`, `src/engine/githubSource.ts`, `src/engine/ingestPipeline.ts`, `src/engine/fileSelector.ts`, `src/components/CoveragePanel.tsx`, `tests/imageSniff.test.ts`, `tests/mediaRefs.test.ts`, `tests/mediaLoader.test.ts`, `tests/contracts.test.ts`, `tests/githubSource.test.ts`, `tests/ingestPipeline.test.ts`, `tests/repoApi.test.ts`, `tests/helpers/tinyImages.ts`
+- Depends on: F12.1, F1.1, F1.3, F1.4
+- verify: `npm run typecheck && npx vitest run tests/imageSniff.test.ts tests/mediaRefs.test.ts tests/mediaLoader.test.ts tests/contracts.test.ts tests/githubSource.test.ts tests/ingestPipeline.test.ts tests/repoApi.test.ts`
+
+### F12.9 — Images in the preview: local embed, outside `https:` images, `img-src`, document limits
+- Inputs: the snapshot `media` list, the page source
+- Outputs: pictures shown in the Sandbox; labelled placeholders for the rest
+- Invariants: local pictures only as `data:` addresses after a signature re-check; outside pictures only for `https:` addresses with no user name, port, IP address, local-looking name, or `srcset`; `img-src` is exactly `data: https:`; no other CSP directive changes; embedded pictures at most 2 MB per document counting repeats; document limit 3 MB; sandbox flags and `referrerPolicy` unchanged
+- Files: `src/preview/previewDocument.ts`, `src/preview/previewFlags.ts`, `src/preview/hostMatch.ts`, `src/preview/blockedReport.ts`, `src/components/SandboxPanel.tsx`, `src/components/BlockedList.tsx`, `tests/previewImages.test.ts`, `tests/imageHost.test.ts`, `tests/previewDocument.test.ts`, `tests/previewHostile.test.ts`, `tests/previewHosts.test.ts`, `tests/sandboxUi.test.tsx`
+- Depends on: F12.6, F12.7, F12.8, F7.3
+- verify: `npm run typecheck && npx vitest run tests/previewImages.test.ts tests/imageHost.test.ts tests/previewDocument.test.ts tests/previewHostile.test.ts tests/previewHosts.test.ts tests/sandboxUi.test.tsx`
+
+### F12.10 — Colours, the pure Visual Linter, real picture measuring, picture-size check, findings
+- Inputs: plain-data measurements, page elements, source text
+- Outputs: measured findings with confidence and number; "can't measure" counts
+- Invariants: overlap never `high` and skips hidden, `fixed`, `sticky`, `absolute`, and parent-child pairs; contrast only on solid backgrounds; tap and small-text checks only up to 768 px; findings hold fixed words and numbers only; caps 25 per kind and 100 in all
+- Files: `src/preview/colors.ts`, `src/preview/linter.ts`, `src/preview/linterFindings.ts`, `src/preview/mediaSize.ts`, `src/preview/layoutCheck.ts`, `tests/colors.test.ts`, `tests/linter.test.ts`, `tests/linterOverlap.test.ts`, `tests/linterFindings.test.ts`, `tests/mediaSize.test.ts`, `tests/previewModules.test.ts`
+- Depends on: F12.1, F7.7
+- verify: `npm run typecheck && npx vitest run tests/colors.test.ts tests/linter.test.ts tests/linterOverlap.test.ts tests/linterFindings.test.ts tests/mediaSize.test.ts tests/previewModules.test.ts`
+
+### F12.11 — Browser measurement reader, Full check, store, summary UI
+- Inputs: the live preview frame
+- Outputs: the extended measurements; the three-width Full check; the summary, blocked list, and labels in the panels
+- Invariants: the reader returns plain data and holds no thresholds; waits for fonts at most 1,500 ms; restores the frame width in `finally`; findings are never saved; "static render (scripts off)" is always shown with measured results; no "no problems" line for an unfinished check
+- Files: `src/preview/previewDom.ts`, `src/hooks/usePreview.ts`, `src/store/previewSlice.ts`, `src/store/previewActions.ts`, `src/components/LintSummary.tsx`, `src/components/SandboxPanel.tsx`, `src/components/EditPanel.tsx`, `src/components/FindingDetail.tsx`, `src/components/FindingsTable.tsx`, `src/styles.css`, `tests/previewController.test.ts`, `tests/lintSummaryUi.test.tsx`, `tests/sandboxUi.test.tsx`
+- Depends on: F12.6, F12.9, F12.10, F7.9
+- verify: `npm run typecheck && npx vitest run tests/previewController.test.ts tests/lintSummaryUi.test.tsx tests/sandboxUi.test.tsx tests/editController.test.ts && npm run build`
+
+### F12.12 — Recipes with re-measure and automatic undo
+- Inputs: a measured finding, the element table, the practice copy
+- Outputs: a History change kept only when verified, or undone with a plain reason
+- Invariants: only mapped plain `.html` elements; fixed validated declarations; kept only if the target is gone at all three widths and nothing new appeared; undone on regression, timeout, stop, or changed page; never undoes another History entry; Log lines hold numbers only; nothing applies until the button is pressed
+- Files: `src/preview/recipes.ts`, `src/edit/styleModel.ts`, `src/hooks/useRecipe.ts`, `src/store/previewSlice.ts`, `src/store/previewActions.ts`, `src/components/EditPanel.tsx`, `src/components/SandboxPanel.tsx`, `tests/recipes.test.ts`, `tests/recipeController.test.ts`, `tests/styleModel.test.ts`, `tests/editPad.test.ts`
+- Depends on: F12.10, F12.11, F8.1, F8.2, F4.4
+- verify: `npm run typecheck && npx vitest run tests/recipes.test.ts tests/recipeController.test.ts tests/styleModel.test.ts tests/editPad.test.ts tests/workState.test.ts`
+
+### F12.13 — Privacy, static, hostile-input, and exit-gate tests
+- Inputs: the whole 3B-1 feature at store level with fakes
 - Outputs: the proofs
-- Invariants: no AI text in the Log, storage, errors, or any download (downloads byte-identical); injection changes nothing; the 3B and 3A gates pass with fake providers
-- Files: `tests/phase3bPrivacy.test.ts`, `tests/phase3bInjection.test.ts`, `tests/phase3bStatic.test.ts`, `tests/phase3bGate.test.ts`, `tests/helpers/aiHarness.ts`
-- Depends on: F12.1 to F12.7
-- verify: `npm run typecheck && npx vitest run tests/phase3bPrivacy.test.ts tests/phase3bInjection.test.ts tests/phase3bStatic.test.ts tests/phase3bGate.test.ts`
+- Invariants: sentinels (including bytes inside images) never reach the Log, storage, errors, findings, the blocked list, or any AI request; no `eval`, network call, or `engine/live` import in checks or preview code; hostile inputs finish within limits; the three gate scenarios pass
+- Files: `tests/checksPrivacy.test.ts`, `tests/checksStatic.test.ts`, `tests/checksHostile.test.ts`, `tests/imagePrivacy.test.ts`, `tests/phase3b1Gate.test.ts`, `tests/helpers/lintHarness.ts`
+- Depends on: F12.1 to F12.12
+- verify: `npm run typecheck && npx vitest run tests/checksPrivacy.test.ts tests/checksStatic.test.ts tests/checksHostile.test.ts tests/imagePrivacy.test.ts tests/phase3b1Gate.test.ts`
 
 ### F12 gate
-- verify: `npm run typecheck && npx vitest run && npm run build`
-- 3B gate (build-phases.md): all 3A gates pass again; the same privacy rules hold; no AI text in any download
-- manual gate (Unverified until run): the browser run with a fake provider server, and your own real-key check (design section 13)
+- verify: `npm run typecheck && npx vitest run && npm run build && npm audit`
+- 3B-1 gate (build-phases.md, 3B block): all Phase 2 and 3A tests pass again; the same privacy rules hold; the three bundled samples show no unexplained new finding; every recipe is kept only when re-measured clean
+- manual gate (Unverified until run): the headless-browser run (design 11), the mutation checks (design 12), and the independent review; real CDN hosts are **Unverified** (the browser run uses stand-ins)
+
+### F12 as built (3B-1)
+Deviations from the spec text (details in `PHASE_3B1_REPORT.md`):
+- Baseline was 113 files / 2,119 tests (follow-up tests were added after the 3A report said 2,105).
+- Skipped code checks are reported in a new optional `coverage.codeNotChecked` (by reason), not in `couldNotCheck`, so existing coverage tests and `partial` are unchanged. Reasons include `jsx` (React code in a `.js` file).
+- JavaScript auto-fix is stricter than "first error gone": a candidate must make the WHOLE file parse cleanly; end-of-file errors are never auto-fixed.
+- Skill ids use `scan.frontend.*`. 29 skills, 42 cards.
+- Findings carry `measure.info.{tag,col}`; recipes pick the element by tag and column (several elements can start on one line). Overflow findings gained `confidence: 'high'`.
+- "Check at all widths" label kept (existing test); `blockedExternal` kept; extra block reasons `local_missing` and `picture_*`.
+- One decision point for "another change was made" in the recipe controller (`undo()` refuses with a plain message).
+- The referrer wording is exact: "PatchBay's address is not sent as a referrer"; a font requested by an allowed style sheet carries that style sheet's host.
+- Two layers (IPv4 rule, last-label letters rule) both reject numeric hosts; mutation checks remove both together.
+- Independent review fixes: JSX in `.js` is "not checked", `}` no longer starts a regex guess, linked pictures measure the nearest boxed ancestor, CSS line numbers after a cut-short string.

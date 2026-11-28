@@ -374,3 +374,63 @@ export async function fetchFileCapped(
     if (onAbort) g.signal.removeEventListener('abort', onAbort);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Picture bytes (3B-1): the same host checks as `fetchFileCapped`, raw bytes out, capped.
+// ---------------------------------------------------------------------------
+
+export interface BytesResult {
+  bytes: Uint8Array;
+  /** True when the file was longer than the cap (only the first `maxBytes` bytes are kept). */
+  truncated: boolean;
+}
+
+/** Fetches one file from the raw host and keeps at most `maxBytes`. Reading stops one byte past the cap. */
+export async function fetchBytesCapped(
+  owner: string,
+  repo: string,
+  ref: string,
+  path: string,
+  maxBytes: number,
+  deps: SourceDeps,
+): Promise<BytesResult> {
+  assertNoTraversal('file path', path);
+  assertNoTraversal('reference', ref);
+  const url = rawUrl(owner, repo, ref, path);
+  assertAllowedHost(url);
+  const g = guard(deps);
+  const now = deps.now ?? Date.now;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(g.signal.reason);
+    if (g.signal.aborted) onAbort();
+    else g.signal.addEventListener('abort', onAbort, { once: true });
+  });
+  aborted.catch(() => undefined);
+  try {
+    const response = await deps.fetch(url, { signal: g.signal });
+    assertFinalHost(response);
+    if (!response.ok) throw errorForStatus(response, now, `The file "${path}"`);
+    if (!response.body) return { bytes: new Uint8Array(0), truncated: false };
+    reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    let sawMore = false;
+    while (total <= maxBytes) {
+      const { done, value } = await Promise.race([reader.read(), aborted]);
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+      if (total > maxBytes) sawMore = true;
+    }
+    if (sawMore) void reader.cancel().catch(() => undefined);
+    const all = concat(chunks, total);
+    return { bytes: sawMore ? all.subarray(0, maxBytes) : all, truncated: sawMore };
+  } catch (error) {
+    if (reader) void reader.cancel().catch(() => undefined);
+    throw g.translate(error);
+  } finally {
+    if (onAbort) g.signal.removeEventListener('abort', onAbort);
+  }
+}

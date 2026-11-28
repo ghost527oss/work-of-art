@@ -10,6 +10,7 @@ import {
   type RepoFile,
   type RepoInventory,
   type RepoInventoryEntry,
+  type RepoMedia,
 } from '../types/contracts';
 
 // ---------------------------------------------------------------------------
@@ -331,6 +332,7 @@ export function computeCoverage(
   inventory: RepoInventory,
   files: readonly RepoFile[],
   extraWarnings: readonly string[] = [],
+  media: readonly RepoMedia[] = [],
 ): RepoCoverage {
   let loaded = 0;
   let truncated = 0;
@@ -395,5 +397,6 @@ export function computeCoverage(
     warnings: [...inventory.treeWarnings, ...extraWarnings],
     treeComplete: inventory.treeComplete,
     sourceAnalysisComplete,
+    ...(media.length > 0 ? { loadedMediaFiles: media.length, loadedMediaBytes: media.reduce((n, m) => n + m.bytes, 0) } : {}),
   };
 }
